@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة الإدارة - زكريا بروم</title>
+  <link rel="icon" href="/favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <svg viewBox="0 0 60 60" width="60" height="60">
+          <rect width="60" height="60" rx="12" fill="#0d7377"/>
+          <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="22" font-weight="bold" font-family="Tajawal">ZA</text>
+        </svg>
+        <h1>لوحة الإدارة</h1>
+        <p>زكريا بروم - منتجات الدعاية والإعلان</p>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label>اسم المستخدم</label>
+          <input type="text" id="loginUsername" placeholder="admin" required>
+        </div>
+        <div class="form-group">
+          <label>كلمة المرور</label>
+          <input type="password" id="loginPassword" required>
+        </div>
+        <button type="submit" class="btn-primary btn-full">تسجيل الدخول</button>
+        <p id="loginError" class="error-msg" style="display:none;"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div id="adminPanel" class="admin-panel" style="display:none;">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <svg viewBox="0 0 60 60" width="36" height="36">
+          <rect width="60" height="60" rx="12" fill="#0d7377"/>
+          <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="22" font-weight="bold" font-family="Tajawal">ZA</text>
+        </svg>
+        <span>زكريا بروم</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-section="dashboard"><i class="fas fa-chart-line"></i> لوحة المعلومات</a>
+        <a href="#" class="nav-item" data-section="orders"><i class="fas fa-shopping-bag"></i> الطلبات <span class="badge" id="ordersBadge"></span></a>
+        <a href="#" class="nav-item" data-section="products"><i class="fas fa-box"></i> المنتجات</a>
+        <a href="#" class="nav-item" data-section="categories"><i class="fas fa-tags"></i> الفئات</a>
+        <a href="#" class="nav-item" data-section="translations"><i class="fas fa-language"></i> الترجمات</a>
+        <a href="#" class="nav-item" data-section="users"><i class="fas fa-users"></i> العملاء</a>
+        <a href="#" class="nav-item" data-section="coupons"><i class="fas fa-ticket-alt"></i> كوبونات</a>
+        <a href="#" class="nav-item" data-section="posts"><i class="fas fa-newspaper"></i> المدونة</a>
+        <a href="#" class="nav-item" data-section="chatbot"><i class="fas fa-robot"></i> الشات بوت</a>
+        <a href="#" class="nav-item" data-section="analytics"><i class="fas fa-chart-bar"></i> الإحصائيات</a>
+        <a href="#" class="nav-item" data-section="settings"><i class="fas fa-cog"></i> الإعدادات</a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/" target="_blank"><i class="fas fa-external-link-alt"></i> عرض الموقع</a>
+        <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="top-bar">
+        <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+        <h2 id="pageTitle">لوحة المعلومات</h2>
+        <div class="top-bar-actions">
+          <span id="adminName">المدير</span>
+        </div>
+      </header>
+
+      <div class="content-area" id="contentArea">
+        <!-- Dynamic content loaded here -->
+      </div>
+    </main>
+  </div>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

@@ -258,6 +258,84 @@ router.get('/products', adminAuth, async (req, res) => {
   }
 });
 
+// GET /products/:id - get single product details
+router.get('/products/:id', adminAuth, async (req, res) => {
+  try {
+    const products = await fetchAndParseProducts();
+    const product = products.find(p => p.id === req.params.id || p.model === req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    
+    // Check for name overrides
+    const db = getDb();
+    const overrides = db.prepare("SELECT lang, translation FROM translation_overrides WHERE type = 'product' AND original_key = ?").all(product.model);
+    if (overrides.length > 0) {
+      overrides.forEach(o => { product.name[o.lang] = o.translation; });
+    }
+    
+    res.json({ product });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /products/:id - update product name translations
+router.put('/products/:id', adminAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const { name_tr, name_ar, name_en, price } = req.body;
+    const products = await fetchAndParseProducts();
+    const product = products.find(p => p.id === req.params.id || p.model === req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    
+    const model = product.model;
+    // Save Arabic override
+    if (name_ar) {
+      db.prepare(`
+        INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+        VALUES ('product', ?, 'ar', ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+      `).run(model, name_ar, name_ar);
+    }
+    // Save English override
+    if (name_en) {
+      db.prepare(`
+        INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+        VALUES ('product', ?, 'en', ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+      `).run(model, name_en, name_en);
+    }
+    // Save Turkish override (only if different from original)
+    if (name_tr && name_tr !== product.name.tr) {
+      db.prepare(`
+        INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+        VALUES ('product', ?, 'tr', ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+      `).run(model, name_tr, name_tr);
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /products/:id/visibility - toggle product visibility
+router.put('/products/:id/visibility', adminAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const { hidden } = req.body;
+    const productId = req.params.id;
+    if (hidden) {
+      db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(productId);
+    } else {
+      db.prepare('DELETE FROM hidden_products WHERE product_id = ?').run(productId);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== CATEGORIES MANAGEMENT =====
 router.get('/categories', adminAuth, async (req, res) => {
   try {

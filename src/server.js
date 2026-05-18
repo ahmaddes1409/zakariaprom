@@ -63,7 +63,7 @@ async function startServer() {
       const hiddenCategories = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
       products = products.filter(p => !p.categories.tr.some(c => hiddenCategories.includes(c.split(' > ')[0])));
 
-      // Apply translation overrides
+      // Apply product name translation overrides (keyed by model)
       const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'product'").all();
       if (overrides.length > 0) {
         const overrideMap = {};
@@ -72,8 +72,8 @@ async function startServer() {
           overrideMap[o.original_key][o.lang] = o.translation;
         });
         products = products.map(p => {
-          if (overrideMap[p.id]) {
-            return { ...p, name: { ...p.name, ...overrideMap[p.id] } };
+          if (overrideMap[p.model]) {
+            return { ...p, name: { ...p.name, ...overrideMap[p.model] } };
           }
           return p;
         });

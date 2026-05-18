@@ -154,6 +154,50 @@ router.put('/translations', adminAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// GET /translations/products - paginated product translations with search
+router.get('/translations/products', adminAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const { page = 1, limit = 20, search = '' } = req.query;
+    let products = await fetchAndParseProducts();
+    
+    // Apply search filter
+    if (search) {
+      const q = search.toLowerCase();
+      products = products.filter(p => 
+        (p.name?.tr || '').toLowerCase().includes(q) ||
+        (p.name?.ar || '').toLowerCase().includes(q) ||
+        (p.name?.en || '').toLowerCase().includes(q) ||
+        (p.model || '').toLowerCase().includes(q)
+      );
+    }
+    
+    const total = products.length;
+    const totalPages = Math.ceil(total / parseInt(limit));
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const paginated = products.slice(offset, offset + parseInt(limit));
+    
+    // Get product name overrides
+    const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'product'").all();
+    const overrideMap = {};
+    overrides.forEach(o => {
+      if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
+      overrideMap[o.original_key][o.lang] = o.translation;
+    });
+    
+    const result = paginated.map(p => ({
+      model: p.model,
+      tr: p.name?.tr || '',
+      ar: overrideMap[p.model]?.ar || p.name?.ar || '',
+      en: overrideMap[p.model]?.en || p.name?.en || ''
+    }));
+    
+    res.json({ products: result, total, totalPages });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /translations/:type/:key - get current translation for a specific item
 router.get('/translations/:type/:key', adminAuth, (req, res) => {
   const db = getDb();

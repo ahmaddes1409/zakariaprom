@@ -403,11 +403,54 @@ async function renderTranslations() {
             </tbody>
           </table>
         </div>
+            </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>ترجمات المنتجات</h3>
+        <input id="productTransSearch" type="text" placeholder="ابحث عن منتج..." style="padding:6px 12px;border:1px solid #ddd;border-radius:6px;width:200px;" onkeyup="searchProductTranslations()">
+      </div>
+      <div class="card-body">
+        <div id="productTransList">جاري التحميل...</div>
+        <div id="productTransPagination" style="margin-top:12px;display:flex;gap:8px;justify-content:center;"></div>
       </div>
     </div>
   `;
+  loadProductTranslations(1);
 }
-
+let productTransPage = 1;
+async function loadProductTranslations(page) {
+  productTransPage = page;
+  const search = document.getElementById('productTransSearch')?.value || '';
+  const data = await api(`/api/admin/translations/products?page=${page}&limit=20&search=${encodeURIComponent(search)}`);
+  const products = data?.products || [];
+  const total = data?.total || 0;
+  const totalPages = data?.totalPages || 1;
+  const listEl = document.getElementById('productTransList');
+  if (!products.length) { listEl.innerHTML = '<p style="color:#888;">لا توجد منتجات</p>'; return; }
+  listEl.innerHTML = `<div class="table-responsive"><table>
+    <thead><tr><th>الموديل</th><th>تركي</th><th>عربي</th><th>إنجليزي</th><th>إجراءات</th></tr></thead>
+    <tbody>${products.map(p => `
+      <tr><td style="font-size:11px;color:#666;">${p.model}</td><td>${p.tr}</td><td>${p.ar}</td><td>${p.en}</td>
+      <td><button class="btn-secondary btn-sm" onclick="editTranslation('product','${encodeURIComponent(p.model)}')">تعديل</button></td></tr>`).join('')}
+    </tbody>
+  </table></div>`;
+  // Pagination
+  const pagEl = document.getElementById('productTransPagination');
+  if (totalPages > 1) {
+    let btns = '';
+    if (page > 1) btns += `<button class="btn-secondary btn-sm" onclick="loadProductTranslations(${page-1})">السابق</button>`;
+    btns += `<span style="padding:4px 8px;">${page} / ${totalPages}</span>`;
+    if (page < totalPages) btns += `<button class="btn-secondary btn-sm" onclick="loadProductTranslations(${page+1})">التالي</button>`;
+    pagEl.innerHTML = btns;
+  } else { pagEl.innerHTML = ''; }
+}
+window.loadProductTranslations = loadProductTranslations;
+let searchTimeout;
+function searchProductTranslations() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => loadProductTranslations(1), 300);
+}
+window.searchProductTranslations = searchProductTranslations;
 window.editTranslation = async function(type, key) {
   const k = decodeURIComponent(key);
   showModal('تعديل الترجمة', `

@@ -121,12 +121,12 @@ async function renderDashboard() {
   const area = document.getElementById('contentArea');
   area.innerHTML = `
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-box"></i></div><div class="stat-info"><h3>${data.products || 0}</h3><p>منتج</p></div></div>
-      <div class="stat-card"><div class="stat-icon green"><i class="fas fa-tags"></i></div><div class="stat-info"><h3>${data.categories || 0}</h3><p>فئة</p></div></div>
-      <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-shopping-bag"></i></div><div class="stat-info"><h3>${data.orders || 0}</h3><p>طلب</p></div></div>
-      <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-users"></i></div><div class="stat-info"><h3>${data.users || 0}</h3><p>عميل مسجل</p></div></div>
-      <div class="stat-card"><div class="stat-icon teal"><i class="fas fa-sync"></i></div><div class="stat-info"><h3>${data.lastSync || 'لم يتم'}</h3><p>آخر مزامنة XML</p></div></div>
-      <div class="stat-card"><div class="stat-icon red"><i class="fas fa-clock"></i></div><div class="stat-info"><h3>${data.pendingOrders || 0}</h3><p>طلب بانتظار الرد</p></div></div>
+      <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-box"></i></div><div class="stat-info"><h3>${data.stats?.totalProducts || 0}</h3><p>منتج</p></div></div>
+      <div class="stat-card"><div class="stat-icon green"><i class="fas fa-tags"></i></div><div class="stat-info"><h3>${data.stats?.totalCategories || 0}</h3><p>فئة</p></div></div>
+      <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-shopping-bag"></i></div><div class="stat-info"><h3>${data.stats?.totalOrders || 0}</h3><p>طلب</p></div></div>
+      <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-users"></i></div><div class="stat-info"><h3>${data.stats?.totalUsers || 0}</h3><p>عميل مسجل</p></div></div>
+      <div class="stat-card"><div class="stat-icon teal"><i class="fas fa-sync"></i></div><div class="stat-info"><h3>${data.stats?.totalVisits || 0}</h3><p>زيارة (30 يوم)</p></div></div>
+      <div class="stat-card"><div class="stat-icon red"><i class="fas fa-clock"></i></div><div class="stat-info"><h3>${data.stats?.newOrders || 0}</h3><p>طلب جديد</p></div></div>
     </div>
     <div class="card">
       <div class="card-header"><h3>آخر الطلبات</h3></div>
@@ -349,6 +349,8 @@ window.editCategory = async function(catTr) {
       <div class="form-group"><label>الاسم (تركي)</label><input id="ecTr" value="${c.tr || cat}" readonly style="background:#f0f4f8;"></div>
       <div class="form-group"><label>الاسم (عربي)</label><input id="ecAr" value="${c.ar || ''}"></div>
       <div class="form-group"><label>الاسم (إنجليزي)</label><input id="ecEn" value="${c.en || ''}"></div>
+      <div class="form-group"><label>رابط صورة الفئة</label><input id="ecImage" value="${c.image || ''}" placeholder="https://..."></div>
+      ${c.image ? '<div style="margin-bottom:12px;"><img src="' + c.image + '" style="max-width:200px;border-radius:8px;"></div>' : ''}
       <div class="form-group"><label>إخفاء الفئة</label><label class="toggle"><input type="checkbox" id="ecHidden" ${c.hidden ? 'checked' : ''}><span class="toggle-slider"></span></label></div>
       <button type="submit" class="btn-primary">حفظ</button>
     </form>
@@ -359,6 +361,7 @@ window.editCategory = async function(catTr) {
       category_tr: cat,
       ar: document.getElementById('ecAr').value,
       en: document.getElementById('ecEn').value,
+      image: document.getElementById('ecImage').value,
       hidden: document.getElementById('ecHidden').checked
     }});
     toast('تم حفظ التعديلات');
@@ -486,7 +489,7 @@ async function renderUsers() {
 async function renderCoupons() {
   const data = await api('/api/admin/coupons');
   const area = document.getElementById('contentArea');
-  const coupons = data?.coupons || [];
+  const coupons = Array.isArray(data) ? data : (data?.coupons || []);
   area.innerHTML = `
     <div class="filters-bar">
       <button class="btn-primary" onclick="addCoupon()"><i class="fas fa-plus"></i> إضافة كوبون</button>
@@ -496,8 +499,8 @@ async function renderCoupons() {
         <table>
           <thead><tr><th>الكود</th><th>النوع</th><th>القيمة</th><th>الحد الأدنى</th><th>الاستخدام</th><th>الصلاحية</th><th>الحالة</th><th>إجراءات</th></tr></thead>
           <tbody>${coupons.length ? coupons.map(c => `
-            <tr><td><strong>${c.code}</strong></td><td>${c.type === 'percentage' ? 'نسبة %' : 'مبلغ ثابت'}</td>
-            <td>${c.value}${c.type === 'percentage' ? '%' : ' TL'}</td>
+            <tr><td><strong>${c.code}</strong></td><td>${c.discount_type === 'percentage' ? 'نسبة %' : 'مبلغ ثابت'}</td>
+            <td>${c.discount_value}${c.discount_type === 'percentage' ? '%' : ' TL'}</td>
             <td>${c.min_order || '-'}</td><td>${c.used_count}/${c.max_uses || '∞'}</td>
             <td>${c.expires_at ? formatDate(c.expires_at) : 'بدون'}</td>
             <td>${c.active ? '<span class="status status-completed">فعال</span>' : '<span class="status status-cancelled">معطل</span>'}</td>
@@ -549,7 +552,7 @@ window.deleteCoupon = async function(id) {
 async function renderPosts() {
   const data = await api('/api/admin/posts');
   const area = document.getElementById('contentArea');
-  const posts = data?.posts || [];
+  const posts = Array.isArray(data) ? data : (data?.posts || []);
   area.innerHTML = `
     <div class="filters-bar">
       <button class="btn-primary" onclick="addPost()"><i class="fas fa-plus"></i> إضافة مقال</button>
@@ -609,7 +612,7 @@ window.deletePost = async function(id) {
 async function renderChatbot() {
   const data = await api('/api/admin/chatbot');
   const area = document.getElementById('contentArea');
-  const responses = data?.responses || [];
+  const responses = Array.isArray(data) ? data : (data?.responses || []);
   area.innerHTML = `
     <div class="card">
       <div class="card-header"><h3>إعدادات الشات بوت</h3></div>
@@ -695,18 +698,17 @@ async function renderAnalytics() {
 
 // ========== SETTINGS ==========
 async function renderSettings() {
-  const data = await api('/api/admin/settings');
+  const s = await api('/api/admin/settings') || {};
   const area = document.getElementById('contentArea');
-  const s = data?.settings || {};
   area.innerHTML = `
     <div class="settings-grid">
       <div class="card">
         <div class="card-header"><h3>معلومات الشركة</h3></div>
         <div class="card-body">
           <form id="settingsForm">
-            <div class="form-group"><label>اسم الشركة (عربي)</label><input id="sNameAr" value="${s.company_name_ar || 'زكريا بروم'}"></div>
-            <div class="form-group"><label>اسم الشركة (إنجليزي)</label><input id="sNameEn" value="${s.company_name_en || 'Zakaria Prom'}"></div>
-            <div class="form-group"><label>اسم الشركة (تركي)</label><input id="sNameTr" value="${s.company_name_tr || 'Zakaria Prom'}"></div>
+            <div class="form-group"><label>اسم الشركة (عربي)</label><input id="sNameAr" value="${s.site_name_ar || 'زكريا بروم'}"></div>
+            <div class="form-group"><label>اسم الشركة (إنجليزي)</label><input id="sNameEn" value="${s.site_name_en || 'Zakaria Prom'}"></div>
+            <div class="form-group"><label>اسم الشركة (تركي)</label><input id="sNameTr" value="${s.site_name_tr || 'Zakaria Prom'}"></div>
             <div class="form-group"><label>الهاتف</label><input id="sPhone" value="${s.phone || '+905428104208'}"></div>
             <div class="form-group"><label>واتساب</label><input id="sWhatsapp" value="${s.whatsapp || '905428104208'}"></div>
             <div class="form-group"><label>البريد الإلكتروني</label><input id="sEmail" value="${s.email || 'info@zakariaprom.com'}"></div>
@@ -756,9 +758,9 @@ async function renderSettings() {
   document.getElementById('settingsForm').onsubmit = async (e) => {
     e.preventDefault();
     await api('/api/admin/settings', { method: 'PUT', body: {
-      company_name_ar: document.getElementById('sNameAr').value,
-      company_name_en: document.getElementById('sNameEn').value,
-      company_name_tr: document.getElementById('sNameTr').value,
+      site_name_ar: document.getElementById('sNameAr').value,
+      site_name_en: document.getElementById('sNameEn').value,
+      site_name_tr: document.getElementById('sNameTr').value,
       phone: document.getElementById('sPhone').value,
       whatsapp: document.getElementById('sWhatsapp').value,
       email: document.getElementById('sEmail').value,

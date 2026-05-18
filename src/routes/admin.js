@@ -110,7 +110,110 @@ router.post('/products/show', adminAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ===== PRODUCTS LIST (Admin) =====
+router.get('/products', adminAuth, async (req, res) => {
+  try {
+    const { search, page = 1, limit = 20 } = req.query;
+    let products = await fetchAndParseProducts();
+    if (search) {
+      const q = search.toLowerCase();
+      products = products.filter(p => 
+        (p.name?.tr || '').toLowerCase().includes(q) ||
+        (p.name?.ar || '').toLowerCase().includes(q) ||
+        (p.model || '').toLowerCase().includes(q)
+      );
+    }
+    const total = products.length;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedProducts = products.slice(offset, offset + parseInt(limit));
+    res.json({ products: paginatedProducts, total, totalPages: Math.ceil(total / parseInt(limit)) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== CATEGORIES MANAGEMENT =====
+router.get('/categories', adminAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const products = await fetchAndParseProducts();
+    const categories = getCategories(products);
+    const hiddenCats = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
+    const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'category'").all();
+    const overrideMap = {};
+    overrides.forEach(o => {
+      if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
+      overrideMap[o.original_key][o.lang] = o.translation;
+    });
+    // Get category images
+    const images = db.prepare('SELECT * FROM category_images').all();
+    const imageMap = {};
+    images.forEach(i => { imageMap[i.category_name] = i.image_url; });
+    const result = categories.map(cat => ({
+      ...cat,
+      ...(overrideMap[cat.tr] || {}),
+      hidden: hiddenCats.includes(cat.tr),
+      image: imageMap[cat.tr] || ''
+    }));
+    res.json({ categories: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/categories/:name', adminAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const catName = decodeURIComponent(req.params.name);
+    const products = await fetchAndParseProducts();
+    const categories = getCategories(products);
+    const cat = categories.find(c => c.tr === catName);
+    if (!cat) return res.status(404).json({ error: 'Category not found' });
+    const hiddenCats = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
+    const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'category' AND original_key = ?").all(catName);
+    const overrideObj = {};
+    overrides.forEach(o => { overrideObj[o.lang] = o.translation; });
+    const imageRow = db.prepare('SELECT image_url FROM category_images WHERE category_name = ?').get(catName);
+    res.json({ category: { ...cat, ...overrideObj, hidden: hiddenCats.includes(catName), image: imageRow?.image_url || '' } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/categories', adminAuth, (req, res) => {
+  const db = getDb();
+  const { category_tr, ar, en, hidden, image } = req.body;
+  if (!category_tr) return res.status(400).json({ error: 'category_tr required' });
+  // Save translations
+  if (ar) {
+    db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+      VALUES ('category', ?, 'ar', ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP`
+    ).run(category_tr, ar, ar);
+  }
+  if (en) {
+    db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+      VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP`
+    ).run(category_tr, en, en);
+  }
+  // Handle hidden state
+  if (hidden) {
+    db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_tr);
+  } else {
+    db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(category_tr);
+  }
+  // Handle image
+  if (image !== undefined) {
+    if (image) {
+      db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(category_tr, image);
+    } else {
+      db.prepare('DELETE FROM category_images WHERE category_name = ?').run(category_tr);
+    }
+  }
+  res.json({ success: true });
+});
+
 router.get('/categories/hidden', adminAuth, (req, res) => {
   const db = getDb();
   const hidden = db.prepare('SELECT * FROM hidden_categories').all();

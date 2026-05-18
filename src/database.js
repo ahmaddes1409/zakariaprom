@@ -291,6 +291,15 @@ function initializeDatabase() {
     )
   `);
 
+  // Category images table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS category_images (
+      category_name TEXT PRIMARY KEY,
+      image_url TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Coupons table
   db.exec(`
     CREATE TABLE IF NOT EXISTS coupons (

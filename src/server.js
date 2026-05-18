@@ -131,21 +131,22 @@ async function startServer() {
 
       // Apply category translation overrides
       const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'category'").all();
-      if (overrides.length > 0) {
-        const overrideMap = {};
-        overrides.forEach(o => {
-          if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
-          overrideMap[o.original_key][o.lang] = o.translation;
-        });
-        return res.json(categories.map(cat => {
-          if (overrideMap[cat.tr]) {
-            return { ...cat, ...overrideMap[cat.tr] };
-          }
-          return cat;
-        }));
-      }
+      const overrideMap = {};
+      overrides.forEach(o => {
+        if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
+        overrideMap[o.original_key][o.lang] = o.translation;
+      });
 
-      res.json(categories);
+      // Get category images
+      const images = db.prepare('SELECT * FROM category_images').all();
+      const imageMap = {};
+      images.forEach(i => { imageMap[i.category_name] = i.image_url; });
+
+      res.json(categories.map(cat => ({
+        ...cat,
+        ...(overrideMap[cat.tr] || {}),
+        image: imageMap[cat.tr] || ''
+      })));
     } catch (error) {
       console.error('Error fetching categories:', error);
       res.status(500).json({ error: 'Failed to fetch categories' });

@@ -1,21 +1,185 @@
-const Database = require('better-sqlite3');
+const initSqlJs = require('sql.js');
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'zakariaprom.db');
 
 // Ensure data directory exists
-const fs = require('fs');
 const dataDir = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// sql.js wrapper to mimic better-sqlite3 API
+let database = null;
+
+// Save database to file periodically
+function saveDatabase() {
+  if (database) {
+    const data = database.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(DB_PATH, buffer);
+  }
+}
+
+// Auto-save every 30 seconds
+let saveInterval = null;
+
+// Wrapper class to mimic better-sqlite3 API
+class DatabaseWrapper {
+  constructor(sqliteDb) {
+    this.sqliteDb = sqliteDb;
+  }
+
+  prepare(sql) {
+    const self = this;
+    return {
+      get(...params) {
+        try {
+          const stmt = self.sqliteDb.prepare(sql);
+          if (params.length > 0) {
+            stmt.bind(params);
+          }
+          if (stmt.step()) {
+            const row = stmt.getAsObject();
+            stmt.free();
+            return row;
+          }
+          stmt.free();
+          return undefined;
+        } catch (e) {
+          console.error('DB get error:', sql, params, e.message);
+          return undefined;
+        }
+      },
+      all(...params) {
+        try {
+          const results = [];
+          const stmt = self.sqliteDb.prepare(sql);
+          if (params.length > 0) {
+            stmt.bind(params);
+          }
+          while (stmt.step()) {
+            results.push(stmt.getAsObject());
+          }
+          stmt.free();
+          return results;
+        } catch (e) {
+          console.error('DB all error:', sql, params, e.message);
+          return [];
+        }
+      },
+      run(...params) {
+        try {
+          self.sqliteDb.run(sql, params);
+          saveDatabase();
+          const lastId = self.sqliteDb.exec("SELECT last_insert_rowid() as id")[0];
+          const changes = self.sqliteDb.getRowsModified();
+          return {
+            lastInsertRowid: lastId ? lastId.values[0][0] : 0,
+            changes: changes
+          };
+        } catch (e) {
+          console.error('DB run error:', sql, params, e.message);
+          return { lastInsertRowid: 0, changes: 0 };
+        }
+      }
+    };
+  }
+
+  exec(sql) {
+    try {
+      this.sqliteDb.exec(sql);
+      saveDatabase();
+    } catch (e) {
+      console.error('DB exec error:', e.message);
+    }
+  }
+
+  pragma(pragma) {
+    try {
+      this.sqliteDb.exec(`PRAGMA ${pragma}`);
+    } catch (e) {
+      // Ignore pragma errors
+    }
+  }
+
+  transaction(fn) {
+    const self = this;
+    return function(...args) {
+      self.sqliteDb.exec('BEGIN TRANSACTION');
+      try {
+        const result = fn(...args);
+        self.sqliteDb.exec('COMMIT');
+        saveDatabase();
+        return result;
+      } catch (e) {
+        self.sqliteDb.exec('ROLLBACK');
+        throw e;
+      }
+    };
+  }
+}
+
+// The db object - will be initialized synchronously via initSync
+let db = null;
+
+function initSync() {
+  // Load sql.js synchronously using require
+  const SQL = require('sql.js/dist/sql-wasm.js');
+  
+  // Check if we need to use the factory function
+  if (typeof SQL === 'function') {
+    // sql.js returns a promise in newer versions, but we need sync
+    // Use the bundled version that works synchronously
+    throw new Error('sql.js async init not supported in sync mode');
+  }
+  
+  let sqliteDb;
+  if (fs.existsSync(DB_PATH)) {
+    const fileBuffer = fs.readFileSync(DB_PATH);
+    sqliteDb = new SQL.Database(fileBuffer);
+  } else {
+    sqliteDb = new SQL.Database();
+  }
+  
+  database = sqliteDb;
+  db = new DatabaseWrapper(sqliteDb);
+  return db;
+}
+
+// Async initialization (preferred)
+async function initDatabaseAsync() {
+  const SQL = await initSqlJs();
+  
+  let sqliteDb;
+  if (fs.existsSync(DB_PATH)) {
+    const fileBuffer = fs.readFileSync(DB_PATH);
+    sqliteDb = new SQL.Database(fileBuffer);
+  } else {
+    sqliteDb = new SQL.Database();
+  }
+  
+  database = sqliteDb;
+  db = new DatabaseWrapper(sqliteDb);
+  
+  // Auto-save every 30 seconds
+  saveInterval = setInterval(saveDatabase, 30000);
+  
+  // Save on process exit
+  process.on('exit', saveDatabase);
+  process.on('SIGINT', () => { saveDatabase(); process.exit(); });
+  process.on('SIGTERM', () => { saveDatabase(); process.exit(); });
+  
+  return db;
+}
 
 function initializeDatabase() {
+  if (!db) {
+    throw new Error('Database not initialized. Call initDatabaseAsync() first.');
+  }
+
   // Admin users table
   db.exec(`
     CREATE TABLE IF NOT EXISTS admins (
@@ -54,8 +218,7 @@ function initializeDatabase() {
       product_image TEXT,
       quantity INTEGER DEFAULT 1,
       options TEXT,
-      added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      added_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -75,8 +238,7 @@ function initializeDatabase() {
       total_items INTEGER DEFAULT 0,
       language TEXT DEFAULT 'ar',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -87,7 +249,6 @@ function initializeDatabase() {
       user_id INTEGER NOT NULL,
       product_id TEXT NOT NULL,
       added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE(user_id, product_id)
     )
   `);
@@ -303,4 +464,10 @@ function initializeDatabase() {
   console.log('Database initialized successfully');
 }
 
-module.exports = { db, initializeDatabase };
+// Export a getter for db that always returns current value
+module.exports = {
+  get db() { return db; },
+  initializeDatabase,
+  initDatabaseAsync,
+  saveDatabase
+};

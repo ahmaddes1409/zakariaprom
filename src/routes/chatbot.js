@@ -1,11 +1,14 @@
 const express = require('express');
-const { db } = require('../database');
+const database = require('../database');
 const { fetchAndParseProducts, searchProducts, getCategories } = require('../dataService');
+
+function getDb() { return database.db; }
 
 const router = express.Router();
 
 // Get chatbot config
 router.get('/config', (req, res) => {
+  const db = getDb();
   const enabled = db.prepare("SELECT value FROM settings WHERE key = 'chatbot_enabled'").get();
   const welcomeAr = db.prepare("SELECT value FROM settings WHERE key = 'chatbot_welcome_ar'").get();
   const welcomeEn = db.prepare("SELECT value FROM settings WHERE key = 'chatbot_welcome_en'").get();
@@ -25,6 +28,7 @@ router.get('/config', (req, res) => {
 
 // Chat message handler
 router.post('/message', async (req, res) => {
+  const db = getDb();
   const { message, lang = 'ar' } = req.body;
   if (!message) {
     return res.status(400).json({ error: 'Message required' });

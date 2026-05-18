@@ -1,7 +1,9 @@
 const express = require('express');
-const { db } = require('../database');
+const database = require('../database');
 const { userAuth, optionalUserAuth, registerUser, loginUser } = require('../auth');
 const { nanoid } = require('../utils');
+
+function getDb() { return database.db; }
 
 const router = express.Router();
 
@@ -41,12 +43,14 @@ router.post('/logout', (req, res) => {
 });
 
 router.get('/me', userAuth, (req, res) => {
+  const db = getDb();
   const user = db.prepare('SELECT id, email, name, phone, company, country, language, created_at FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ user });
 });
 
 router.put('/profile', userAuth, (req, res) => {
+  const db = getDb();
   const { name, phone, company, country, language } = req.body;
   db.prepare('UPDATE users SET name=?, phone=?, company=?, country=?, language=? WHERE id=?')
     .run(name || '', phone || '', company || '', country || '', language || 'ar', req.user.id);
@@ -55,6 +59,7 @@ router.put('/profile', userAuth, (req, res) => {
 
 // ===== CART =====
 router.get('/cart', optionalUserAuth, (req, res) => {
+  const db = getDb();
   const sessionId = req.cookies?.session_id || req.headers['x-session-id'];
   let items;
   if (req.user) {
@@ -68,6 +73,7 @@ router.get('/cart', optionalUserAuth, (req, res) => {
 });
 
 router.post('/cart', optionalUserAuth, (req, res) => {
+  const db = getDb();
   const { product_id, product_name, product_image, quantity, options, session_id } = req.body;
   if (!product_id) {
     return res.status(400).json({ error: 'Product ID required' });
@@ -100,6 +106,7 @@ router.post('/cart', optionalUserAuth, (req, res) => {
 });
 
 router.put('/cart/:id', optionalUserAuth, (req, res) => {
+  const db = getDb();
   const { quantity } = req.body;
   if (quantity <= 0) {
     db.prepare('DELETE FROM cart_items WHERE id = ?').run(req.params.id);
@@ -110,11 +117,13 @@ router.put('/cart/:id', optionalUserAuth, (req, res) => {
 });
 
 router.delete('/cart/:id', optionalUserAuth, (req, res) => {
+  const db = getDb();
   db.prepare('DELETE FROM cart_items WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 router.delete('/cart', optionalUserAuth, (req, res) => {
+  const db = getDb();
   if (req.user) {
     db.prepare('DELETE FROM cart_items WHERE user_id = ?').run(req.user.id);
   } else {
@@ -128,6 +137,7 @@ router.delete('/cart', optionalUserAuth, (req, res) => {
 
 // Merge guest cart into user cart after login
 router.post('/cart/merge', userAuth, (req, res) => {
+  const db = getDb();
   const { session_id } = req.body;
   if (session_id) {
     const guestItems = db.prepare('SELECT * FROM cart_items WHERE session_id = ? AND user_id IS NULL').all(session_id);
@@ -147,6 +157,7 @@ router.post('/cart/merge', userAuth, (req, res) => {
 
 // ===== ORDERS (Quote Requests) =====
 router.post('/orders', optionalUserAuth, (req, res) => {
+  const db = getDb();
   const { guest_name, guest_email, guest_phone, guest_company, notes, language, session_id } = req.body;
 
   // Get cart items
@@ -193,17 +204,20 @@ router.post('/orders', optionalUserAuth, (req, res) => {
 });
 
 router.get('/orders', userAuth, (req, res) => {
+  const db = getDb();
   const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
   res.json({ orders });
 });
 
 // ===== WISHLIST =====
 router.get('/wishlist', userAuth, (req, res) => {
+  const db = getDb();
   const items = db.prepare('SELECT * FROM wishlist WHERE user_id = ? ORDER BY added_at DESC').all(req.user.id);
   res.json({ items });
 });
 
 router.post('/wishlist', userAuth, (req, res) => {
+  const db = getDb();
   const { product_id } = req.body;
   if (!product_id) return res.status(400).json({ error: 'Product ID required' });
   try {
@@ -215,6 +229,7 @@ router.post('/wishlist', userAuth, (req, res) => {
 });
 
 router.delete('/wishlist/:product_id', userAuth, (req, res) => {
+  const db = getDb();
   db.prepare('DELETE FROM wishlist WHERE user_id = ? AND product_id = ?').run(req.user.id, req.params.product_id);
   res.json({ success: true });
 });

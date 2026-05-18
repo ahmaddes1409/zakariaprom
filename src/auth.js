@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { db } = require('./database');
+const database = require('./database');
+
+// Use getter to always get current db instance (initialized async)
+function getDb() { return database.db; }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'zakariaprom-secret-key-2026-change-in-production';
 const TOKEN_EXPIRY = '7d';
@@ -61,6 +64,7 @@ function optionalUserAuth(req, res, next) {
 
 // Admin login
 function adminLogin(username, password) {
+  const db = getDb();
   const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get(username);
   if (!admin) return null;
   if (!bcrypt.compareSync(password, admin.password)) return null;
@@ -70,6 +74,7 @@ function adminLogin(username, password) {
 
 // User registration
 function registerUser(email, password, name, phone, company, country, language) {
+  const db = getDb();
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (existing) return { error: 'Email already registered' };
   
@@ -84,6 +89,7 @@ function registerUser(email, password, name, phone, company, country, language) 
 
 // User login
 function loginUser(email, password) {
+  const db = getDb();
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
   if (!user) return { error: 'Invalid email or password' };
   if (!bcrypt.compareSync(password, user.password)) return { error: 'Invalid email or password' };

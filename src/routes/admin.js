@@ -1,7 +1,9 @@
 const express = require('express');
-const { db } = require('../database');
+const database = require('../database');
 const { adminAuth, adminLogin } = require('../auth');
 const { fetchAndParseProducts, getCategories } = require('../dataService');
+
+function getDb() { return database.db; }
 
 const router = express.Router();
 
@@ -33,6 +35,7 @@ router.get('/me', adminAuth, (req, res) => {
 // ===== DASHBOARD =====
 router.get('/dashboard', adminAuth, async (req, res) => {
   try {
+    const db = getDb();
     const products = await fetchAndParseProducts();
     const categories = getCategories(products);
     const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get().count;
@@ -61,11 +64,13 @@ router.get('/dashboard', adminAuth, async (req, res) => {
 
 // ===== TRANSLATIONS =====
 router.get('/translations', adminAuth, (req, res) => {
+  const db = getDb();
   const overrides = db.prepare('SELECT * FROM translation_overrides ORDER BY type, original_key').all();
   res.json(overrides);
 });
 
 router.post('/translations', adminAuth, (req, res) => {
+  const db = getDb();
   const { type, original_key, lang, translation } = req.body;
   if (!type || !original_key || !lang || !translation) {
     return res.status(400).json({ error: 'All fields required' });
@@ -79,23 +84,27 @@ router.post('/translations', adminAuth, (req, res) => {
 });
 
 router.delete('/translations/:id', adminAuth, (req, res) => {
+  const db = getDb();
   db.prepare('DELETE FROM translation_overrides WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // ===== PRODUCTS MANAGEMENT =====
 router.get('/products/hidden', adminAuth, (req, res) => {
+  const db = getDb();
   const hidden = db.prepare('SELECT * FROM hidden_products').all();
   res.json(hidden);
 });
 
 router.post('/products/hide', adminAuth, (req, res) => {
+  const db = getDb();
   const { product_id } = req.body;
   db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(product_id);
   res.json({ success: true });
 });
 
 router.post('/products/show', adminAuth, (req, res) => {
+  const db = getDb();
   const { product_id } = req.body;
   db.prepare('DELETE FROM hidden_products WHERE product_id = ?').run(product_id);
   res.json({ success: true });
@@ -103,17 +112,20 @@ router.post('/products/show', adminAuth, (req, res) => {
 
 // ===== CATEGORIES MANAGEMENT =====
 router.get('/categories/hidden', adminAuth, (req, res) => {
+  const db = getDb();
   const hidden = db.prepare('SELECT * FROM hidden_categories').all();
   res.json(hidden);
 });
 
 router.post('/categories/hide', adminAuth, (req, res) => {
+  const db = getDb();
   const { category_name } = req.body;
   db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_name);
   res.json({ success: true });
 });
 
 router.post('/categories/show', adminAuth, (req, res) => {
+  const db = getDb();
   const { category_name } = req.body;
   db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(category_name);
   res.json({ success: true });
@@ -121,6 +133,7 @@ router.post('/categories/show', adminAuth, (req, res) => {
 
 // ===== ORDERS =====
 router.get('/orders', adminAuth, (req, res) => {
+  const db = getDb();
   const { status, page = 1, limit = 20 } = req.query;
   let query = 'SELECT * FROM orders';
   const params = [];
@@ -139,6 +152,7 @@ router.get('/orders', adminAuth, (req, res) => {
 });
 
 router.put('/orders/:id/status', adminAuth, (req, res) => {
+  const db = getDb();
   const { status } = req.body;
   const validStatuses = ['new', 'processing', 'quoted', 'confirmed', 'completed', 'cancelled'];
   if (!validStatuses.includes(status)) {
@@ -149,12 +163,14 @@ router.put('/orders/:id/status', adminAuth, (req, res) => {
 });
 
 router.delete('/orders/:id', adminAuth, (req, res) => {
+  const db = getDb();
   db.prepare('DELETE FROM orders WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // ===== USERS =====
 router.get('/users', adminAuth, (req, res) => {
+  const db = getDb();
   const { page = 1, limit = 20, search } = req.query;
   let query = 'SELECT id, email, name, phone, company, country, language, created_at, last_login FROM users';
   const params = [];
@@ -174,6 +190,7 @@ router.get('/users', adminAuth, (req, res) => {
 
 // ===== SETTINGS =====
 router.get('/settings', adminAuth, (req, res) => {
+  const db = getDb();
   const settings = db.prepare('SELECT * FROM settings').all();
   const settingsObj = {};
   settings.forEach(s => { settingsObj[s.key] = s.value; });
@@ -181,9 +198,10 @@ router.get('/settings', adminAuth, (req, res) => {
 });
 
 router.put('/settings', adminAuth, (req, res) => {
+  const db = getDb();
   const updates = req.body;
-  const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)');
   const transaction = db.transaction((items) => {
+    const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)');
     for (const [key, value] of Object.entries(items)) {
       stmt.run(key, value);
     }
@@ -194,11 +212,13 @@ router.put('/settings', adminAuth, (req, res) => {
 
 // ===== COUPONS =====
 router.get('/coupons', adminAuth, (req, res) => {
+  const db = getDb();
   const coupons = db.prepare('SELECT * FROM coupons ORDER BY created_at DESC').all();
   res.json(coupons);
 });
 
 router.post('/coupons', adminAuth, (req, res) => {
+  const db = getDb();
   const { code, discount_type, discount_value, min_items, max_uses, expires_at } = req.body;
   if (!code || !discount_value) {
     return res.status(400).json({ error: 'Code and discount value required' });
@@ -210,23 +230,27 @@ router.post('/coupons', adminAuth, (req, res) => {
 });
 
 router.put('/coupons/:id', adminAuth, (req, res) => {
+  const db = getDb();
   const { active } = req.body;
   db.prepare('UPDATE coupons SET active = ? WHERE id = ?').run(active ? 1 : 0, req.params.id);
   res.json({ success: true });
 });
 
 router.delete('/coupons/:id', adminAuth, (req, res) => {
+  const db = getDb();
   db.prepare('DELETE FROM coupons WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // ===== BLOG/NEWS =====
 router.get('/posts', adminAuth, (req, res) => {
+  const db = getDb();
   const posts = db.prepare('SELECT * FROM posts ORDER BY created_at DESC').all();
   res.json(posts);
 });
 
 router.post('/posts', adminAuth, (req, res) => {
+  const db = getDb();
   const { title_ar, title_en, title_tr, content_ar, content_en, content_tr, image, published } = req.body;
   const result = db.prepare(
     'INSERT INTO posts (title_ar, title_en, title_tr, content_ar, content_en, content_tr, image, published) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -235,6 +259,7 @@ router.post('/posts', adminAuth, (req, res) => {
 });
 
 router.put('/posts/:id', adminAuth, (req, res) => {
+  const db = getDb();
   const { title_ar, title_en, title_tr, content_ar, content_en, content_tr, image, published } = req.body;
   db.prepare(
     'UPDATE posts SET title_ar=?, title_en=?, title_tr=?, content_ar=?, content_en=?, content_tr=?, image=?, published=?, updated_at=CURRENT_TIMESTAMP WHERE id=?'
@@ -243,17 +268,20 @@ router.put('/posts/:id', adminAuth, (req, res) => {
 });
 
 router.delete('/posts/:id', adminAuth, (req, res) => {
+  const db = getDb();
   db.prepare('DELETE FROM posts WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // ===== CHATBOT FAQ =====
 router.get('/chatbot', adminAuth, (req, res) => {
+  const db = getDb();
   const faqs = db.prepare('SELECT * FROM chatbot_faq ORDER BY priority DESC').all();
   res.json(faqs);
 });
 
 router.post('/chatbot', adminAuth, (req, res) => {
+  const db = getDb();
   const { question_ar, question_en, question_tr, answer_ar, answer_en, answer_tr, keywords, priority } = req.body;
   const result = db.prepare(
     'INSERT INTO chatbot_faq (question_ar, question_en, question_tr, answer_ar, answer_en, answer_tr, keywords, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -262,6 +290,7 @@ router.post('/chatbot', adminAuth, (req, res) => {
 });
 
 router.put('/chatbot/:id', adminAuth, (req, res) => {
+  const db = getDb();
   const { question_ar, question_en, question_tr, answer_ar, answer_en, answer_tr, keywords, priority, active } = req.body;
   db.prepare(
     'UPDATE chatbot_faq SET question_ar=?, question_en=?, question_tr=?, answer_ar=?, answer_en=?, answer_tr=?, keywords=?, priority=?, active=? WHERE id=?'
@@ -270,12 +299,14 @@ router.put('/chatbot/:id', adminAuth, (req, res) => {
 });
 
 router.delete('/chatbot/:id', adminAuth, (req, res) => {
+  const db = getDb();
   db.prepare('DELETE FROM chatbot_faq WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 
 // ===== ANALYTICS =====
 router.get('/analytics', adminAuth, (req, res) => {
+  const db = getDb();
   const { days = 30 } = req.query;
   const visitsByDay = db.prepare(`
     SELECT DATE(created_at) as date, COUNT(*) as visits 

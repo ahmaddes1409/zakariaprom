@@ -1,0 +1,19 @@
+{
+  "name": "zakariaprom",
+  "version": "1.0.0",
+  "description": "Zakaria Prom - Promotional Products Website",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "xml2js": "^0.6.2",
+    "node-fetch": "^3.3.2",
+    "node-cache": "^5.1.2"
+  }
+}

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>زكريا بروم - منتجات الدعاية والإعلان</title>
+  <meta name="description" content="زكريا بروم - منتجات الدعاية والإعلان والهدايا الترويجية. أكثر من 1600 منتج متنوع بأعلى جودة وأفضل الأسعار.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header" id="header">
+      <div class="header-top">
+        <div class="container header-top-inner">
+          <div class="contact-info">
+            <a href="tel:+905428104208" class="contact-link">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              +90 542 810 4208
+            </a>
+            <a href="mailto:info@zakariaprom.com" class="contact-link">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+              info@zakariaprom.com
+            </a>
+          </div>
+          <div class="lang-switcher">
+            <button class="lang-btn active" data-lang="ar">العربية</button>
+            <button class="lang-btn" data-lang="en">English</button>
+            <button class="lang-btn" data-lang="tr">Türkçe</button>
+          </div>
+        </div>
+      </div>
+      <div class="header-main">
+        <div class="container header-main-inner">
+          <a href="/" class="logo">
+            <span class="logo-icon">ZP</span>
+            <div class="logo-text">
+              <span class="logo-name" data-i18n="siteName">زكريا بروم</span>
+              <span class="logo-slogan" data-i18n="siteSlogan">منتجات الدعاية والإعلان</span>
+            </div>
+          </a>
+          <div class="search-box">
+            <input type="text" id="searchInput" data-i18n-placeholder="searchPlaceholder" placeholder="ابحث عن منتج...">
+            <button id="searchBtn" class="search-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            </button>
+          </div>
+          <div class="header-actions">
+            <a href="https://wa.me/905428104208" target="_blank" class="whatsapp-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              <span data-i18n="whatsapp">واتساب</span>
+            </a>
+          </div>
+          <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <nav class="nav" id="mainNav">
+        <div class="container">
+          <ul class="nav-list">
+            <li><a href="#" class="nav-link active" data-page="home" data-i18n="home">الرئيسية</a></li>
+            <li><a href="#" class="nav-link" data-page="products" data-i18n="products">المنتجات</a></li>
+            <li><a href="#" class="nav-link" data-page="about" data-i18n="about">من نحن</a></li>
+            <li><a href="#" class="nav-link" data-page="contact" data-i18n="contact">اتصل بنا</a></li>
+          </ul>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main id="mainContent">
+      <!-- Home Page -->
+      <div id="homePage" class="page active">
+        <!-- Hero Section -->
+        <section class="hero">
+          <div class="hero-overlay"></div>
+          <div class="container hero-content">
+            <h1 data-i18n="siteName">زكريا بروم</h1>
+            <p class="hero-subtitle" data-i18n="siteSlogan">منتجات الدعاية والإعلان</p>
+            <p class="hero-desc" data-i18n="aboutText">زكريا بروم هي شركة متخصصة في منتجات الدعاية والإعلان والهدايا الترويجية. نقدم أكثر من 1600 منتج متنوع بأعلى جودة وأفضل الأسعار.</p>
+            <button class="btn-primary hero-btn" data-page="products" data-i18n="products">المنتجات</button>
+          </div>
+        </section>
+
+        <!-- Categories Section -->
+        <section class="categories-section">
+          <div class="container">
+            <h2 class="section-title" data-i18n="categories">الفئات</h2>
+            <div class="categories-grid" id="categoriesGrid">
+              <!-- Loaded dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Featured Products -->
+        <section class="featured-section">
+          <div class="container">
+            <h2 class="section-title" data-i18n="products">المنتجات</h2>
+            <div class="products-grid" id="featuredProducts">
+              <!-- Loaded dynamically -->
+            </div>
+            <div class="text-center mt-2">
+              <button class="btn-primary" data-page="products" data-i18n="showMore">عرض المزيد</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Services Section -->
+        <section class="services-section">
+          <div class="container">
+            <h2 class="section-title" data-i18n="services">خدماتنا</h2>
+            <div class="services-grid">
+              <div class="service-card">
+                <div class="service-icon">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2v6h.01M6 8l4-4m8 4V2h-.01M18 8l-4-4M6 22v-6h.01M6 16l4 4m8-4v6h-.01M18 16l-4 4"/></svg>
+                </div>
+                <h3 data-i18n="printing">طباعة</h3>
+              </div>
+              <div class="service-card">
+                <div class="service-icon">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></svg>
+                </div>
+                <h3 data-i18n="engraving">حفر ليزر</h3>
+              </div>
+              <div class="service-card">
+                <div class="service-icon">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                </div>
+                <h3 data-i18n="customDesign">تصميم مخصص</h3>
+              </div>
+              <div class="service-card">
+                <div class="service-icon">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </div>
+                <h3 data-i18n="bulkOrders">طلبات بالجملة</h3>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Products Page -->
+      <div id="productsPage" class="page">
+        <div class="container products-layout">
+          <aside class="sidebar" id="sidebar">
+            <h3 data-i18n="filterByCategory">تصفية حسب الفئة</h3>
+            <ul class="category-list" id="categoryList">
+              <!-- Loaded dynamically -->
+            </ul>
+          </aside>
+          <div class="products-main">
+            <div class="products-toolbar">
+              <div class="products-count">
+                <span id="productsCount">0</span> <span data-i18n="productsCount">منتج</span>
+              </div>
+              <div class="sort-box">
+                <label data-i18n="sortBy">ترتيب حسب</label>
+                <select id="sortSelect">
+                  <option value="default" data-i18n="sortDefault">الافتراضي</option>
+                  <option value="price_asc" data-i18n="sortPriceLow">السعر: من الأقل</option>
+                  <option value="price_desc" data-i18n="sortPriceHigh">السعر: من الأعلى</option>
+                  <option value="name" data-i18n="sortName">الاسم</option>
+                </select>
+              </div>
+            </div>
+            <div class="products-grid" id="productsGrid">
+              <!-- Loaded dynamically -->
+            </div>
+            <div class="pagination" id="pagination">
+              <!-- Loaded dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product Detail Modal -->
+      <div class="modal" id="productModal">
+        <div class="modal-content">
+          <button class="modal-close" id="modalClose">&times;</button>
+          <div class="modal-body" id="modalBody">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- About Page -->
+      <div id="aboutPage" class="page">
+        <div class="container page-content">
+          <h1 data-i18n="about">من نحن</h1>
+          <div class="about-content">
+            <div class="about-text">
+              <p data-i18n="aboutText">زكريا بروم هي شركة متخصصة في منتجات الدعاية والإعلان والهدايا الترويجية. نقدم أكثر من 1600 منتج متنوع بأعلى جودة وأفضل الأسعار. لدينا مطابع في تركيا وسوريا لخدمتكم.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact Page -->
+      <div id="contactPage" class="page">
+        <div class="container page-content">
+          <h1 data-i18n="contact">اتصل بنا</h1>
+          <div class="contact-grid">
+            <div class="contact-info-card">
+              <h3 data-i18n="phone">الهاتف</h3>
+              <p><a href="tel:+905428104208">+90 542 810 4208</a></p>
+            </div>
+            <div class="contact-info-card">
+              <h3 data-i18n="email">البريد الإلكتروني</h3>
+              <p><a href="mailto:info@zakariaprom.com">info@zakariaprom.com</a></p>
+            </div>
+            <div class="contact-info-card">
+              <h3 data-i18n="address">العنوان</h3>
+              <p data-i18n="addressText">إسطنبول، تركيا</p>
+            </div>
+            <div class="contact-info-card">
+              <h3 data-i18n="whatsapp">واتساب</h3>
+              <p><a href="https://wa.me/905428104208" target="_blank">+90 542 810 4208</a></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-brand">
+            <span class="logo-icon">ZP</span>
+            <span class="logo-name" data-i18n="siteName">زكريا بروم</span>
+          </div>
+          <p class="footer-text" data-i18n="footerText">جميع الحقوق محفوظة © 2026 زكريا بروم</p>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="spinner"></div>
+      <p data-i18n="loading">جاري التحميل...</p>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

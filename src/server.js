@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Serve static files
+// Serve static files (React build + admin panel)
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Start server after async DB initialization
@@ -218,8 +218,17 @@ async function startServer() {
     res.json(posts);
   });
 
-  // SPA fallback - serve index.html for all other routes
+  // Admin panel - serve admin.html
+  app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
+  });
+
+  // SPA fallback - serve React index.html for all other routes (client-side routing)
   app.get('*', (req, res) => {
+    // Don't serve index.html for API routes or admin assets
+    if (req.path.startsWith('/api/') || req.path === '/admin.html' || req.path === '/admin.css' || req.path === '/admin.js') {
+      return res.status(404).json({ error: 'Not found' });
+    }
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
   });
 

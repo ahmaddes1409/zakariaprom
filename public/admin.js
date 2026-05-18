@@ -374,9 +374,8 @@ window.editCategory = async function(catTr) {
 async function renderTranslations() {
   const data = await api('/api/admin/translations');
   const area = document.getElementById('contentArea');
-  const trans = data?.translations || {};
-  const cats = trans.categories || [];
-  const terms = trans.terms || [];
+  const cats = data?.categories || [];
+  const terms = data?.terms || [];
   area.innerHTML = `
     <div class="card">
       <div class="card-header"><h3>ترجمات الفئات</h3><button class="btn-primary btn-sm" onclick="addTranslation('category')">+ إضافة</button></div>

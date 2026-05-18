@@ -63,10 +63,55 @@ router.get('/dashboard', adminAuth, async (req, res) => {
 });
 
 // ===== TRANSLATIONS =====
-router.get('/translations', adminAuth, (req, res) => {
+router.get('/translations', adminAuth, async (req, res) => {
   const db = getDb();
   const overrides = db.prepare('SELECT * FROM translation_overrides ORDER BY type, original_key').all();
-  res.json(overrides);
+  
+  // Build override map
+  const overrideMap = {};
+  overrides.forEach(o => {
+    if (!overrideMap[o.type]) overrideMap[o.type] = {};
+    if (!overrideMap[o.type][o.original_key]) overrideMap[o.type][o.original_key] = {};
+    overrideMap[o.type][o.original_key][o.lang] = o.translation;
+  });
+
+  // Get all categories from products
+  try {
+    const products = await fetchAndParseProducts();
+    const allCategories = getCategories(products);
+    
+    // Merge categories with overrides
+    const categories = allCategories.map(cat => ({
+      tr: cat.tr,
+      ar: overrideMap.category?.[cat.tr]?.ar || cat.ar,
+      en: overrideMap.category?.[cat.tr]?.en || cat.en
+    }));
+
+    // Get term overrides
+    const terms = [];
+    if (overrideMap.term) {
+      Object.keys(overrideMap.term).forEach(key => {
+        terms.push({
+          tr: key,
+          ar: overrideMap.term[key].ar || '',
+          en: overrideMap.term[key].en || ''
+        });
+      });
+    }
+
+    res.json({ categories, terms });
+  } catch (error) {
+    // Fallback: just return overrides grouped
+    const categories = [];
+    const terms = [];
+    overrides.forEach(o => {
+      const list = o.type === 'category' ? categories : terms;
+      let existing = list.find(i => i.tr === o.original_key);
+      if (!existing) { existing = { tr: o.original_key, ar: '', en: '' }; list.push(existing); }
+      existing[o.lang] = o.translation;
+    });
+    res.json({ categories, terms });
+  }
 });
 
 router.post('/translations', adminAuth, (req, res) => {

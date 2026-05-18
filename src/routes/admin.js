@@ -83,6 +83,43 @@ router.post('/translations', adminAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// PUT /translations - update translation (used by admin panel editTranslation)
+router.put('/translations', adminAuth, (req, res) => {
+  const db = getDb();
+  const { type, key, ar, en } = req.body;
+  if (!type || !key) {
+    return res.status(400).json({ error: 'Type and key required' });
+  }
+  // Save Arabic translation
+  if (ar) {
+    db.prepare(`
+      INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+      VALUES (?, ?, 'ar', ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+    `).run(type, key, ar, ar);
+  }
+  // Save English translation
+  if (en) {
+    db.prepare(`
+      INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+      VALUES (?, ?, 'en', ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+    `).run(type, key, en, en);
+  }
+  res.json({ success: true });
+});
+
+// GET /translations/:type/:key - get current translation for a specific item
+router.get('/translations/:type/:key', adminAuth, (req, res) => {
+  const db = getDb();
+  const { type, key } = req.params;
+  const decodedKey = decodeURIComponent(key);
+  const overrides = db.prepare('SELECT lang, translation FROM translation_overrides WHERE type = ? AND original_key = ?').all(type, decodedKey);
+  const result = { tr: decodedKey, ar: '', en: '' };
+  overrides.forEach(o => { result[o.lang] = o.translation; });
+  res.json(result);
+});
+
 router.delete('/translations/:id', adminAuth, (req, res) => {
   const db = getDb();
   db.prepare('DELETE FROM translation_overrides WHERE id = ?').run(req.params.id);

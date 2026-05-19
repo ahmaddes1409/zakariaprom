@@ -2,14 +2,20 @@ import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { companyInfo } from "@/lib/data";
 import { Phone, Mail, MapPin, Send, MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 export default function ContactPage() {
-  const { language, t } = useLanguage();
+  const { language, t, settings } = useLanguage();
   const [formData, setFormData] = useState({ name: "", email: "", message: "" });
+
+  const phone = settings.phone || "+90 542 810 4208";
+  const email = settings.email || "info@zakariaprom.com";
+  const whatsapp = settings.whatsapp || "905428104208";
+  const addressKey = `address_${language}` as keyof typeof settings;
+  const address = (settings[addressKey] as string) || 
+    (language === "ar" ? "إسطنبول، تركيا" : language === "tr" ? "İstanbul, Türkiye" : "Istanbul, Turkey");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,8 +28,6 @@ export default function ContactPage() {
     );
     setFormData({ name: "", email: "", message: "" });
   };
-
-  const getAddress = (addr: { ar: string; en: string; tr: string }) => addr[language];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -41,7 +45,7 @@ export default function ContactPage() {
             {t("contact.title")}
           </motion.h1>
           <p className="text-white/70 text-lg">
-            {t("contact.getInTouch")}
+            {language === "ar" ? "تواصل معنا الآن" : language === "tr" ? "Bize Ulaşın" : "Get in Touch"}
           </p>
         </div>
       </section>
@@ -51,7 +55,7 @@ export default function ContactPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {/* Contact Info Cards */}
             <div className="space-y-4">
-              {/* Turkey Branch */}
+              {/* Branch Info */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -62,35 +66,19 @@ export default function ContactPage() {
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-[#00a8a8] shrink-0 mt-0.5" />
-                    <span className="text-gray-600 text-sm">{getAddress(companyInfo.turkeyAddress)}</span>
+                    <span className="text-gray-600 text-sm">{address}</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-[#00a8a8] shrink-0" />
-                    <a href={`tel:${companyInfo.phone}`} dir="ltr" className="text-gray-600 hover:text-[#00a8a8] text-sm transition-colors">
-                      {companyInfo.phone}
+                    <a href={`tel:${phone}`} dir="ltr" className="text-gray-600 hover:text-[#00a8a8] text-sm transition-colors">
+                      {phone}
                     </a>
                   </li>
                   <li className="flex items-center gap-3">
                     <Mail className="w-5 h-5 text-[#00a8a8] shrink-0" />
-                    <a href={`mailto:${companyInfo.email}`} className="text-gray-600 hover:text-[#00a8a8] text-sm transition-colors">
-                      {companyInfo.email}
+                    <a href={`mailto:${email}`} className="text-gray-600 hover:text-[#00a8a8] text-sm transition-colors">
+                      {email}
                     </a>
-                  </li>
-                </ul>
-              </motion.div>
-
-              {/* Syria Branch */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-                className="bg-white rounded-xl p-6 shadow-sm"
-              >
-                <h3 className="font-bold text-[#0e4a6f] mb-4 text-lg">{t("footer.syria")}</h3>
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-[#00a8a8] shrink-0 mt-0.5" />
-                    <span className="text-gray-600 text-sm">{getAddress(companyInfo.syriaAddress)}</span>
                   </li>
                 </ul>
               </motion.div>
@@ -100,7 +88,7 @@ export default function ContactPage() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2, duration: 0.4 }}
-                href={`https://wa.me/905428104208`}
+                href={`https://wa.me/${whatsapp}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-[#25D366] text-white rounded-xl p-4 shadow-sm hover:bg-[#20bd5a] transition-colors"
@@ -123,7 +111,9 @@ export default function ContactPage() {
               className="lg:col-span-2"
             >
               <form onSubmit={handleSubmit} className="bg-white rounded-xl p-8 shadow-sm">
-                <h2 className="text-xl font-bold text-[#0e4a6f] mb-6">{t("contact.getInTouch")}</h2>
+                <h2 className="text-xl font-bold text-[#0e4a6f] mb-6">
+                  {language === "ar" ? "تواصل معنا الآن" : language === "tr" ? "Bize Ulaşın" : "Get in Touch"}
+                </h2>
                 <div className="space-y-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("contact.name")}</label>

@@ -7,7 +7,10 @@ import { motion } from "framer-motion";
 const HERO_IMG_2 = "https://d2xsxph8kpxj0f.cloudfront.net/310519663586966936/fHWUHuB9ZycaiSpMH5YZHk/hero-banner-2-Hb83PkY93ca573tYpuRS3b.webp";
 
 export default function AboutPage() {
-  const { language, t } = useLanguage();
+  const { language, t, settings } = useLanguage();
+
+  const siteName = (settings[`site_name_${language}` as keyof typeof settings] as string) || 
+    (language === "ar" ? "زكريا بروم" : "Zakaria Prom");
 
   const stats = [
     { icon: Building2, value: "2", labelAr: "مطبعة", labelEn: "Printing Facilities", labelTr: "Matbaa" },
@@ -42,7 +45,7 @@ export default function AboutPage() {
             {t("about.title")}
           </motion.h1>
           <p className="text-white/70 max-w-2xl mx-auto text-lg">
-            {language === "ar" ? "زكريا بروم" : "Zakaria Prom"}
+            {siteName}
           </p>
         </div>
       </section>

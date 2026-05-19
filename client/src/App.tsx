@@ -9,6 +9,10 @@ import Home from "./pages/Home";
 import CategoryPage from "./pages/CategoryPage";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
+import ProductPage from "./pages/ProductPage";
+import SearchPage from "./pages/SearchPage";
+import LoginPage from "./pages/LoginPage";
+import FloatingActions from "./components/FloatingActions";
 
 function Router() {
   return (
@@ -17,6 +21,9 @@ function Router() {
       <Route path="/category/:id" component={CategoryPage} />
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />
+      <Route path="/product/:id" component={ProductPage} />
+      <Route path="/search" component={SearchPage} />
+      <Route path="/login" component={LoginPage} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
@@ -31,6 +38,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
+            <FloatingActions />
           </TooltipProvider>
         </LanguageProvider>
       </ThemeProvider>

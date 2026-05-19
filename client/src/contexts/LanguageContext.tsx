@@ -1,95 +1,124 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { fetchTranslations, fetchSettings, type ApiTranslations, type ApiSettings } from "@/lib/api";
 
 export type Language = "ar" | "en" | "tr";
 
-interface Translations {
-  [key: string]: { ar: string; en: string; tr: string };
-}
-
-const translations: Translations = {
-  // Navigation
-  "nav.home": { ar: "الرئيسية", en: "Home", tr: "Ana Sayfa" },
-  "nav.about": { ar: "من نحن", en: "About Us", tr: "Hakkımızda" },
-  "nav.services": { ar: "خدماتنا", en: "Our Services", tr: "Hizmetlerimiz" },
-  "nav.catalog": { ar: "الكتالوج", en: "Catalog", tr: "Katalog" },
-  "nav.contact": { ar: "اتصل بنا", en: "Contact Us", tr: "İletişim" },
-  "nav.products": { ar: "المنتجات", en: "Products", tr: "Ürünler" },
-  "nav.faq": { ar: "الأسئلة الشائعة", en: "FAQ", tr: "S.S.S." },
-
-  // Search
-  "search.placeholder": { ar: "ابحث عن المنتجات بالاسم أو الكود...", en: "Search products by name or code...", tr: "Ürün adı veya kodu ile arayın..." },
-
-  // Hero
-  "hero.title": { ar: "منتجات الدعاية والإعلان", en: "Promotional Products", tr: "Promosyon Ürünleri" },
-  "hero.subtitle": { ar: "إنتاج واستيراد - بيع بالجملة", en: "Production & Import - Wholesale", tr: "Üretim ve İthalat - Toptan Satış" },
-  "hero.cta": { ar: "تصفح المنتجات", en: "Browse Products", tr: "Ürünleri İncele" },
-  "hero.tagline": { ar: "علامتك التجارية... شغفنا", en: "Your Brand... Our Passion", tr: "Markanız... Tutkumuz" },
-
-  // Categories
-  "cat.tech": { ar: "منتجات تكنولوجية", en: "Technology Products", tr: "Teknoloji Ürünleri" },
-  "cat.powerbank": { ar: "باور بانك", en: "Power Banks", tr: "Powerbanklar" },
-  "cat.wireless": { ar: "شواحن لاسلكية", en: "Wireless Chargers", tr: "Wireless Şarj İstasyonları" },
-  "cat.speakers": { ar: "سماعات بلوتوث", en: "Bluetooth Speakers", tr: "Bluetooth Hoparlörler" },
-  "cat.usb": { ar: "فلاش ميموري", en: "USB Flash Drives", tr: "USB Bellekler" },
-  "cat.metalPens": { ar: "أقلام معدنية", en: "Metal Pens", tr: "Metal Kalemler" },
-  "cat.plasticPens": { ar: "أقلام بلاستيكية", en: "Plastic Pens", tr: "Plastik Kalemler" },
-  "cat.penSets": { ar: "أطقم أقلام هدايا", en: "Gift Pen Sets", tr: "Hediye Kalem Setleri" },
-  "cat.notebooks": { ar: "دفاتر وأجندات", en: "Notebooks & Agendas", tr: "Defterler ve Ajandalar" },
-  "cat.thermos": { ar: "ترمس ومج", en: "Thermos & Mugs", tr: "Termos ve Mug" },
-  "cat.ceramicMugs": { ar: "أكواب سيراميك", en: "Ceramic Mugs", tr: "Seramik Kupalar" },
-  "cat.keychains": { ar: "ميداليات", en: "Keychains", tr: "Anahtarlıklar" },
-  "cat.badges": { ar: "شارات وبروشات", en: "Badges & Pins", tr: "Rozetler" },
-  "cat.lighters": { ar: "ولاعات معدنية فاخرة", en: "Luxury Metal Lighters", tr: "Lüks Metal Çakmaklar" },
-  "cat.promoLighters": { ar: "ولاعات دعائية", en: "Promotional Lighters", tr: "Promosyon Çakmaklar" },
-  "cat.deskSets": { ar: "أطقم مكتبية", en: "Desk Sets", tr: "Masa Setleri" },
-  "cat.bags": { ar: "حقائب ظهر", en: "Backpacks", tr: "Sırt Çantaları" },
-  "cat.wallets": { ar: "محافظ", en: "Wallets", tr: "Cüzdanlar" },
-  "cat.umbrellas": { ar: "مظلات", en: "Umbrellas", tr: "Şemsiyeler" },
-  "cat.giftSets": { ar: "أطقم هدايا فاخرة", en: "Luxury Gift Sets", tr: "Kutulu Hediye Setleri" },
-  "cat.clocks": { ar: "ساعات دعائية", en: "Promotional Clocks", tr: "Promosyon Saatler" },
-  "cat.printing": { ar: "منتجات مطبعة", en: "Printing Products", tr: "Matbaa Ürünleri" },
-  "cat.textile": { ar: "منتجات نسيجية", en: "Textile Products", tr: "Tekstil Ürünleri" },
-  "cat.knives": { ar: "سكاكين جيب وكشافات", en: "Pocket Knives & Flashlights", tr: "Çakı ve El Feneri" },
-
-  // Footer
-  "footer.address": { ar: "عنواننا", en: "Our Address", tr: "Adresimiz" },
-  "footer.phone": { ar: "الهاتف", en: "Phone", tr: "Telefon" },
-  "footer.email": { ar: "البريد الإلكتروني", en: "Email", tr: "E-posta" },
-  "footer.rights": { ar: "جميع الحقوق محفوظة", en: "All rights reserved", tr: "Tüm hakları saklıdır" },
-  "footer.turkey": { ar: "فرع تركيا", en: "Turkey Branch", tr: "Türkiye Şubesi" },
-  "footer.syria": { ar: "فرع سوريا", en: "Syria Branch", tr: "Suriye Şubesi" },
-  "footer.followUs": { ar: "تابعنا", en: "Follow Us", tr: "Bizi Takip Edin" },
-  "footer.quickLinks": { ar: "روابط سريعة", en: "Quick Links", tr: "Hızlı Bağlantılar" },
-
-  // About
-  "about.title": { ar: "من نحن", en: "About Us", tr: "Hakkımızda" },
-  "about.desc": { ar: "زكريا بروم شركة رائدة في مجال إنتاج واستيراد منتجات الدعاية والإعلان والهدايا الترويجية. نمتلك مطابع في تركيا وسوريا ونقدم خدماتنا للشركات والمؤسسات في جميع أنحاء المنطقة.", en: "Zakaria Prom is a leading company in the production and import of promotional and advertising products. We have printing facilities in Turkey and Syria, serving businesses across the region.", tr: "Zakaria Prom, promosyon ve reklam ürünleri üretim ve ithalatında lider bir firmadır. Türkiye ve Suriye'de matbaalarımız bulunmakta olup bölgedeki işletmelere hizmet vermekteyiz." },
-
-  // Services
-  "services.customPrint": { ar: "طباعة مخصصة", en: "Custom Printing", tr: "Özel Baskı" },
-  "services.customPrintDesc": { ar: "طباعة شعارك على جميع المنتجات بأعلى جودة", en: "Print your logo on all products with the highest quality", tr: "Logonuzu tüm ürünlere en yüksek kalitede basıyoruz" },
-  "services.wholesale": { ar: "بيع بالجملة", en: "Wholesale", tr: "Toptan Satış" },
-  "services.wholesaleDesc": { ar: "أسعار خاصة للطلبات الكبيرة والشركات", en: "Special prices for bulk orders and companies", tr: "Toplu siparişler ve şirketler için özel fiyatlar" },
-  "services.design": { ar: "تصميم إبداعي", en: "Creative Design", tr: "Yaratıcı Tasarım" },
-  "services.designDesc": { ar: "فريق تصميم محترف لإنشاء هوية بصرية مميزة", en: "Professional design team to create a distinctive visual identity", tr: "Özgün bir görsel kimlik oluşturmak için profesyonel tasarım ekibi" },
-  "services.delivery": { ar: "شحن وتوصيل", en: "Shipping & Delivery", tr: "Kargo ve Teslimat" },
-  "services.deliveryDesc": { ar: "نوصل طلباتكم إلى جميع أنحاء تركيا وسوريا والمنطقة", en: "We deliver your orders across Turkey, Syria and the region", tr: "Siparişlerinizi Türkiye, Suriye ve bölge geneline ulaştırıyoruz" },
-
-  // Contact
-  "contact.title": { ar: "تواصل معنا", en: "Contact Us", tr: "İletişim" },
-  "contact.name": { ar: "الاسم", en: "Name", tr: "İsim" },
-  "contact.email": { ar: "البريد الإلكتروني", en: "Email", tr: "E-posta" },
-  "contact.message": { ar: "الرسالة", en: "Message", tr: "Mesaj" },
-  "contact.send": { ar: "إرسال", en: "Send", tr: "Gönder" },
-  "contact.getInTouch": { ar: "تواصل معنا الآن", en: "Get in Touch", tr: "Bize Ulaşın" },
-
-  // General
-  "general.viewAll": { ar: "عرض الكل", en: "View All", tr: "Tümünü Gör" },
-  "general.readMore": { ar: "اقرأ المزيد", en: "Read More", tr: "Daha Fazla" },
-  "general.categories": { ar: "الفئات", en: "Categories", tr: "Kategoriler" },
-  "general.featuredProducts": { ar: "المنتجات المميزة", en: "Featured Products", tr: "Öne Çıkan Ürünler" },
-  "general.newArrivals": { ar: "وصل حديثاً", en: "New Arrivals", tr: "Yeni Ürünler" },
-  "general.requestQuote": { ar: "اطلب عرض سعر", en: "Request a Quote", tr: "Fiyat Teklifi İsteyin" },
+// Local fallback translations (used until API loads)
+const fallbackTranslations: Record<Language, Record<string, string>> = {
+  ar: {
+    "nav.home": "الرئيسية",
+    "nav.about": "من نحن",
+    "nav.products": "المنتجات",
+    "nav.contact": "اتصل بنا",
+    "search.placeholder": "ابحث عن المنتجات...",
+    "hero.title": "منتجات الدعاية والإعلان",
+    "hero.subtitle": "إنتاج واستيراد - بيع بالجملة",
+    "hero.cta": "تصفح المنتجات",
+    "hero.tagline": "علامتك التجارية... شغفنا",
+    "general.categories": "الفئات",
+    "general.featuredProducts": "المنتجات المميزة",
+    "general.requestQuote": "اطلب عرض سعر",
+    "general.viewAll": "عرض الكل",
+    "services.customPrint": "طباعة مخصصة",
+    "services.customPrintDesc": "طباعة شعارك على جميع المنتجات بأعلى جودة",
+    "services.wholesale": "بيع بالجملة",
+    "services.wholesaleDesc": "أسعار خاصة للطلبات الكبيرة والشركات",
+    "services.design": "تصميم إبداعي",
+    "services.designDesc": "فريق تصميم محترف لإنشاء هوية بصرية مميزة",
+    "services.delivery": "شحن وتوصيل",
+    "services.deliveryDesc": "نوصل طلباتكم إلى جميع أنحاء تركيا وسوريا والمنطقة",
+    "about.title": "من نحن",
+    "about.desc": "زكريا بروم شركة رائدة في مجال إنتاج واستيراد منتجات الدعاية والإعلان والهدايا الترويجية.",
+    "contact.title": "تواصل معنا",
+    "contact.name": "الاسم",
+    "contact.email": "البريد الإلكتروني",
+    "contact.message": "الرسالة",
+    "contact.send": "إرسال",
+    "footer.rights": "جميع الحقوق محفوظة",
+    "footer.quickLinks": "روابط سريعة",
+    "footer.followUs": "تابعنا",
+    "footer.turkey": "فرع تركيا",
+    "footer.syria": "فرع سوريا",
+    "general.loading": "جاري التحميل...",
+    "general.noProducts": "لا توجد منتجات",
+    "general.productsCount": "منتج",
+  },
+  en: {
+    "nav.home": "Home",
+    "nav.about": "About Us",
+    "nav.products": "Products",
+    "nav.contact": "Contact Us",
+    "search.placeholder": "Search products...",
+    "hero.title": "Promotional Products",
+    "hero.subtitle": "Production & Import - Wholesale",
+    "hero.cta": "Browse Products",
+    "hero.tagline": "Your Brand... Our Passion",
+    "general.categories": "Categories",
+    "general.featuredProducts": "Featured Products",
+    "general.requestQuote": "Request a Quote",
+    "general.viewAll": "View All",
+    "services.customPrint": "Custom Printing",
+    "services.customPrintDesc": "Print your logo on all products with the highest quality",
+    "services.wholesale": "Wholesale",
+    "services.wholesaleDesc": "Special prices for bulk orders and companies",
+    "services.design": "Creative Design",
+    "services.designDesc": "Professional design team to create a distinctive visual identity",
+    "services.delivery": "Shipping & Delivery",
+    "services.deliveryDesc": "We deliver your orders across Turkey, Syria and the region",
+    "about.title": "About Us",
+    "about.desc": "Zakaria Prom is a leading company in the production and import of promotional and advertising products.",
+    "contact.title": "Contact Us",
+    "contact.name": "Name",
+    "contact.email": "Email",
+    "contact.message": "Message",
+    "contact.send": "Send",
+    "footer.rights": "All rights reserved",
+    "footer.quickLinks": "Quick Links",
+    "footer.followUs": "Follow Us",
+    "footer.turkey": "Turkey Branch",
+    "footer.syria": "Syria Branch",
+    "general.loading": "Loading...",
+    "general.noProducts": "No products found",
+    "general.productsCount": "products",
+  },
+  tr: {
+    "nav.home": "Ana Sayfa",
+    "nav.about": "Hakkımızda",
+    "nav.products": "Ürünler",
+    "nav.contact": "İletişim",
+    "search.placeholder": "Ürün ara...",
+    "hero.title": "Promosyon Ürünleri",
+    "hero.subtitle": "Üretim ve İthalat - Toptan Satış",
+    "hero.cta": "Ürünleri İncele",
+    "hero.tagline": "Markanız... Tutkumuz",
+    "general.categories": "Kategoriler",
+    "general.featuredProducts": "Öne Çıkan Ürünler",
+    "general.requestQuote": "Fiyat Teklifi İsteyin",
+    "general.viewAll": "Tümünü Gör",
+    "services.customPrint": "Özel Baskı",
+    "services.customPrintDesc": "Logonuzu tüm ürünlere en yüksek kalitede basıyoruz",
+    "services.wholesale": "Toptan Satış",
+    "services.wholesaleDesc": "Toplu siparişler ve şirketler için özel fiyatlar",
+    "services.design": "Yaratıcı Tasarım",
+    "services.designDesc": "Özgün bir görsel kimlik oluşturmak için profesyonel tasarım ekibi",
+    "services.delivery": "Kargo ve Teslimat",
+    "services.deliveryDesc": "Siparişlerinizi Türkiye, Suriye ve bölge geneline ulaştırıyoruz",
+    "about.title": "Hakkımızda",
+    "about.desc": "Zakaria Prom, promosyon ve reklam ürünleri üretim ve ithalatında lider bir firmadır.",
+    "contact.title": "İletişim",
+    "contact.name": "İsim",
+    "contact.email": "E-posta",
+    "contact.message": "Mesaj",
+    "contact.send": "Gönder",
+    "footer.rights": "Tüm hakları saklıdır",
+    "footer.quickLinks": "Hızlı Bağlantılar",
+    "footer.followUs": "Bizi Takip Edin",
+    "footer.turkey": "Türkiye Şubesi",
+    "footer.syria": "Suriye Şubesi",
+    "general.loading": "Yükleniyor...",
+    "general.noProducts": "Ürün bulunamadı",
+    "general.productsCount": "ürün",
+  },
 };
 
 interface LanguageContextType {
@@ -97,12 +126,28 @@ interface LanguageContextType {
   setLanguage: (lang: Language) => void;
   t: (key: string) => string;
   dir: "rtl" | "ltr";
+  settings: ApiSettings;
+  apiTranslations: ApiTranslations | null;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>("ar");
+  const [settings, setSettings] = useState<ApiSettings>({});
+  const [apiTranslations, setApiTranslations] = useState<ApiTranslations | null>(null);
+
+  // Fetch settings once
+  useEffect(() => {
+    fetchSettings().then(setSettings);
+  }, []);
+
+  // Fetch translations when language changes
+  useEffect(() => {
+    fetchTranslations(language).then((data) => {
+      if (data) setApiTranslations(data);
+    });
+  }, [language]);
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
@@ -112,17 +157,53 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const t = useCallback(
     (key: string) => {
-      const entry = translations[key];
-      if (!entry) return key;
-      return entry[language] || entry.ar || key;
+      // First check local fallback translations
+      const local = fallbackTranslations[language]?.[key];
+      if (local) return local;
+
+      // Then check API translations with key mapping
+      if (apiTranslations) {
+        const apiKeyMap: Record<string, string> = {
+          "nav.home": "home",
+          "nav.about": "about",
+          "nav.products": "products",
+          "nav.contact": "contact",
+          "search.placeholder": "searchPlaceholder",
+          "hero.title": "siteSlogan",
+          "general.categories": "categories",
+          "general.requestQuote": "requestQuote",
+          "general.loading": "loading",
+          "general.noProducts": "noProducts",
+          "general.productsCount": "productsCount",
+          "about.title": "about",
+          "about.desc": "aboutText",
+          "footer.rights": "footerText",
+        };
+        const apiKey = apiKeyMap[key];
+        if (apiKey && apiTranslations[apiKey]) {
+          return apiTranslations[apiKey]!;
+        }
+      }
+
+      // Check settings for dynamic values
+      if (key === "site.name") {
+        return settings[`site_name_${language}` as keyof ApiSettings] as string || 
+          (language === "ar" ? "زكريا بروم" : "Zakaria Prom");
+      }
+      if (key === "site.slogan") {
+        return settings[`site_slogan_${language}` as keyof ApiSettings] as string || 
+          fallbackTranslations[language]["hero.title"] || "";
+      }
+
+      return key;
     },
-    [language]
+    [language, apiTranslations, settings]
   );
 
   const dir = language === "ar" ? "rtl" : "ltr";
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, dir }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, dir, settings, apiTranslations }}>
       {children}
     </LanguageContext.Provider>
   );

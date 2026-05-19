@@ -219,6 +219,18 @@ async function startServer() {
     res.json(posts);
   });
 
+  // Public banners
+  app.get('/api/banners', (req, res) => {
+    const banners = db.prepare('SELECT * FROM banners WHERE active = 1 ORDER BY sort_order ASC, id DESC').all();
+    res.json(banners);
+  });
+
+  // Public currencies
+  app.get('/api/currencies', (req, res) => {
+    const currencies = db.prepare('SELECT * FROM currencies WHERE active = 1 ORDER BY id ASC').all();
+    res.json(currencies);
+  });
+
   // Admin panel - serve admin.html
   app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));

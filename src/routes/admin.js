@@ -249,6 +249,10 @@ router.get('/products', adminAuth, async (req, res) => {
         (p.model || '').toLowerCase().includes(q)
       );
     }
+    // Add hidden status
+    const db = getDb();
+    const hiddenIds = db.prepare('SELECT product_id FROM hidden_products').all().map(r => r.product_id);
+    products = products.map(p => ({ ...p, hidden: hiddenIds.includes(p.id) || hiddenIds.includes(p.model) }));
     const total = products.length;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const paginatedProducts = products.slice(offset, offset + parseInt(limit));
@@ -517,6 +521,21 @@ router.put('/settings', adminAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// Change admin password
+router.put('/change-password', adminAuth, (req, res) => {
+  const db = getDb();
+  const bcrypt = require('bcryptjs');
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password) return res.status(400).json({ error: 'Both passwords required' });
+  const admin = db.prepare('SELECT * FROM admins WHERE id = ?').get(req.admin.id);
+  if (!admin || !bcrypt.compareSync(current_password, admin.password)) {
+    return res.status(400).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+  }
+  const hashed = bcrypt.hashSync(new_password, 10);
+  db.prepare('UPDATE admins SET password = ? WHERE id = ?').run(hashed, req.admin.id);
+  res.json({ success: true });
+});
+
 // ===== COUPONS =====
 router.get('/coupons', adminAuth, (req, res) => {
   const db = getDb();
@@ -526,13 +545,15 @@ router.get('/coupons', adminAuth, (req, res) => {
 
 router.post('/coupons', adminAuth, (req, res) => {
   const db = getDb();
-  const { code, discount_type, discount_value, min_items, max_uses, expires_at } = req.body;
-  if (!code || !discount_value) {
+  const { code, discount_type, discount_value, type, value, min_items, min_order, max_uses, expires_at } = req.body;
+  const dType = discount_type || type || 'percentage';
+  const dValue = discount_value || value;
+  if (!code || !dValue) {
     return res.status(400).json({ error: 'Code and discount value required' });
   }
   const result = db.prepare(
     'INSERT INTO coupons (code, discount_type, discount_value, min_items, max_uses, expires_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(code.toUpperCase(), discount_type || 'percentage', discount_value, min_items || 0, max_uses || 0, expires_at || null);
+  ).run(code.toUpperCase(), dType, dValue, min_items || min_order || 0, max_uses || 0, expires_at || null);
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
@@ -644,6 +665,137 @@ router.get('/analytics', adminAuth, (req, res) => {
   `).all();
 
   res.json({ visitsByDay, topPages, topProducts, topCategories });
+});
+
+// ===== BANNERS =====
+router.get('/banners', adminAuth, (req, res) => {
+  const db = getDb();
+  const banners = db.prepare('SELECT * FROM banners ORDER BY sort_order ASC, id DESC').all();
+  res.json(banners);
+});
+
+router.post('/banners', adminAuth, (req, res) => {
+  const db = getDb();
+  const { title_ar, title_en, title_tr, subtitle_ar, subtitle_en, subtitle_tr, image_url, link, sort_order } = req.body;
+  if (!image_url) return res.status(400).json({ error: 'Image URL required' });
+  const result = db.prepare(
+    'INSERT INTO banners (title_ar, title_en, title_tr, subtitle_ar, subtitle_en, subtitle_tr, image_url, link, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(title_ar || '', title_en || '', title_tr || '', subtitle_ar || '', subtitle_en || '', subtitle_tr || '', image_url, link || '', sort_order || 0);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+
+router.put('/banners/:id', adminAuth, (req, res) => {
+  const db = getDb();
+  const { title_ar, title_en, title_tr, subtitle_ar, subtitle_en, subtitle_tr, image_url, link, sort_order, active } = req.body;
+  db.prepare(
+    'UPDATE banners SET title_ar=?, title_en=?, title_tr=?, subtitle_ar=?, subtitle_en=?, subtitle_tr=?, image_url=?, link=?, sort_order=?, active=? WHERE id=?'
+  ).run(title_ar || '', title_en || '', title_tr || '', subtitle_ar || '', subtitle_en || '', subtitle_tr || '', image_url || '', link || '', sort_order || 0, active !== undefined ? (active ? 1 : 0) : 1, req.params.id);
+  res.json({ success: true });
+});
+
+router.delete('/banners/:id', adminAuth, (req, res) => {
+  const db = getDb();
+  db.prepare('DELETE FROM banners WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ===== STAFF/EMPLOYEES =====
+router.get('/staff', adminAuth, (req, res) => {
+  const db = getDb();
+  const staff = db.prepare('SELECT id, username, name, role, permissions, active, created_at, last_login FROM staff ORDER BY created_at DESC').all();
+  res.json(staff);
+});
+
+router.post('/staff', adminAuth, (req, res) => {
+  const db = getDb();
+  const bcrypt = require('bcryptjs');
+  const { username, password, name, role, permissions } = req.body;
+  if (!username || !password || !name) return res.status(400).json({ error: 'Username, password and name required' });
+  const existing = db.prepare('SELECT id FROM staff WHERE username = ?').get(username);
+  if (existing) return res.status(400).json({ error: 'Username already exists' });
+  const hashedPassword = bcrypt.hashSync(password, 10);
+  const result = db.prepare(
+    'INSERT INTO staff (username, password, name, role, permissions) VALUES (?, ?, ?, ?, ?)'
+  ).run(username, hashedPassword, name, role || 'editor', JSON.stringify(permissions || {}));
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+
+router.put('/staff/:id', adminAuth, (req, res) => {
+  const db = getDb();
+  const bcrypt = require('bcryptjs');
+  const { name, role, permissions, active, password } = req.body;
+  if (password) {
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    db.prepare('UPDATE staff SET name=?, role=?, permissions=?, active=?, password=? WHERE id=?').run(name, role || 'editor', JSON.stringify(permissions || {}), active ? 1 : 0, hashedPassword, req.params.id);
+  } else {
+    db.prepare('UPDATE staff SET name=?, role=?, permissions=?, active=? WHERE id=?').run(name, role || 'editor', JSON.stringify(permissions || {}), active ? 1 : 0, req.params.id);
+  }
+  res.json({ success: true });
+});
+
+router.delete('/staff/:id', adminAuth, (req, res) => {
+  const db = getDb();
+  db.prepare('DELETE FROM staff WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ===== CURRENCIES =====
+router.get('/currencies', adminAuth, (req, res) => {
+  const db = getDb();
+  const currencies = db.prepare('SELECT * FROM currencies ORDER BY id ASC').all();
+  res.json(currencies);
+});
+
+router.put('/currencies', adminAuth, (req, res) => {
+  const db = getDb();
+  const { currencies } = req.body;
+  if (!currencies || !Array.isArray(currencies)) return res.status(400).json({ error: 'Currencies array required' });
+  for (const c of currencies) {
+    db.prepare('UPDATE currencies SET rate_from_try = ?, active = ?, updated_at = CURRENT_TIMESTAMP WHERE code = ?').run(c.rate_from_try, c.active ? 1 : 0, c.code);
+  }
+  res.json({ success: true });
+});
+
+router.post('/currencies', adminAuth, (req, res) => {
+  const db = getDb();
+  const { code, name_ar, name_en, name_tr, symbol, rate_from_try } = req.body;
+  if (!code || !symbol) return res.status(400).json({ error: 'Code and symbol required' });
+  const result = db.prepare(
+    'INSERT OR REPLACE INTO currencies (code, name_ar, name_en, name_tr, symbol, rate_from_try) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(code.toUpperCase(), name_ar || '', name_en || '', name_tr || '', symbol, rate_from_try || 1.0);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+
+// ===== CUSTOM CATEGORIES =====
+router.get('/custom-categories', adminAuth, (req, res) => {
+  const db = getDb();
+  const categories = db.prepare('SELECT * FROM custom_categories ORDER BY sort_order ASC, id DESC').all();
+  res.json(categories);
+});
+
+router.post('/custom-categories', adminAuth, (req, res) => {
+  const db = getDb();
+  const { name_ar, name_en, name_tr, image_url, sort_order } = req.body;
+  if (!name_ar) return res.status(400).json({ error: 'Arabic name required' });
+  const result = db.prepare(
+    'INSERT INTO custom_categories (name_ar, name_en, name_tr, image_url, sort_order) VALUES (?, ?, ?, ?, ?)'
+  ).run(name_ar, name_en || '', name_tr || '', image_url || '', sort_order || 0);
+  res.json({ success: true, id: result.lastInsertRowid });
+});
+
+router.put('/custom-categories/:id', adminAuth, (req, res) => {
+  const db = getDb();
+  const { name_ar, name_en, name_tr, image_url, sort_order, active } = req.body;
+  db.prepare(
+    'UPDATE custom_categories SET name_ar=?, name_en=?, name_tr=?, image_url=?, sort_order=?, active=? WHERE id=?'
+  ).run(name_ar || '', name_en || '', name_tr || '', image_url || '', sort_order || 0, active !== undefined ? (active ? 1 : 0) : 1, req.params.id);
+  res.json({ success: true });
+});
+
+router.delete('/custom-categories/:id', adminAuth, (req, res) => {
+  const db = getDb();
+  db.prepare('DELETE FROM custom_categories WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
 });
 
 module.exports = router;

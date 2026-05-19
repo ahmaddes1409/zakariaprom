@@ -101,6 +101,9 @@ async function loadSection(section) {
     case 'chatbot': await renderChatbot(); break;
     case 'analytics': await renderAnalytics(); break;
     case 'settings': await renderSettings(); break;
+    case 'banners': await renderBanners(); break;
+    case 'staff': await renderStaff(); break;
+    case 'currencies': await renderCurrencies(); break;
   }
 }
 
@@ -109,7 +112,8 @@ function getSectionTitle(s) {
     dashboard: 'لوحة المعلومات', orders: 'الطلبات', products: 'المنتجات',
     categories: 'الفئات', translations: 'الترجمات', users: 'العملاء',
     coupons: 'كوبونات الخصم', posts: 'المدونة', chatbot: 'الشات بوت',
-    analytics: 'الإحصائيات', settings: 'الإعدادات'
+    analytics: 'الإحصائيات', settings: 'الإعدادات',
+    banners: 'البانرات', staff: 'الموظفين', currencies: 'العملات'
   };
   return titles[s] || s;
 }
@@ -251,7 +255,7 @@ async function renderProducts() {
               <td>${p.hidden ? '<span class="status status-cancelled">مخفي</span>' : '<span class="status status-completed">ظاهر</span>'}</td>
               <td>
                 <button class="btn-secondary btn-sm" onclick="editProduct('${p.id}')">تعديل</button>
-                <button class="btn-sm ${p.hidden ? 'btn-success' : 'btn-danger'}" onclick="toggleProduct('${p.id}', ${!p.hidden})">${p.hidden ? 'إظهار' : 'إخفاء'}</button>
+                <button class="btn-sm ${p.hidden ? 'btn-success' : 'btn-danger'}" onclick="toggleProduct('${p.model || p.id}', ${!p.hidden})">${p.hidden ? 'إظهار' : 'إخفاء'}</button>
               </td>
             </tr>`).join('')}
           </tbody>
@@ -668,8 +672,8 @@ async function renderChatbot() {
         <table>
           <thead><tr><th>الكلمات المفتاحية</th><th>الرد (عربي)</th><th>الرد (إنجليزي)</th><th>الرد (تركي)</th><th>إجراءات</th></tr></thead>
           <tbody>${responses.length ? responses.map(r => `
-            <tr><td>${r.keywords}</td><td>${(r.response_ar || '').substring(0,50)}...</td>
-            <td>${(r.response_en || '').substring(0,50)}...</td><td>${(r.response_tr || '').substring(0,50)}...</td>
+            <tr><td>${r.keywords}</td><td>${(r.answer_ar || '').substring(0,50)}...</td>
+            <td>${(r.answer_en || '').substring(0,50)}...</td><td>${(r.answer_tr || '').substring(0,50)}...</td>
             <td><button class="btn-secondary btn-sm" onclick="editChatResponse(${r.id})">تعديل</button>
             <button class="btn-danger btn-sm" onclick="deleteChatResponse(${r.id})">حذف</button></td></tr>`).join('')
             : '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-robot"></i><p>لا توجد ردود مخصصة</p></div></td></tr>'}
@@ -694,9 +698,9 @@ window.addChatResponse = function() {
     e.preventDefault();
     await api('/api/admin/chatbot', { method: 'POST', body: {
       keywords: document.getElementById('crKeywords').value,
-      response_ar: document.getElementById('crAr').value,
-      response_en: document.getElementById('crEn').value,
-      response_tr: document.getElementById('crTr').value
+      answer_ar: document.getElementById('crAr').value,
+      answer_en: document.getElementById('crEn').value,
+      answer_tr: document.getElementById('crTr').value
     }});
     toast('تمت إضافة الرد');
     closeModal();
@@ -704,6 +708,35 @@ window.addChatResponse = function() {
   };
 };
 
+window.editChatResponse = async function(id) {
+  const data = await api('/api/admin/chatbot');
+  const responses = Array.isArray(data) ? data : (data?.responses || []);
+  const r = responses.find(x => x.id === id);
+  if (!r) return toast('لم يتم العثور على الرد');
+  showModal('تعديل رد الشات بوت', `
+    <form id="editChatForm">
+      <div class="form-group"><label>الكلمات المفتاحية (مفصولة بفاصلة)</label><input id="ecKeywords" value="${r.keywords || ''}" required></div>
+      <div class="form-group"><label>الرد (عربي)</label><textarea id="ecAr" rows="3">${r.answer_ar || ''}</textarea></div>
+      <div class="form-group"><label>الرد (إنجليزي)</label><textarea id="ecEn" rows="3">${r.answer_en || ''}</textarea></div>
+      <div class="form-group"><label>الرد (تركي)</label><textarea id="ecTr" rows="3">${r.answer_tr || ''}</textarea></div>
+      <button type="submit" class="btn-primary">حفظ التعديلات</button>
+    </form>
+  `);
+  document.getElementById('editChatForm').onsubmit = async (e) => {
+    e.preventDefault();
+    await api('/api/admin/chatbot/' + id, { method: 'PUT', body: {
+      keywords: document.getElementById('ecKeywords').value,
+      answer_ar: document.getElementById('ecAr').value,
+      answer_en: document.getElementById('ecEn').value,
+      answer_tr: document.getElementById('ecTr').value,
+      priority: r.priority || 0,
+      active: 1
+    }});
+    toast('تم تحديث الرد');
+    closeModal();
+    renderChatbot();
+  };
+};
 window.deleteChatResponse = async function(id) {
   if (!confirm('حذف هذا الرد؟')) return;
   await api(`/api/admin/chatbot/${id}`, { method: 'DELETE' });
@@ -843,6 +876,305 @@ async function renderSettings() {
     }});
     if (res?.success) toast('تم تغيير كلمة المرور');
     else toast(res?.error || 'خطأ', 'error');
+  };
+}
+
+// ========== BANNERS ==========
+async function renderBanners() {
+  const banners = await api('/api/admin/banners') || [];
+  const area = document.getElementById('contentArea');
+  area.innerHTML = `
+    <div class="filters-bar">
+      <button class="btn-primary" onclick="addBanner()"><i class="fas fa-plus"></i> إضافة بانر</button>
+      <span style="color:var(--text-muted);">${banners.length} بانر</span>
+    </div>
+    <div class="card">
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>الصورة</th><th>العنوان (عربي)</th><th>الرابط</th><th>الترتيب</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+          <tbody>${banners.map(b => `
+            <tr>
+              <td><img src="${b.image_url}" style="width:80px;height:40px;object-fit:cover;border-radius:4px;" onerror="this.style.display='none'"></td>
+              <td>${b.title_ar || '-'}</td>
+              <td>${b.link || '-'}</td>
+              <td>${b.sort_order || 0}</td>
+              <td>${b.active ? '<span class="status status-completed">نشط</span>' : '<span class="status status-cancelled">معطل</span>'}</td>
+              <td>
+                <button class="btn-secondary btn-sm" onclick="editBanner(${b.id})">تعديل</button>
+                <button class="btn-danger btn-sm" onclick="deleteBanner(${b.id})">حذف</button>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+window.addBanner = function() {
+  showModal('إضافة بانر جديد', `
+    <form id="bannerForm">
+      <div class="form-group"><label>العنوان (عربي)</label><input id="bTitleAr"></div>
+      <div class="form-group"><label>العنوان (إنجليزي)</label><input id="bTitleEn"></div>
+      <div class="form-group"><label>العنوان (تركي)</label><input id="bTitleTr"></div>
+      <div class="form-group"><label>الوصف (عربي)</label><input id="bSubAr"></div>
+      <div class="form-group"><label>الوصف (إنجليزي)</label><input id="bSubEn"></div>
+      <div class="form-group"><label>الوصف (تركي)</label><input id="bSubTr"></div>
+      <div class="form-group"><label>رابط الصورة *</label><input id="bImage" required placeholder="https://..."></div>
+      <div class="form-group"><label>رابط الزر</label><input id="bLink" placeholder="/category/..."></div>
+      <div class="form-group"><label>الترتيب</label><input type="number" id="bOrder" value="0"></div>
+      <button type="submit" class="btn-primary">حفظ</button>
+    </form>
+  `);
+  document.getElementById('bannerForm').onsubmit = async (e) => {
+    e.preventDefault();
+    await api('/api/admin/banners', { method: 'POST', body: {
+      title_ar: document.getElementById('bTitleAr').value,
+      title_en: document.getElementById('bTitleEn').value,
+      title_tr: document.getElementById('bTitleTr').value,
+      subtitle_ar: document.getElementById('bSubAr').value,
+      subtitle_en: document.getElementById('bSubEn').value,
+      subtitle_tr: document.getElementById('bSubTr').value,
+      image_url: document.getElementById('bImage').value,
+      link: document.getElementById('bLink').value,
+      sort_order: parseInt(document.getElementById('bOrder').value) || 0
+    }});
+    toast('تم إضافة البانر');
+    closeModal();
+    renderBanners();
+  };
+};
+
+window.editBanner = async function(id) {
+  const banners = await api('/api/admin/banners') || [];
+  const b = banners.find(x => x.id === id);
+  if (!b) return;
+  showModal('تعديل البانر', `
+    <form id="bannerForm">
+      <div class="form-group"><label>العنوان (عربي)</label><input id="bTitleAr" value="${b.title_ar || ''}"></div>
+      <div class="form-group"><label>العنوان (إنجليزي)</label><input id="bTitleEn" value="${b.title_en || ''}"></div>
+      <div class="form-group"><label>العنوان (تركي)</label><input id="bTitleTr" value="${b.title_tr || ''}"></div>
+      <div class="form-group"><label>الوصف (عربي)</label><input id="bSubAr" value="${b.subtitle_ar || ''}"></div>
+      <div class="form-group"><label>الوصف (إنجليزي)</label><input id="bSubEn" value="${b.subtitle_en || ''}"></div>
+      <div class="form-group"><label>الوصف (تركي)</label><input id="bSubTr" value="${b.subtitle_tr || ''}"></div>
+      <div class="form-group"><label>رابط الصورة *</label><input id="bImage" value="${b.image_url || ''}" required></div>
+      <div class="form-group"><label>رابط الزر</label><input id="bLink" value="${b.link || ''}"></div>
+      <div class="form-group"><label>الترتيب</label><input type="number" id="bOrder" value="${b.sort_order || 0}"></div>
+      <div class="form-group"><label>نشط</label><label class="toggle"><input type="checkbox" id="bActive" ${b.active ? 'checked' : ''}><span class="toggle-slider"></span></label></div>
+      <button type="submit" class="btn-primary">حفظ</button>
+    </form>
+  `);
+  document.getElementById('bannerForm').onsubmit = async (e) => {
+    e.preventDefault();
+    await api(`/api/admin/banners/${id}`, { method: 'PUT', body: {
+      title_ar: document.getElementById('bTitleAr').value,
+      title_en: document.getElementById('bTitleEn').value,
+      title_tr: document.getElementById('bTitleTr').value,
+      subtitle_ar: document.getElementById('bSubAr').value,
+      subtitle_en: document.getElementById('bSubEn').value,
+      subtitle_tr: document.getElementById('bSubTr').value,
+      image_url: document.getElementById('bImage').value,
+      link: document.getElementById('bLink').value,
+      sort_order: parseInt(document.getElementById('bOrder').value) || 0,
+      active: document.getElementById('bActive').checked
+    }});
+    toast('تم تعديل البانر');
+    closeModal();
+    renderBanners();
+  };
+};
+
+window.deleteBanner = async function(id) {
+  if (!confirm('هل تريد حذف هذا البانر؟')) return;
+  await api(`/api/admin/banners/${id}`, { method: 'DELETE' });
+  toast('تم حذف البانر');
+  renderBanners();
+};
+
+// ========== STAFF ==========
+async function renderStaff() {
+  const staff = await api('/api/admin/staff') || [];
+  const area = document.getElementById('contentArea');
+  area.innerHTML = `
+    <div class="filters-bar">
+      <button class="btn-primary" onclick="addStaff()"><i class="fas fa-plus"></i> إضافة موظف</button>
+      <span style="color:var(--text-muted);">${staff.length} موظف</span>
+    </div>
+    <div class="card">
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+          <tbody>${staff.map(s => `
+            <tr>
+              <td>${s.name}</td>
+              <td>${s.username}</td>
+              <td>${s.role === 'editor' ? 'محرر' : s.role === 'viewer' ? 'مشاهد' : s.role}</td>
+              <td>${s.active ? '<span class="status status-completed">نشط</span>' : '<span class="status status-cancelled">معطل</span>'}</td>
+              <td>
+                <button class="btn-secondary btn-sm" onclick="editStaff(${s.id})">تعديل</button>
+                <button class="btn-danger btn-sm" onclick="deleteStaff(${s.id})">حذف</button>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+window.addStaff = function() {
+  showModal('إضافة موظف جديد', `
+    <form id="staffForm">
+      <div class="form-group"><label>الاسم *</label><input id="stName" required></div>
+      <div class="form-group"><label>اسم المستخدم *</label><input id="stUsername" required></div>
+      <div class="form-group"><label>كلمة المرور *</label><input type="password" id="stPassword" required></div>
+      <div class="form-group"><label>الدور</label><select id="stRole"><option value="editor">محرر (تعديل منتجات وطلبات)</option><option value="viewer">مشاهد (عرض فقط)</option></select></div>
+      <div class="form-group"><label>الصلاحيات</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <label><input type="checkbox" class="perm" value="products"> المنتجات</label>
+          <label><input type="checkbox" class="perm" value="orders"> الطلبات</label>
+          <label><input type="checkbox" class="perm" value="categories"> الفئات</label>
+          <label><input type="checkbox" class="perm" value="translations"> الترجمات</label>
+          <label><input type="checkbox" class="perm" value="users"> العملاء</label>
+          <label><input type="checkbox" class="perm" value="coupons"> الكوبونات</label>
+          <label><input type="checkbox" class="perm" value="banners"> البانرات</label>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary">حفظ</button>
+    </form>
+  `);
+  document.getElementById('staffForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const perms = {};
+    document.querySelectorAll('.perm:checked').forEach(c => { perms[c.value] = true; });
+    await api('/api/admin/staff', { method: 'POST', body: {
+      name: document.getElementById('stName').value,
+      username: document.getElementById('stUsername').value,
+      password: document.getElementById('stPassword').value,
+      role: document.getElementById('stRole').value,
+      permissions: perms
+    }});
+    toast('تم إضافة الموظف');
+    closeModal();
+    renderStaff();
+  };
+};
+
+window.editStaff = async function(id) {
+  const staff = await api('/api/admin/staff') || [];
+  const s = staff.find(x => x.id === id);
+  if (!s) return;
+  const perms = typeof s.permissions === 'string' ? JSON.parse(s.permissions || '{}') : (s.permissions || {});
+  showModal('تعديل الموظف', `
+    <form id="staffForm">
+      <div class="form-group"><label>الاسم</label><input id="stName" value="${s.name}"></div>
+      <div class="form-group"><label>كلمة مرور جديدة (اترك فارغاً لعدم التغيير)</label><input type="password" id="stPassword"></div>
+      <div class="form-group"><label>الدور</label><select id="stRole"><option value="editor" ${s.role==='editor'?'selected':''}>محرر</option><option value="viewer" ${s.role==='viewer'?'selected':''}>مشاهد</option></select></div>
+      <div class="form-group"><label>نشط</label><label class="toggle"><input type="checkbox" id="stActive" ${s.active ? 'checked' : ''}><span class="toggle-slider"></span></label></div>
+      <div class="form-group"><label>الصلاحيات</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <label><input type="checkbox" class="perm" value="products" ${perms.products?'checked':''}> المنتجات</label>
+          <label><input type="checkbox" class="perm" value="orders" ${perms.orders?'checked':''}> الطلبات</label>
+          <label><input type="checkbox" class="perm" value="categories" ${perms.categories?'checked':''}> الفئات</label>
+          <label><input type="checkbox" class="perm" value="translations" ${perms.translations?'checked':''}> الترجمات</label>
+          <label><input type="checkbox" class="perm" value="users" ${perms.users?'checked':''}> العملاء</label>
+          <label><input type="checkbox" class="perm" value="coupons" ${perms.coupons?'checked':''}> الكوبونات</label>
+          <label><input type="checkbox" class="perm" value="banners" ${perms.banners?'checked':''}> البانرات</label>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary">حفظ</button>
+    </form>
+  `);
+  document.getElementById('staffForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const permsObj = {};
+    document.querySelectorAll('.perm:checked').forEach(c => { permsObj[c.value] = true; });
+    const body = {
+      name: document.getElementById('stName').value,
+      role: document.getElementById('stRole').value,
+      active: document.getElementById('stActive').checked,
+      permissions: permsObj
+    };
+    const pw = document.getElementById('stPassword').value;
+    if (pw) body.password = pw;
+    await api(`/api/admin/staff/${id}`, { method: 'PUT', body });
+    toast('تم تعديل الموظف');
+    closeModal();
+    renderStaff();
+  };
+};
+
+window.deleteStaff = async function(id) {
+  if (!confirm('هل تريد حذف هذا الموظف؟')) return;
+  await api(`/api/admin/staff/${id}`, { method: 'DELETE' });
+  toast('تم حذف الموظف');
+  renderStaff();
+};
+
+// ========== CURRENCIES ==========
+async function renderCurrencies() {
+  const currencies = await api('/api/admin/currencies') || [];
+  const area = document.getElementById('contentArea');
+  area.innerHTML = `
+    <div class="card">
+      <div class="card-header"><h3>إدارة العملات وأسعار الصرف</h3></div>
+      <div class="card-body">
+        <p style="color:var(--text-muted);margin-bottom:16px;">الأسعار الأساسية بالليرة التركية. أدخل سعر الصرف لكل عملة (1 TRY = X عملة).</p>
+        <form id="currenciesForm">
+          <div class="table-responsive">
+            <table>
+              <thead><tr><th>الرمز</th><th>الاسم</th><th>الرمز</th><th>سعر الصرف (1 TRY =)</th><th>نشط</th></tr></thead>
+              <tbody>${currencies.map(c => `
+                <tr>
+                  <td><strong>${c.code}</strong></td>
+                  <td>${c.name_ar || c.name_en || c.code}</td>
+                  <td>${c.symbol}</td>
+                  <td><input type="number" step="0.0001" class="curr-rate" data-code="${c.code}" value="${c.rate_from_try}" style="width:120px;"></td>
+                  <td><label class="toggle"><input type="checkbox" class="curr-active" data-code="${c.code}" ${c.active ? 'checked' : ''}><span class="toggle-slider"></span></label></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <button type="submit" class="btn-primary" style="margin-top:16px;">حفظ أسعار الصرف</button>
+        </form>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-header"><h3>إضافة عملة جديدة</h3></div>
+      <div class="card-body">
+        <form id="addCurrencyForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+          <div class="form-group"><label>الرمز</label><input id="ncCode" placeholder="EUR" style="width:80px;"></div>
+          <div class="form-group"><label>الاسم (عربي)</label><input id="ncNameAr" placeholder="يورو"></div>
+          <div class="form-group"><label>الرمز</label><input id="ncSymbol" placeholder="€" style="width:60px;"></div>
+          <div class="form-group"><label>سعر الصرف</label><input type="number" step="0.0001" id="ncRate" value="1" style="width:100px;"></div>
+          <button type="submit" class="btn-primary">إضافة</button>
+        </form>
+      </div>
+    </div>
+  `;
+  document.getElementById('currenciesForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const currArr = [];
+    document.querySelectorAll('.curr-rate').forEach(el => {
+      currArr.push({
+        code: el.dataset.code,
+        rate_from_try: parseFloat(el.value) || 1,
+        active: document.querySelector(`.curr-active[data-code="${el.dataset.code}"]`).checked
+      });
+    });
+    await api('/api/admin/currencies', { method: 'PUT', body: { currencies: currArr } });
+    toast('تم حفظ أسعار الصرف');
+  };
+  document.getElementById('addCurrencyForm').onsubmit = async (e) => {
+    e.preventDefault();
+    await api('/api/admin/currencies', { method: 'POST', body: {
+      code: document.getElementById('ncCode').value,
+      name_ar: document.getElementById('ncNameAr').value,
+      symbol: document.getElementById('ncSymbol').value,
+      rate_from_try: parseFloat(document.getElementById('ncRate').value) || 1
+    }});
+    toast('تم إضافة العملة');
+    renderCurrencies();
   };
 }
 

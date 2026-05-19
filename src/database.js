@@ -365,6 +365,68 @@ function initializeDatabase() {
     )
   `);
 
+  // Banners table
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS banners (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title_ar TEXT DEFAULT '',
+      title_en TEXT DEFAULT '',
+      title_tr TEXT DEFAULT '',
+      subtitle_ar TEXT DEFAULT '',
+      subtitle_en TEXT DEFAULT '',
+      subtitle_tr TEXT DEFAULT '',
+      image_url TEXT NOT NULL,
+      link TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+
+  // Staff/employees table
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS staff (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT DEFAULT 'editor',
+      permissions TEXT DEFAULT '{}',
+      active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_login DATETIME
+    )
+  `).run();
+
+  // Currency rates table
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS currencies (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      name_ar TEXT DEFAULT '',
+      name_en TEXT DEFAULT '',
+      name_tr TEXT DEFAULT '',
+      symbol TEXT DEFAULT '',
+      rate_from_try REAL DEFAULT 1.0,
+      active INTEGER DEFAULT 1,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+
+  // Custom categories table
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS custom_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name_ar TEXT NOT NULL,
+      name_en TEXT DEFAULT '',
+      name_tr TEXT DEFAULT '',
+      image_url TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+
   // Create default admin if not exists
   const adminExists = db.prepare('SELECT id FROM admins WHERE username = ?').get('admin');
   if (!adminExists) {
@@ -467,6 +529,20 @@ function initializeDatabase() {
 
     for (const faq of defaultFAQs) {
       insertFAQ.run(faq.question_ar, faq.question_en, faq.question_tr, faq.answer_ar, faq.answer_en, faq.answer_tr, faq.keywords, faq.priority);
+    }
+  }
+
+  // Insert default currencies
+  const currencyExists = db.prepare('SELECT id FROM currencies LIMIT 1').get();
+  if (!currencyExists) {
+    const defaultCurrencies = [
+      { code: 'TRY', name_ar: 'ليرة تركية', name_en: 'Turkish Lira', name_tr: 'Türk Lirası', symbol: '₺', rate_from_try: 1.0 },
+      { code: 'USD', name_ar: 'دولار أمريكي', name_en: 'US Dollar', name_tr: 'Amerikan Doları', symbol: '$', rate_from_try: 0.029 },
+      { code: 'SYP', name_ar: 'ليرة سورية', name_en: 'Syrian Pound', name_tr: 'Suriye Lirası', symbol: 'ل.س', rate_from_try: 380 }
+    ];
+    const insertCurrency = db.prepare('INSERT OR IGNORE INTO currencies (code, name_ar, name_en, name_tr, symbol, rate_from_try) VALUES (?, ?, ?, ?, ?, ?)');
+    for (const c of defaultCurrencies) {
+      insertCurrency.run(c.code, c.name_ar, c.name_en, c.name_tr, c.symbol, c.rate_from_try);
     }
   }
 

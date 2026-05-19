@@ -611,9 +611,10 @@ router.get('/chatbot', adminAuth, (req, res) => {
 router.post('/chatbot', adminAuth, (req, res) => {
   const db = getDb();
   const { question_ar, question_en, question_tr, answer_ar, answer_en, answer_tr, keywords, priority } = req.body;
+  const qAr = question_ar || keywords || '';
   const result = db.prepare(
     'INSERT INTO chatbot_faq (question_ar, question_en, question_tr, answer_ar, answer_en, answer_tr, keywords, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(question_ar, question_en || '', question_tr || '', answer_ar, answer_en || '', answer_tr || '', keywords || '', priority || 0);
+  ).run(qAr, question_en || '', question_tr || '', answer_ar || '', answer_en || '', answer_tr || '', keywords || '', priority || 0);
   res.json({ success: true, id: result.lastInsertRowid });
 });
 

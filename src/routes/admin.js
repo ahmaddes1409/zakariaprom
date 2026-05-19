@@ -621,9 +621,10 @@ router.post('/chatbot', adminAuth, (req, res) => {
 router.put('/chatbot/:id', adminAuth, (req, res) => {
   const db = getDb();
   const { question_ar, question_en, question_tr, answer_ar, answer_en, answer_tr, keywords, priority, active } = req.body;
+  const qAr = question_ar || keywords || '';
   db.prepare(
     'UPDATE chatbot_faq SET question_ar=?, question_en=?, question_tr=?, answer_ar=?, answer_en=?, answer_tr=?, keywords=?, priority=?, active=? WHERE id=?'
-  ).run(question_ar, question_en || '', question_tr || '', answer_ar, answer_en || '', answer_tr || '', keywords || '', priority || 0, active ? 1 : 0, req.params.id);
+  ).run(qAr, question_en || '', question_tr || '', answer_ar || '', answer_en || '', answer_tr || '', keywords || '', priority || 0, active !== undefined ? (active ? 1 : 0) : 1, req.params.id);
   res.json({ success: true });
 });
 

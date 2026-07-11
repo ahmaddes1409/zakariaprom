@@ -10,7 +10,7 @@ export default function AboutPage() {
   const { language, t, settings } = useLanguage();
 
   const siteName = (settings[`site_name_${language}` as keyof typeof settings] as string) || 
-    (language === "ar" ? "زكريا بروم" : "Zakaria Prom");
+    (language === "ar" ? "مكتبة زكريا" : "Zakaria Library");
 
   const stats = [
     { icon: Building2, value: "2", labelAr: "مطبعة", labelEn: "Printing Facilities", labelTr: "Matbaa" },

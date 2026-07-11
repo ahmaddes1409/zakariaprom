@@ -22,7 +22,10 @@ export default function Header() {
   const [, navigate] = useLocation();
 
   const siteName = (settings[`site_name_${language}` as keyof typeof settings] as string) || 
-    (language === "ar" ? "زكريا بروم" : "Zakaria Prom");
+    (language === "ar" ? "مكتبة زكريا" : "Zakaria Library");
+  const logoType = (settings.logo_type as string) || 'text';
+  const logoText = (settings.logo_text as string) || 'ZA';
+  const logoUrl = (settings.logo_url as string) || '';
   const phone = settings.phone || "+90 542 810 4208";
   const email = settings.email || "info@zakariaprom.com";
 
@@ -103,9 +106,13 @@ export default function Header() {
         <div className="container flex items-center justify-between py-3 gap-4">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <div className="w-12 h-12 bg-[#0e4a6f] rounded-lg flex items-center justify-center text-white font-black text-xl tracking-tight">
-              ZA
-            </div>
+            {logoType === 'image' && logoUrl ? (
+              <img src={logoUrl} alt={siteName} className="w-12 h-12 rounded-lg object-contain" />
+            ) : (
+              <div className="w-12 h-12 bg-[#0e4a6f] rounded-lg flex items-center justify-center text-white font-black text-xl tracking-tight">
+                {logoText}
+              </div>
+            )}
             <div className="hidden sm:block">
               <div className="font-bold text-[#0e4a6f] text-lg leading-tight">
                 {siteName}

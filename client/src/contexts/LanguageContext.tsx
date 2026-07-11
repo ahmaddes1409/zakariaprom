@@ -28,7 +28,7 @@ const fallbackTranslations: Record<Language, Record<string, string>> = {
     "services.delivery": "شحن وتوصيل",
     "services.deliveryDesc": "نوصل طلباتكم إلى جميع أنحاء تركيا وسوريا والمنطقة",
     "about.title": "من نحن",
-    "about.desc": "زكريا بروم شركة رائدة في مجال إنتاج واستيراد منتجات الدعاية والإعلان والهدايا الترويجية.",
+    "about.desc": "مكتبة زكريا شركة رائدة في مجال إنتاج واستيراد منتجات الدعاية والإعلان والهدايا الترويجية.",
     "contact.title": "تواصل معنا",
     "contact.name": "الاسم",
     "contact.email": "البريد الإلكتروني",
@@ -66,7 +66,7 @@ const fallbackTranslations: Record<Language, Record<string, string>> = {
     "services.delivery": "Shipping & Delivery",
     "services.deliveryDesc": "We deliver your orders across Turkey, Syria and the region",
     "about.title": "About Us",
-    "about.desc": "Zakaria Prom is a leading company in the production and import of promotional and advertising products.",
+    "about.desc": "Zakaria Library is a leading company in the production and import of promotional and advertising products.",
     "contact.title": "Contact Us",
     "contact.name": "Name",
     "contact.email": "Email",
@@ -104,7 +104,7 @@ const fallbackTranslations: Record<Language, Record<string, string>> = {
     "services.delivery": "Kargo ve Teslimat",
     "services.deliveryDesc": "Siparişlerinizi Türkiye, Suriye ve bölge geneline ulaştırıyoruz",
     "about.title": "Hakkımızda",
-    "about.desc": "Zakaria Prom, promosyon ve reklam ürünleri üretim ve ithalatında lider bir firmadır.",
+    "about.desc": "Zakaria Kütüphane, promosyon ve reklam ürünleri üretim ve ithalatında lider bir firmadır.",
     "contact.title": "İletişim",
     "contact.name": "İsim",
     "contact.email": "E-posta",
@@ -188,7 +188,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       // Check settings for dynamic values
       if (key === "site.name") {
         return settings[`site_name_${language}` as keyof ApiSettings] as string || 
-          (language === "ar" ? "زكريا بروم" : "Zakaria Prom");
+          (language === "ar" ? "مكتبة زكريا" : "Zakaria Library");
       }
       if (key === "site.slogan") {
         return settings[`site_slogan_${language}` as keyof ApiSettings] as string || 

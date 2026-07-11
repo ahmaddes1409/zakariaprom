@@ -102,7 +102,7 @@ export default function Home() {
   };
 
   const siteName = settings[`site_name_${language}` as keyof typeof settings] as string || 
-    (language === "ar" ? "زكريا بروم" : "Zakaria Prom");
+    (language === "ar" ? "مكتبة زكريا" : "Zakaria Library");
 
   // Default hero if no banners
   const hasApiBanners = banners.length > 0;

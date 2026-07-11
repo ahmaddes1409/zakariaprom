@@ -6,7 +6,10 @@ export default function Footer() {
   const { language, t, settings } = useLanguage();
 
   const siteName = (settings[`site_name_${language}` as keyof typeof settings] as string) || 
-    (language === "ar" ? "زكريا بروم" : "Zakaria Prom");
+    (language === "ar" ? "مكتبة زكريا" : "Zakaria Library");
+  const logoType = (settings.logo_type as string) || 'text';
+  const logoText = (settings.logo_text as string) || 'ZA';
+  const logoUrl = (settings.logo_url as string) || '';
   
   const phone = settings.phone || "+90 542 810 4208";
   const email = settings.email || "info@zakariaprom.com";
@@ -23,9 +26,13 @@ export default function Footer() {
           {/* Company Info */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-[#00a8a8] rounded-lg flex items-center justify-center text-white font-black text-lg">
-                ZA
-              </div>
+              {logoType === 'image' && logoUrl ? (
+                <img src={logoUrl} alt={siteName} className="w-10 h-10 rounded-lg object-contain" />
+              ) : (
+                <div className="w-10 h-10 bg-[#00a8a8] rounded-lg flex items-center justify-center text-white font-black text-lg">
+                  {logoText}
+                </div>
+              )}
               <div>
                 <div className="font-bold text-white text-lg">{siteName}</div>
               </div>

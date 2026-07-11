@@ -45,6 +45,9 @@ export interface ApiSettings {
   chatbot_welcome_ar?: string;
   chatbot_welcome_en?: string;
   chatbot_welcome_tr?: string;
+  logo_type?: string;
+  logo_text?: string;
+  logo_url?: string;
 }
 
 export interface ApiTranslations {

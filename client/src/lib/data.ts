@@ -54,9 +54,9 @@ export const featuredProducts: Product[] = [
 ];
 
 export const companyInfo = {
-  nameAr: "زكريا بروم",
-  nameEn: "Zakaria Prom",
-  nameTr: "Zakaria Prom",
+  nameAr: "مكتبة زكريا",
+  nameEn: "Zakaria Library",
+  nameTr: "Zakaria Kütüphane",
   phone: "+90 542 810 4208",
   email: "info@zakariaprom.com",
   turkeyAddress: {

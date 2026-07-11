@@ -161,28 +161,31 @@ export default function ProductPage() {
               {/* Options */}
               {product.options && product.options.length > 0 && (
                 <div className="space-y-4 mb-6">
-                  {product.options.map((option, i) => (
-                    <div key={i}>
-                      <h3 className="text-sm font-bold text-[#0e4a6f] mb-2">{option.name}</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {option.values.map((val, j) => (
-                          <span
-                            key={j}
-                            className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-md"
-                          >
-                            {val}
-                          </span>
-                        ))}
+                  {product.options.map((option, i) => {
+                    const optionValues = option.values || option.items || [];
+                    return (
+                      <div key={i}>
+                        <h3 className="text-sm font-bold text-[#0e4a6f] mb-2">{option.name}</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {optionValues.map((val: any, j: number) => (
+                            <span
+                              key={j}
+                              className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-md"
+                            >
+                              {typeof val === 'string' ? val : val?.name || (typeof val === 'object' ? '---' : String(val))}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
               {/* Price */}
-              {product.price > 0 && (
+              {product.price_usd > 0 && (
                 <div className="text-xl font-bold text-[#0e4a6f] mb-6">
-                  {product.price} {settings.currency || "TL"}
+                  ${product.price_usd}
                 </div>
               )}
 

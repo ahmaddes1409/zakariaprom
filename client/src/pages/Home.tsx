@@ -374,9 +374,9 @@ export default function Home() {
                         {getProductName(product)}
                       </h3>
                       <div className="flex items-center justify-between">
-                        {product.price > 0 && (
+                        {product.price_usd > 0 && (
                           <span className="text-xs text-gray-400">
-                            {product.price} {settings.currency || "TL"}
+                            ${product.price_usd}
                           </span>
                         )}
                         <span className="text-xs px-3 py-1.5 bg-[#00a8a8]/10 text-[#00a8a8] font-medium rounded-md">

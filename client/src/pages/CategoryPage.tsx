@@ -1,15 +1,16 @@
 /*
  * Design: Clean Corporate Catalog - Teal/Navy
  * Dynamic category page - fetches real products from API
+ * Infinite Scroll: loads more products as user scrolls down
  * Responsive: mobile-first with collapsible sidebar on small screens
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useParams } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { fetchCategories, fetchProducts, type ApiCategory, type ApiProduct } from "@/lib/api";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
+import { Filter, X, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function CategoryPage() {
@@ -21,10 +22,15 @@ export default function CategoryPage() {
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const currentCategory = categories.find((c) => c.tr === categoryTr);
 
@@ -32,20 +38,55 @@ export default function CategoryPage() {
     fetchCategories().then(setCategories);
   }, []);
 
+  // Reset when category changes
   useEffect(() => {
-    setLoading(true);
+    setProducts([]);
     setPage(1);
+    setHasMore(true);
+    setLoading(true);
   }, [categoryTr]);
 
+  // Fetch products
   useEffect(() => {
-    setLoading(true);
+    if (page === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     fetchProducts({ category: categoryTr, page, limit: 24, lang: language }).then((data) => {
-      setProducts(data.products || []);
+      if (page === 1) {
+        setProducts(data.products || []);
+      } else {
+        setProducts((prev) => [...prev, ...(data.products || [])]);
+      }
       setTotalPages(data.pagination?.totalPages || 1);
       setTotal(data.pagination?.total || 0);
+      setHasMore(page < (data.pagination?.totalPages || 1));
       setLoading(false);
+      setLoadingMore(false);
     });
   }, [categoryTr, page, language]);
+
+  // Intersection Observer for infinite scroll
+  const lastProductRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (loadingMore) return;
+      if (observerRef.current) observerRef.current.disconnect();
+
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore && !loadingMore) {
+            setPage((prev) => prev + 1);
+          }
+        },
+        { threshold: 0.1, rootMargin: "200px" }
+      );
+
+      if (node) observerRef.current.observe(node);
+    },
+    [loadingMore, hasMore]
+  );
 
   const getCatName = (cat: ApiCategory) => {
     if (language === "ar") return cat.ar;
@@ -196,10 +237,10 @@ export default function CategoryPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                     {products.map((product, i) => (
                       <motion.div
-                        key={product.id}
+                        key={`${product.id}-${i}`}
                         initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: Math.min(i * 0.03, 0.5), duration: 0.3 }}
+                        transition={{ delay: Math.min((i % 24) * 0.03, 0.5), duration: 0.3 }}
                         className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200"
                       >
                         <Link href={`/product/${product.id}`}>
@@ -217,9 +258,9 @@ export default function CategoryPage() {
                               {getProductName(product)}
                             </h3>
                             <div className="flex items-center justify-between flex-wrap gap-1">
-                              {product.price > 0 && (
+                              {product.price_usd > 0 && (
                                 <span className="text-[10px] sm:text-xs text-gray-400">
-                                  {product.price} {settings.currency || "TL"}
+                                  ${product.price_usd}
                                 </span>
                               )}
                               <span className="text-[10px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 bg-[#00a8a8]/10 text-[#00a8a8] font-medium rounded-md">
@@ -232,26 +273,27 @@ export default function CategoryPage() {
                     ))}
                   </div>
 
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8">
-                      <button
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="px-3 py-2 rounded-lg border text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                      >
-                        {isRTL ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-                      </button>
-                      <span className="text-sm text-gray-600">
-                        {page} / {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages}
-                        className="px-3 py-2 rounded-lg border text-sm disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                      >
-                        {isRTL ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                      </button>
+                  {/* Infinite Scroll Trigger */}
+                  {hasMore && (
+                    <div
+                      ref={lastProductRef}
+                      className="flex items-center justify-center py-8"
+                    >
+                      {loadingMore && (
+                        <div className="flex items-center gap-3 text-gray-500">
+                          <Loader2 className="w-5 h-5 animate-spin text-[#00a8a8]" />
+                          <span className="text-sm">{t("general.loading")}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* End of products indicator */}
+                  {!hasMore && products.length > 0 && (
+                    <div className="text-center py-6 text-gray-400 text-sm">
+                      {language === "ar" ? `تم عرض جميع المنتجات (${total})` : 
+                       language === "tr" ? `Tüm ürünler gösterildi (${total})` :
+                       `All products shown (${total})`}
                     </div>
                   )}
                 </>

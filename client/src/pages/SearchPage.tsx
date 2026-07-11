@@ -1,14 +1,14 @@
 /*
  * Design: Clean Corporate Catalog - Teal/Navy
- * Search results page with product grid
+ * Search results page with infinite scroll
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useSearch } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { fetchProducts, type ApiProduct } from "@/lib/api";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function SearchPage() {
@@ -19,21 +19,67 @@ export default function SearchPage() {
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // Reset when query changes
+  useEffect(() => {
+    setProducts([]);
+    setPage(1);
+    setHasMore(true);
+    setLoading(true);
+  }, [query]);
 
   useEffect(() => {
-    if (query) {
-      setLoading(true);
-      fetchProducts({ search: query, limit: 100, lang: language }).then((data) => {
-        setProducts(data.products || []);
-        setTotal(data.pagination?.total || data.products?.length || 0);
-        setLoading(false);
-      });
-    } else {
+    if (!query) {
       setProducts([]);
       setLoading(false);
+      setHasMore(false);
+      return;
     }
-  }, [query, language]);
+
+    if (page === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    fetchProducts({ search: query, page, limit: 24, lang: language }).then((data) => {
+      if (page === 1) {
+        setProducts(data.products || []);
+      } else {
+        setProducts((prev) => [...prev, ...(data.products || [])]);
+      }
+      setTotal(data.pagination?.total || data.products?.length || 0);
+      setHasMore(page < (data.pagination?.totalPages || 1));
+      setLoading(false);
+      setLoadingMore(false);
+    });
+  }, [query, page, language]);
+
+  // Intersection Observer for infinite scroll
+  const lastProductRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (loadingMore) return;
+      if (observerRef.current) observerRef.current.disconnect();
+
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore && !loadingMore) {
+            setPage((prev) => prev + 1);
+          }
+        },
+        { threshold: 0.1, rootMargin: "200px" }
+      );
+
+      if (node) observerRef.current.observe(node);
+    },
+    [loadingMore, hasMore]
+  );
 
   const getProductName = (p: ApiProduct) => {
     if (language === "ar") return p.name.ar;
@@ -65,39 +111,65 @@ export default function SearchPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {products.map((product, i) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(i * 0.03, 0.5), duration: 0.3 }}
-                  className="group bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200"
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {products.map((product, i) => (
+                  <motion.div
+                    key={`${product.id}-${i}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min((i % 24) * 0.03, 0.5), duration: 0.3 }}
+                    className="group bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200"
+                  >
+                    <Link href={`/product/${product.id}`}>
+                      <div className="aspect-square overflow-hidden bg-gray-50">
+                        <img
+                          src={product.images?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop"}
+                          alt={getProductName(product)}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <p className="text-xs text-[#00a8a8] font-mono mb-1">{product.model}</p>
+                        <h3 className="font-bold text-[#0e4a6f] text-sm leading-tight mb-2">
+                          {getProductName(product)}
+                        </h3>
+                        {product.price_usd > 0 && (
+                          <span className="text-xs text-gray-400">
+                            ${product.price_usd}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Infinite Scroll Trigger */}
+              {hasMore && (
+                <div
+                  ref={lastProductRef}
+                  className="flex items-center justify-center py-8"
                 >
-                  <Link href={`/product/${product.id}`}>
-                    <div className="aspect-square overflow-hidden bg-gray-50">
-                      <img
-                        src={product.images?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop"}
-                        alt={getProductName(product)}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
+                  {loadingMore && (
+                    <div className="flex items-center gap-3 text-gray-500">
+                      <Loader2 className="w-5 h-5 animate-spin text-[#00a8a8]" />
+                      <span className="text-sm">{t("general.loading")}</span>
                     </div>
-                    <div className="p-3">
-                      <p className="text-xs text-[#00a8a8] font-mono mb-1">{product.model}</p>
-                      <h3 className="font-bold text-[#0e4a6f] text-sm leading-tight mb-2">
-                        {getProductName(product)}
-                      </h3>
-                      {product.price > 0 && (
-                        <span className="text-xs text-gray-400">
-                          {product.price} {settings.currency || "TL"}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
+                  )}
+                </div>
+              )}
+
+              {/* End of products indicator */}
+              {!hasMore && products.length > 0 && (
+                <div className="text-center py-6 text-gray-400 text-sm">
+                  {language === "ar" ? `تم عرض جميع النتائج (${total})` : 
+                   language === "tr" ? `Tüm sonuçlar gösterildi (${total})` :
+                   `All results shown (${total})`}
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

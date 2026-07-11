@@ -17,9 +17,10 @@ export interface ApiProduct {
   topCategory: { tr: string; ar: string; en: string };
   description: string;
   price: number;
+  price_usd: number;
   quantity: number;
   images: string[];
-  options: { name: string; values: string[] }[];
+  options: { name: string; values?: string[]; items?: { name: string; price?: string; quantity?: number }[] }[];
   status: string;
 }
 

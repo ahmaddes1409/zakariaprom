@@ -11,13 +11,18 @@ export default function Footer() {
   const logoText = (settings.logo_text as string) || 'ZA';
   const logoUrl = (settings.logo_url as string) || '';
   
-  const phone = settings.phone || "+90 542 810 4208";
+  const phoneTurkey = settings.phone || "+905428104208";
+  const phoneSyria = settings.phone2 || "+963112242368";
   const email = settings.email || "info@zakariaprom.com";
   const whatsapp = settings.whatsapp || "905428104208";
   
+  // Parse address into branches (separated by |)
   const addressKey = `address_${language}` as keyof typeof settings;
-  const address = (settings[addressKey] as string) || 
-    (language === "ar" ? "إسطنبول، تركيا" : language === "tr" ? "İstanbul, Türkiye" : "Istanbul, Turkey");
+  const fullAddress = (settings[addressKey] as string) || "";
+  const branches = fullAddress.split("|").map(b => b.trim()).filter(Boolean);
+
+  const syriaAddress = branches[0] || (language === "ar" ? "دمشق - الحلبوني - بناء صلاح وخولي" : "Damascus - Halbouni");
+  const turkeyAddress = branches[1] || (language === "ar" ? "إسطنبول - التوب كبي - مجمع المطابع" : "Istanbul - Topkapi");
 
   return (
     <footer className="bg-[#0a2e4a] text-white/90">
@@ -42,43 +47,51 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Quick Links */}
+          {/* Syria Branch */}
           <div>
-            <h3 className="font-bold text-white mb-4 text-lg">{t("footer.quickLinks")}</h3>
-            <ul className="space-y-2.5">
-              {[
-                { key: "nav.home", href: "/" },
-                { key: "nav.about", href: "/about" },
-                { key: "nav.products", href: "/#categories" },
-                { key: "nav.contact", href: "/contact" },
-              ].map((item) => (
-                <li key={item.key}>
-                  <Link href={item.href} className="text-white/60 hover:text-[#00d4d4] transition-colors text-sm">
-                    {t(item.key)}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Contact Info */}
-          <div>
-            <h3 className="font-bold text-white mb-4 text-lg">{t("footer.turkey")}</h3>
+            <h3 className="font-bold text-white mb-4 text-lg">
+              {language === "ar" ? "فرع سوريا" : language === "tr" ? "Suriye Şubesi" : "Syria Branch"}
+            </h3>
             <ul className="space-y-3">
               <li className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-1 text-[#00a8a8] shrink-0" />
-                <span className="text-white/60 text-sm">{address}</span>
+                <span className="text-white/60 text-sm">{syriaAddress}</span>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-[#00a8a8] shrink-0" />
-                <a href={`tel:${phone}`} dir="ltr" className="text-white/60 hover:text-[#00d4d4] text-sm transition-colors">
-                  {phone}
+                <a href={`tel:${phoneSyria}`} dir="ltr" className="text-white/60 hover:text-[#00d4d4] text-sm transition-colors">
+                  {phoneSyria}
                 </a>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-[#00a8a8] shrink-0" />
                 <a href={`mailto:${email}`} className="text-white/60 hover:text-[#00d4d4] text-sm transition-colors">
                   {email}
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Turkey Branch */}
+          <div>
+            <h3 className="font-bold text-white mb-4 text-lg">
+              {language === "ar" ? "فرع تركيا" : language === "tr" ? "Türkiye Şubesi" : "Turkey Branch"}
+            </h3>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 mt-1 text-[#00a8a8] shrink-0" />
+                <span className="text-white/60 text-sm">{turkeyAddress}</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-[#00a8a8] shrink-0" />
+                <a href={`tel:${phoneTurkey}`} dir="ltr" className="text-white/60 hover:text-[#00d4d4] text-sm transition-colors">
+                  {phoneTurkey}
+                </a>
+              </li>
+              <li className="flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-[#25d366] shrink-0" />
+                <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-[#25d366] text-sm transition-colors">
+                  WhatsApp
                 </a>
               </li>
             </ul>

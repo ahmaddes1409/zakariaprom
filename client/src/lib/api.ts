@@ -41,6 +41,7 @@ export interface ApiSettings {
   social_facebook?: string;
   social_instagram?: string;
   social_twitter?: string;
+  social_linkedin?: string;
   chatbot_enabled?: string;
   chatbot_welcome_ar?: string;
   chatbot_welcome_en?: string;

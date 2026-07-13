@@ -106,7 +106,7 @@ export default function Header() {
         <div className="container flex items-center justify-between py-3 gap-4">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            {logoType === 'image' && logoUrl ? (
+            {logoUrl ? (
               <img src={logoUrl} alt={siteName} className="w-12 h-12 rounded-lg object-contain" />
             ) : (
               <div className="w-12 h-12 bg-[#0e4a6f] rounded-lg flex items-center justify-center text-white font-black text-xl tracking-tight">

@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Phone, Mail, MapPin, MessageCircle, Facebook, Instagram } from "lucide-react";
+import { Phone, Mail, MapPin, MessageCircle, Facebook, Instagram, Twitter, Linkedin } from "lucide-react";
 
 export default function Footer() {
   const { language, t, settings } = useLanguage();
@@ -26,7 +26,7 @@ export default function Footer() {
           {/* Company Info */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              {logoType === 'image' && logoUrl ? (
+              {logoUrl ? (
                 <img src={logoUrl} alt={siteName} className="w-10 h-10 rounded-lg object-contain" />
               ) : (
                 <div className="w-10 h-10 bg-[#00a8a8] rounded-lg flex items-center justify-center text-white font-black text-lg">
@@ -96,6 +96,16 @@ export default function Footer() {
               {settings.social_instagram && (
                 <a href={settings.social_instagram} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors">
                   <Instagram className="w-4 h-4" />
+                </a>
+              )}
+              {settings.social_twitter && (
+                <a href={settings.social_twitter} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors">
+                  <Twitter className="w-4 h-4" />
+                </a>
+              )}
+              {settings.social_linkedin && (
+                <a href={settings.social_linkedin} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors">
+                  <Linkedin className="w-4 h-4" />
                 </a>
               )}
               <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#25d366] transition-colors">

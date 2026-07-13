@@ -18,6 +18,17 @@ const CAT_PENS = "https://d2xsxph8kpxj0f.cloudfront.net/310519663586966936/fHWUH
 const CAT_MUGS = "https://d2xsxph8kpxj0f.cloudfront.net/310519663586966936/fHWUHuB9ZycaiSpMH5YZHk/category-mugs-jGfWqiMZ3dBanNYpc2DbMV.webp";
 const CAT_TECH = "https://d2xsxph8kpxj0f.cloudfront.net/310519663586966936/fHWUHuB9ZycaiSpMH5YZHk/category-tech-XFSgoLLXBYULTSG9ip7AhW.webp";
 
+// Convert Google Drive sharing links to direct image URLs
+function fixImageUrl(url: string): string {
+  if (!url) return '';
+  // Google Drive sharing link pattern
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (driveMatch) {
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  }
+  return url;
+}
+
 // Default images for categories based on keywords
 function getCategoryDefaultImage(catTr: string): string {
   const lower = catTr.toLowerCase();
@@ -294,7 +305,7 @@ export default function Home() {
                   >
                     <div className="aspect-[4/3] overflow-hidden bg-gray-100">
                       <img
-                        src={cat.image || getCategoryDefaultImage(cat.tr)}
+                        src={cat.image ? fixImageUrl(cat.image) : getCategoryDefaultImage(cat.tr)}
                         alt={getCatName(cat)}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         loading="lazy"
@@ -362,7 +373,7 @@ export default function Home() {
                   <Link href={`/product/${product.id}`}>
                     <div className="aspect-square overflow-hidden bg-gray-50">
                       <img
-                        src={product.images?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop"}
+                        src={product.images?.[0] ? fixImageUrl(product.images[0]) : "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop"}
                         alt={getProductName(product)}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         loading="lazy"

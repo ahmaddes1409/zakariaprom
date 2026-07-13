@@ -2,6 +2,18 @@ import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Phone, Mail, MapPin, MessageCircle, Facebook, Instagram, Twitter, Linkedin } from "lucide-react";
 
+function fixImageUrl(url: string): string {
+  if (!url) return '';
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (driveMatch) {
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  }
+  if (url.startsWith('/')) {
+    return `https://zakariaprom.com${url}`;
+  }
+  return url;
+}
+
 export default function Footer() {
   const { language, t, settings } = useLanguage();
 
@@ -32,7 +44,7 @@ export default function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-4">
               {logoUrl ? (
-                <img src={logoUrl} alt={siteName} className="w-10 h-10 rounded-lg object-contain" />
+                <img src={fixImageUrl(logoUrl)} alt={siteName} className="w-10 h-10 rounded-lg object-contain" />
               ) : (
                 <div className="w-10 h-10 bg-[#00a8a8] rounded-lg flex items-center justify-center text-white font-black text-lg">
                   {logoText}

@@ -8,6 +8,20 @@ import { Link, useLocation } from "wouter";
 import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import { Search, Phone, Mail, Menu, X, Globe, ChevronDown, User, LogIn } from "lucide-react";
 
+// Convert Google Drive sharing links to direct image URLs
+function fixImageUrl(url: string): string {
+  if (!url) return '';
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (driveMatch) {
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  }
+  // Handle relative paths
+  if (url.startsWith('/')) {
+    return `https://zakariaprom.com${url}`;
+  }
+  return url;
+}
+
 const langLabels: Record<Language, string> = {
   ar: "العربية",
   en: "English",
@@ -107,14 +121,14 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
             {logoUrl ? (
-              <img src={logoUrl} alt={siteName} className="w-12 h-12 rounded-lg object-contain" />
+              <img src={fixImageUrl(logoUrl)} alt={siteName} className="w-14 h-14 rounded-lg object-contain" />
             ) : (
-              <div className="w-12 h-12 bg-[#0e4a6f] rounded-lg flex items-center justify-center text-white font-black text-xl tracking-tight">
+              <div className="w-14 h-14 bg-[#0e4a6f] rounded-lg flex items-center justify-center text-white font-black text-xl tracking-tight">
                 {logoText}
               </div>
             )}
             <div className="hidden sm:block">
-              <div className="font-bold text-[#0e4a6f] text-lg leading-tight">
+              <div className="font-bold text-[#0e4a6f] text-2xl leading-tight">
                 {siteName}
               </div>
               <div className="text-xs text-[#00a8a8] font-medium">

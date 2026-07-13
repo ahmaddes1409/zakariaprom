@@ -11,6 +11,18 @@ import Footer from "@/components/Footer";
 import { Search, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
+function fixImageUrl(url: string): string {
+  if (!url) return '';
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (driveMatch) {
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  }
+  if (url.startsWith('/')) {
+    return `https://zakariaprom.com${url}`;
+  }
+  return url;
+}
+
 export default function SearchPage() {
   const { language, t, settings } = useLanguage();
   const searchString = useSearch();
@@ -124,7 +136,7 @@ export default function SearchPage() {
                     <Link href={`/product/${product.id}`}>
                       <div className="aspect-square overflow-hidden bg-gray-50">
                         <img
-                          src={product.images?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop"}
+                          src={product.images?.[0] ? fixImageUrl(product.images[0]) : "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop"}
                           alt={getProductName(product)}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"

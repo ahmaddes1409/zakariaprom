@@ -11,6 +11,18 @@ import Footer from "@/components/Footer";
 import { ChevronLeft, ChevronRight, MessageCircle, Package } from "lucide-react";
 import { motion } from "framer-motion";
 
+function fixImageUrl(url: string): string {
+  if (!url) return '';
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (driveMatch) {
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  }
+  if (url.startsWith('/')) {
+    return `https://zakariaprom.com${url}`;
+  }
+  return url;
+}
+
 export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const { language, t, settings } = useLanguage();
@@ -114,7 +126,7 @@ export default function ProductPage() {
             <div>
               <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden mb-4">
                 <img
-                  src={product.images?.[selectedImage] || product.images?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=600&fit=crop"}
+                  src={fixImageUrl(product.images?.[selectedImage] || product.images?.[0] || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=600&fit=crop")}
                   alt={getProductName(product)}
                   className="w-full h-full object-contain"
                 />
@@ -129,7 +141,7 @@ export default function ProductPage() {
                         selectedImage === i ? "border-[#00a8a8]" : "border-gray-200"
                       }`}
                     >
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <img src={fixImageUrl(img)} alt="" className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>

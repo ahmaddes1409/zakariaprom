@@ -128,7 +128,7 @@ export default function Header() {
               </div>
             )}
             <div className="hidden sm:block">
-              <div className="font-bold text-[#0e4a6f] text-2xl leading-tight">
+              <div className="font-bold text-[#0e4a6f] text-3xl leading-tight">
                 {siteName}
               </div>
               <div className="text-xs text-[#00a8a8] font-medium">

@@ -135,7 +135,7 @@ export default function Home() {
               className="absolute inset-0"
             >
               <img
-                src={banners[currentBanner]?.image_url}
+                src={fixImageUrl(banners[currentBanner]?.image_url || '')}
                 alt=""
                 className="w-full h-full object-cover"
               />

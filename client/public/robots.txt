@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /login
+Disallow: /api/
+
+Sitemap: https://zakariaprom.com/sitemap.xml
+
+# Google Ads Bot
+User-agent: AdsBot-Google
+Allow: /
+
+# Google Mobile Ads Bot
+User-agent: AdsBot-Google-Mobile
+Allow: /
+
+# Googlebot
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+# Bingbot
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 2

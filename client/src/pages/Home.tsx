@@ -124,7 +124,7 @@ export default function Home() {
 
       {/* Banner Slider / Hero Section */}
       {hasApiBanners ? (
-        <section className="relative overflow-hidden h-[300px] sm:h-[400px] md:h-[450px]">
+        <section className="relative overflow-hidden h-[250px] sm:h-[350px] md:h-[500px] lg:h-[600px]">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentBanner}
@@ -137,9 +137,9 @@ export default function Home() {
               <img
                 src={fixImageUrl(banners[currentBanner]?.image_url || '')}
                 alt=""
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain sm:object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-l from-[#0a2e4a]/80 via-[#0a2e4a]/50 to-transparent" />
+
             </motion.div>
           </AnimatePresence>
 
@@ -162,13 +162,25 @@ export default function Home() {
                 </p>
               )}
               {banners[currentBanner]?.link && (
-                <Link
-                  href={banners[currentBanner].link}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97]"
-                >
-                  {t("hero.cta")}
-                  <ArrowIcon className="w-4 h-4" />
-                </Link>
+                banners[currentBanner].link.startsWith('http') ? (
+                  <a
+                    href={banners[currentBanner].link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97]"
+                  >
+                    {t("hero.cta")}
+                    <ArrowIcon className="w-4 h-4" />
+                  </a>
+                ) : (
+                  <Link
+                    href={banners[currentBanner].link}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97]"
+                  >
+                    {t("hero.cta")}
+                    <ArrowIcon className="w-4 h-4" />
+                  </Link>
+                )
               )}
             </motion.div>
           </div>

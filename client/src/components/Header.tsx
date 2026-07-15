@@ -163,6 +163,7 @@ export default function Header() {
               { key: "nav.home", href: "/" },
               { key: "nav.about", href: "/about" },
               { key: "nav.products", href: "/#categories" },
+              { key: "nav.blog", href: "/blog" },
               { key: "nav.contact", href: "/contact" },
             ].map((item) => (
               <Link
@@ -218,6 +219,7 @@ export default function Header() {
                 { key: "nav.home", href: "/" },
                 { key: "nav.about", href: "/about" },
                 { key: "nav.products", href: "/#categories" },
+                { key: "nav.blog", href: "/blog" },
                 { key: "nav.contact", href: "/contact" },
               ].map((item) => (
                 <Link

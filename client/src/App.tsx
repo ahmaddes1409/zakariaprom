@@ -12,6 +12,8 @@ import ContactPage from "./pages/ContactPage";
 import ProductPage from "./pages/ProductPage";
 import SearchPage from "./pages/SearchPage";
 import LoginPage from "./pages/LoginPage";
+import BlogPage from "./pages/BlogPage";
+import BlogPostPage from "./pages/BlogPostPage";
 import FloatingActions from "./components/FloatingActions";
 
 function Router() {
@@ -23,6 +25,8 @@ function Router() {
       <Route path="/contact" component={ContactPage} />
       <Route path="/product/:id" component={ProductPage} />
       <Route path="/search" component={SearchPage} />
+      <Route path="/blog" component={BlogPage} />
+      <Route path="/blog/:id" component={BlogPostPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

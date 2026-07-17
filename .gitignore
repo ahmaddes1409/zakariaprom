@@ -25,8 +25,6 @@ Thumbs.db
 npm-debug.log*
 
 # Database files (exist on server, not in repo)
-data/*.db
-data/*.sqlite
 
 # Manus internal files
 .project-config.json

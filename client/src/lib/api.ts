@@ -1,4 +1,5 @@
-const API_BASE = "https://zakariaprom.com";
+// Use relative URL to connect to the current server
+const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
 
 export interface ApiCategory {
   tr: string;

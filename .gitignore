@@ -39,3 +39,6 @@ public/uploads/
 # Dev tools (not needed for deployment)
 pnpm-lock.yaml
 pnpm-workspace.yaml
+
+# Database files (stored on server only, not in repo)
+# data/zakariaprom.db is created/maintained on the server

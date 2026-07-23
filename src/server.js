@@ -144,21 +144,18 @@ async function startServer() {
   // Initialize schema and seed data
   initializeDatabase();
 
-  // Run XML auto-sync into DB
-  syncXmlToDb(db, saveDatabase);
-
-  // Sync Etkin Promosyon products into DB and schedule daily 03:30 AM sync
-  try {
-    const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
-    syncEtkinProducts(db, saveDatabase).then(res => {
-      console.log('[Etkin Auto Sync Startup Result]:', res);
-    }).catch(err => {
-      console.error('[Etkin Auto Sync Startup Error]:', err.message);
-    });
-    scheduleDailySync(db, saveDatabase);
-  } catch (e) {
-    console.error('[Etkin Scheduler Error]:', e.message);
-  }
+  // Schedule non-blocking background sync after server starts listening
+  setTimeout(async () => {
+    try {
+      console.log('[Background Sync] Starting background product sync...');
+      await syncXmlToDb(db, saveDatabase);
+      const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
+      await syncEtkinProducts(db, saveDatabase);
+      scheduleDailySync(db, saveDatabase);
+    } catch(e) {
+      console.error('[Background Sync Error]:', e.message);
+    }
+  }, 2000);
 
   // API Routes
   app.use('/api/admin', adminRoutes);

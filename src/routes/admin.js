@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const express = require('express');
 const database = require('../database');
 const { adminAuth, adminLogin } = require('../auth');
@@ -31,6 +32,34 @@ router.post('/logout', (req, res) => {
 router.get('/me', adminAuth, (req, res) => {
   res.json({ admin: req.admin });
 });
+
+// Check database status and statistics
+router.get('/db-status', adminAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const dbPath = database.getDbPath ? database.getDbPath() : 'unknown';
+    let fileStats = {};
+    if (dbPath && path.isAbsolute(dbPath) && fs.existsSync(dbPath)) {
+      const stats = fs.statSync(dbPath);
+      fileStats = { sizeBytes: stats.size, modifiedAt: stats.mtime };
+    }
+    const adminCount = db.prepare('SELECT COUNT(*) as count FROM admins').get()?.count || 0;
+    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get()?.count || 0;
+    const orderCount = db.prepare('SELECT COUNT(*) as count FROM orders').get()?.count || 0;
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(t => t.name);
+
+    res.json({
+      success: true,
+      activeDatabasePath: dbPath,
+      fileStats,
+      recordCounts: { admins: adminCount, users: userCount, orders: orderCount },
+      tables
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // ===== DASHBOARD =====
 router.get('/dashboard', adminAuth, async (req, res) => {

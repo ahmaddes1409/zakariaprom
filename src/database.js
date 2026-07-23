@@ -3,27 +3,107 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'zakariaprom.db');
+// Flexible DB Path with fallback detection for Hostinger nodejs structure
+let DB_PATH = null;
 
-// Ensure data directory exists
-const dataDir = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+function findBestDatabasePath() {
+  const candidatePaths = [
+    process.env.DB_PATH,
+    path.join(__dirname, '..', 'data', 'zakariaprom.db'),
+    path.join(process.cwd(), 'data', 'zakariaprom.db'),
+    path.join(process.cwd(), 'nodejs', 'data', 'zakariaprom.db'),
+    path.join(__dirname, '..', '..', 'data', 'zakariaprom.db'),
+    path.join(__dirname, '..', '..', 'nodejs', 'data', 'zakariaprom.db'),
+    path.join(__dirname, 'data', 'zakariaprom.db'),
+    path.join(process.cwd(), '..', 'data', 'zakariaprom.db'),
+    path.join(process.cwd(), '..', 'nodejs', 'data', 'zakariaprom.db')
+  ].filter(Boolean);
+
+  let bestPath = null;
+  let maxBytes = -1;
+
+  for (const cand of candidatePaths) {
+    try {
+      const resolved = path.resolve(cand);
+      if (fs.existsSync(resolved)) {
+        const stats = fs.statSync(resolved);
+        console.log(`[DB Search] Candidate "${resolved}" exists (${stats.size} bytes)`);
+        if (stats.size > maxBytes) {
+          maxBytes = stats.size;
+          bestPath = resolved;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  if (bestPath && maxBytes > 0) {
+    console.log(`[DB Init] Selected best database file: "${bestPath}" (${maxBytes} bytes)`);
+    return bestPath;
+  }
+
+  const defaultPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'zakariaprom.db');
+  const resolvedDefault = path.resolve(defaultPath);
+  console.log(`[DB Init] No pre-existing non-empty DB found. Will use path: "${resolvedDefault}"`);
+  return resolvedDefault;
+}
+
+function resolveWasmFile(file) {
+  try {
+    const sqlMain = require.resolve('sql.js');
+    const sqlDistDir = path.dirname(sqlMain);
+    const wasmPath = path.join(sqlDistDir, file);
+    if (fs.existsSync(wasmPath)) {
+      return wasmPath;
+    }
+  } catch (e) {}
+
+  const candidates = [
+    path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', file),
+    path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', file),
+    path.join(process.cwd(), '..', 'node_modules', 'sql.js', 'dist', file),
+    path.join(__dirname, '..', '..', 'node_modules', 'sql.js', 'dist', file)
+  ];
+
+  for (const cand of candidates) {
+    if (fs.existsSync(cand)) {
+      return cand;
+    }
+  }
+
+  return file;
 }
 
 // sql.js wrapper to mimic better-sqlite3 API
 let database = null;
 
-// Save database to file periodically
+// Save database to file safely
 function saveDatabase() {
-  if (database) {
-    const data = database.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
+  if (database && DB_PATH) {
+    try {
+      const data = database.export();
+      const buffer = Buffer.from(data);
+      const targetDir = path.dirname(DB_PATH);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      fs.writeFileSync(DB_PATH, buffer);
+    } catch (err) {
+      console.error('[DB Save Error]:', err.message);
+    }
   }
 }
 
-// Auto-save every 30 seconds
+// Helper to normalize parameter bindings for sql.js
+function formatParams(params) {
+  if (params.length === 1 && Array.isArray(params[0])) {
+    return params[0];
+  }
+  return params;
+}
+
+// Auto-save interval handle
 let saveInterval = null;
 
 // Wrapper class to mimic better-sqlite3 API
@@ -38,8 +118,9 @@ class DatabaseWrapper {
       get(...params) {
         try {
           const stmt = self.sqliteDb.prepare(sql);
-          if (params.length > 0) {
-            stmt.bind(params);
+          const boundParams = formatParams(params);
+          if (boundParams.length > 0) {
+            stmt.bind(boundParams);
           }
           if (stmt.step()) {
             const row = stmt.getAsObject();
@@ -57,8 +138,9 @@ class DatabaseWrapper {
         try {
           const results = [];
           const stmt = self.sqliteDb.prepare(sql);
-          if (params.length > 0) {
-            stmt.bind(params);
+          const boundParams = formatParams(params);
+          if (boundParams.length > 0) {
+            stmt.bind(boundParams);
           }
           while (stmt.step()) {
             results.push(stmt.getAsObject());
@@ -72,12 +154,21 @@ class DatabaseWrapper {
       },
       run(...params) {
         try {
-          self.sqliteDb.run(sql, params);
+          const boundParams = formatParams(params);
+          self.sqliteDb.run(sql, boundParams);
           saveDatabase();
-          const lastId = self.sqliteDb.exec("SELECT last_insert_rowid() as id")[0];
-          const changes = self.sqliteDb.getRowsModified();
+          let lastId = 0;
+          try {
+            const res = self.sqliteDb.exec("SELECT last_insert_rowid() as id");
+            if (res && res.length > 0 && res[0].values && res[0].values.length > 0) {
+              lastId = res[0].values[0][0];
+            }
+          } catch(err) {
+            // Ignore last_insert_rowid error
+          }
+          const changes = typeof self.sqliteDb.getRowsModified === 'function' ? self.sqliteDb.getRowsModified() : 0;
           return {
-            lastInsertRowid: lastId ? lastId.values[0][0] : 0,
+            lastInsertRowid: lastId,
             changes: changes
           };
         } catch (e) {
@@ -122,56 +213,68 @@ class DatabaseWrapper {
   }
 }
 
-// The db object - will be initialized synchronously via initSync
+// The db object - initialized asynchronously via initDatabaseAsync
 let db = null;
 
-function initSync() {
-  // Load sql.js synchronously using require
-  const SQL = require('sql.js/dist/sql-wasm.js');
-  
-  // Check if we need to use the factory function
-  if (typeof SQL === 'function') {
-    // sql.js returns a promise in newer versions, but we need sync
-    // Use the bundled version that works synchronously
-    throw new Error('sql.js async init not supported in sync mode');
-  }
-  
-  let sqliteDb;
-  if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    sqliteDb = new SQL.Database(fileBuffer);
-  } else {
-    sqliteDb = new SQL.Database();
-  }
-  
-  database = sqliteDb;
-  db = new DatabaseWrapper(sqliteDb);
-  return db;
-}
-
-// Async initialization (preferred)
+// Async initialization (preferred for sql.js WASM)
 async function initDatabaseAsync() {
-  const SQL = await initSqlJs();
-  
-  let sqliteDb;
-  if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    sqliteDb = new SQL.Database(fileBuffer);
-  } else {
-    sqliteDb = new SQL.Database();
+  let SQL;
+  try {
+    SQL = await initSqlJs({
+      locateFile: file => resolveWasmFile(file)
+    });
+  } catch (err) {
+    console.error('[DB Init Error] Failed to initialize sql.js engine:', err);
+    throw err;
   }
   
+  DB_PATH = findBestDatabasePath();
+
+  const targetDir = path.dirname(DB_PATH);
+  if (!fs.existsSync(targetDir)) {
+    try {
+      fs.mkdirSync(targetDir, { recursive: true });
+    } catch (err) {
+      console.error('[DB Init] Could not create target data directory:', err.message);
+    }
+  }
+
+  console.log(`[DB Init] Active database file path: ${DB_PATH}`);
+
+  let sqliteDb;
+  if (fs.existsSync(DB_PATH)) {
+    try {
+      const fileBuffer = fs.readFileSync(DB_PATH);
+      if (fileBuffer.length > 0) {
+        sqliteDb = new SQL.Database(fileBuffer);
+        console.log(`[DB Init] Loaded existing database file (${fileBuffer.length} bytes)`);
+      } else {
+        console.log('[DB Init] DB file is 0 bytes. Initializing new SQLite instance');
+        sqliteDb = new SQL.Database();
+      }
+    } catch (e) {
+      console.error(`[DB Init Error] Failed to load DB file at ${DB_PATH}:`, e.message);
+      console.log('[DB Init] Fallback: initializing empty SQLite database in memory');
+      sqliteDb = new SQL.Database();
+    }
+  } else {
+    console.log('[DB Init] No existing DB file found. Creating a new SQLite database.');
+    sqliteDb = new SQL.Database();
+  }
+
   database = sqliteDb;
   db = new DatabaseWrapper(sqliteDb);
-  
-  // Auto-save every 30 seconds
+
+  // Save immediately to ensure path & file exist
+  saveDatabase();
+
+  if (saveInterval) clearInterval(saveInterval);
   saveInterval = setInterval(saveDatabase, 30000);
-  
-  // Save on process exit
+
   process.on('exit', saveDatabase);
   process.on('SIGINT', () => { saveDatabase(); process.exit(); });
   process.on('SIGTERM', () => { saveDatabase(); process.exit(); });
-  
+
   return db;
 }
 
@@ -549,9 +652,10 @@ function initializeDatabase() {
   console.log('Database initialized successfully');
 }
 
-// Export a getter for db that always returns current value
+// Export getter for db that always returns current value
 module.exports = {
   get db() { return db; },
+  getDbPath: () => DB_PATH,
   initializeDatabase,
   initDatabaseAsync,
   saveDatabase

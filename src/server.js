@@ -144,18 +144,13 @@ async function startServer() {
   // Initialize schema and seed data
   initializeDatabase();
 
-  // Schedule non-blocking background sync after server starts listening
-  setTimeout(async () => {
-    try {
-      console.log('[Background Sync] Starting background product sync...');
-      await syncXmlToDb(db, saveDatabase);
-      const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
-      await syncEtkinProducts(db, saveDatabase);
-      scheduleDailySync(db, saveDatabase);
-    } catch(e) {
-      console.error('[Background Sync Error]:', e.message);
-    }
-  }, 2000);
+  // Schedule daily 03:30 AM early morning sync for Etkin Promosyon API
+  try {
+    const { scheduleDailySync } = require('./services/etkinService');
+    scheduleDailySync(db, saveDatabase);
+  } catch (e) {
+    console.error('[Etkin Scheduler Error]:', e.message);
+  }
 
   // API Routes
   app.use('/api/admin', adminRoutes);
@@ -184,15 +179,15 @@ async function startServer() {
       // Fetch all products directly from local_products database table
       let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       
-      // Fallback: If DB is empty, run auto-sync to populate products
+      // Fallback: If DB is empty, trigger sync asynchronously in background
       if (!dbRows || dbRows.length === 0) {
-        console.log('[API Products] DB local_products is empty! Triggering automatic sync...');
-        await syncXmlToDb(db, saveDatabase);
-        try {
-          const { syncEtkinProducts } = require('./services/etkinService');
-          await syncEtkinProducts(db, saveDatabase);
-        } catch(e) {}
-        dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+        setImmediate(async () => {
+          try {
+            await syncXmlToDb(db, saveDatabase);
+            const { syncEtkinProducts } = require('./services/etkinService');
+            await syncEtkinProducts(db, saveDatabase);
+          } catch(e) {}
+        });
       }
       
       const hiddenProducts = db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);

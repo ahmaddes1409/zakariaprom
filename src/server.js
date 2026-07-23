@@ -424,8 +424,8 @@ async function startServer() {
 
   // SPA fallback - serve React index.html for all other routes (client-side routing)
   app.get('*', (req, res) => {
-    // Don't serve index.html for API routes or admin assets
-    if (req.path.startsWith('/api/') || req.path === '/admin.html' || req.path === '/admin.css' || req.path === '/admin.js') {
+    // Don't serve index.html for API routes or static files with extensions
+    if (req.path.startsWith('/api/') || req.path.includes('.')) {
       return res.status(404).json({ error: 'Not found' });
     }
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));

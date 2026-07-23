@@ -147,9 +147,14 @@ async function startServer() {
   // Run XML auto-sync into DB
   syncXmlToDb(db, saveDatabase);
 
-  // Schedule daily 03:30 AM early morning sync for Etkin Promosyon API
+  // Sync Etkin Promosyon products into DB and schedule daily 03:30 AM sync
   try {
-    const { scheduleDailySync } = require('./services/etkinService');
+    const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
+    syncEtkinProducts(db, saveDatabase).then(res => {
+      console.log('[Etkin Auto Sync Startup Result]:', res);
+    }).catch(err => {
+      console.error('[Etkin Auto Sync Startup Error]:', err.message);
+    });
     scheduleDailySync(db, saveDatabase);
   } catch (e) {
     console.error('[Etkin Scheduler Error]:', e.message);
@@ -180,7 +185,18 @@ async function startServer() {
       const { translateProductName, translateCategory } = require('./translations');
 
       // Fetch all products directly from local_products database table
-      const dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+      let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+      
+      // Fallback: If DB is empty, run auto-sync to populate products
+      if (!dbRows || dbRows.length === 0) {
+        console.log('[API Products] DB local_products is empty! Triggering automatic sync...');
+        await syncXmlToDb(db, saveDatabase);
+        try {
+          const { syncEtkinProducts } = require('./services/etkinService');
+          await syncEtkinProducts(db, saveDatabase);
+        } catch(e) {}
+        dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+      }
       
       const hiddenProducts = db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);
       const hiddenCategories = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);

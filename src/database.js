@@ -51,11 +51,24 @@ function findBestDatabasePath() {
 
 function resolveWasmFile(file) {
   try {
-    const sqlMain = require.resolve('sql.js');
-    const sqlDistDir = path.dirname(sqlMain);
+    const sqlWasmJsPath = require.resolve('sql.js/dist/sql-wasm.js');
+    const sqlDistDir = path.dirname(sqlWasmJsPath);
     const wasmPath = path.join(sqlDistDir, file);
     if (fs.existsSync(wasmPath)) {
       return wasmPath;
+    }
+  } catch (e) {}
+
+  try {
+    const sqlMain = require.resolve('sql.js');
+    const sqlDir = path.dirname(sqlMain);
+    const wasmPath = path.join(sqlDir, 'dist', file);
+    if (fs.existsSync(wasmPath)) {
+      return wasmPath;
+    }
+    const directWasmPath = path.join(sqlDir, file);
+    if (fs.existsSync(directWasmPath)) {
+      return directWasmPath;
     }
   } catch (e) {}
 
@@ -220,12 +233,17 @@ let db = null;
 async function initDatabaseAsync() {
   let SQL;
   try {
-    SQL = await initSqlJs({
-      locateFile: file => resolveWasmFile(file)
-    });
-  } catch (err) {
-    console.error('[DB Init Error] Failed to initialize sql.js engine:', err);
-    throw err;
+    SQL = await initSqlJs();
+  } catch (err1) {
+    console.warn('[DB Init Warning] Standard sql.js init failed, trying with custom locateFile:', err1.message);
+    try {
+      SQL = await initSqlJs({
+        locateFile: file => resolveWasmFile(file)
+      });
+    } catch (err2) {
+      console.error('[DB Init Error] Failed to initialize sql.js engine:', err2.message);
+      throw err2;
+    }
   }
   
   DB_PATH = findBestDatabasePath();

@@ -548,6 +548,30 @@ function initializeDatabase() {
     )
   `).run();
 
+  // Local products table
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS local_products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id TEXT UNIQUE,
+      name_tr TEXT DEFAULT '',
+      name_ar TEXT DEFAULT '',
+      name_en TEXT DEFAULT '',
+      model TEXT DEFAULT '',
+      description TEXT DEFAULT '',
+      price REAL DEFAULT 0,
+      quantity INTEGER DEFAULT 0,
+      category_tr TEXT DEFAULT '',
+      category_ar TEXT DEFAULT '',
+      category_en TEXT DEFAULT '',
+      colors TEXT DEFAULT '[]',
+      sizes TEXT DEFAULT '[]',
+      images TEXT DEFAULT '[]',
+      hidden INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+
   // Create default admin if not exists
   const adminExists = db.prepare('SELECT id FROM admins WHERE username = ?').get('admin');
   if (!adminExists) {

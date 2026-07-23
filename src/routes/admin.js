@@ -912,7 +912,6 @@ router.delete('/custom-categories/:id', adminAuth, (req, res) => {
 
 
 // ========== LOCAL PRODUCTS (Add/Edit/Delete manual products) ==========
-const fs = require('fs');
 const multer = require('multer');
 
 const localProductUpload = multer({

@@ -2,16 +2,25 @@ const { translateCategory, translateProductName } = require('../translations');
 
 const ETKIN_API_URL = 'http://www.birikimpromosyon.com/api/json/';
 const DEFAULT_HASH = '655af889baa94a38ae39ec4703be2021';
+const DEFAULT_EMAIL = 'info@karmedya.com';
 const SITE_DOMAIN = 'zakariaprom.com';
 
 async function fetchEtkinApi(db, tip = 'tum_urunler', extraParams = {}) {
-  // Retrieve credentials from settings table
-  const emailRow = db.prepare("SELECT value FROM settings WHERE key = 'etkin_ebayi_eposta'").get();
-  const hashRow = db.prepare("SELECT value FROM settings WHERE key = 'etkin_hash'").get();
-  const defaultEmailRow = db.prepare("SELECT value FROM settings WHERE key = 'email'").get();
+  let eposta = DEFAULT_EMAIL;
+  let hash = DEFAULT_HASH;
 
-  const eposta = (emailRow && emailRow.value) ? emailRow.value : ((defaultEmailRow && defaultEmailRow.value) ? defaultEmailRow.value : 'info@zakariaprom.com');
-  const hash = (hashRow && hashRow.value) ? hashRow.value : DEFAULT_HASH;
+  if (db) {
+    try {
+      const emailRow = db.prepare("SELECT value FROM settings WHERE key = 'etkin_ebayi_eposta'").get();
+      const hashRow = db.prepare("SELECT value FROM settings WHERE key = 'etkin_hash'").get();
+      if (emailRow && emailRow.value && emailRow.value.trim()) {
+        eposta = emailRow.value.trim();
+      }
+      if (hashRow && hashRow.value && hashRow.value.trim()) {
+        hash = hashRow.value.trim();
+      }
+    } catch(e) {}
+  }
 
   const payload = {
     ebayi_eposta: eposta,
@@ -70,16 +79,18 @@ async function syncEtkinProducts(db, saveDatabase) {
     `);
 
     for (const item of items) {
-      const pId = (item.urun_id || item.id || item.kod || `etkin_${inserted}`).toString();
-      const nameTr = item.urun_adi || item.adi || item.name || '';
+      const rawId = item.urun_id || item.id || `etkin_${inserted}`;
+      const pId = 'etkin_' + rawId;
+      const nameTr = item.urun_baslik || item.urun_isim || item.name || '';
       const nameAr = translateProductName(nameTr, 'ar');
       const nameEn = translateProductName(nameTr, 'en');
 
-      const model = item.kod || item.model || '';
-      const desc = item.aciklama || item.description || '';
+      const model = item.urun_kodu || item.model || '';
+      const desc = item.urun_aciklama || item.description || '';
 
-      const price = parseFloat(item.fiyat || item.price || 0) || 0;
-      const quantity = parseInt(item.stok || item.quantity || 0) || 0;
+      const priceStr = (item.urun_fiyat || item.fiyat || '0').toString().replace(',', '.').trim();
+      const price = parseFloat(priceStr) || 0;
+      const quantity = parseInt(item.toplam_stok || item.stok || 0) || 0;
 
       let catTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
       if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
@@ -96,20 +107,22 @@ async function syncEtkinProducts(db, saveDatabase) {
         });
       }
 
-      // Collect images
+      // Collect images resim1..resim9
       const images = [];
-      if (item.resimler && Array.isArray(item.resimler)) {
-        item.resimler.forEach(img => { if (img) images.push(img.trim()); });
-      } else {
-        ['resim', 'resim1', 'resim2', 'resim3', 'resim4', 'resim5', 'image', 'image_1'].forEach(k => {
-          if (item[k] && typeof item[k] === 'string' && item[k].trim()) {
-            images.push(item[k].trim());
-          }
-        });
+      for (let i = 1; i <= 9; i++) {
+        const k = `resim${i}`;
+        if (item[k] && typeof item[k] === 'string' && item[k].trim()) {
+          images.push(item[k].trim());
+        }
       }
 
+      let colors = [];
+      if (item.urun_renk) colors = [item.urun_renk];
+      let sizes = [];
+      if (item.urun_ebat) sizes = [item.urun_ebat];
+
       stmt.run([
-        'etkin_' + pId,
+        pId,
         nameTr,
         nameAr,
         nameEn,
@@ -120,8 +133,8 @@ async function syncEtkinProducts(db, saveDatabase) {
         catTr,
         catAr,
         catEn,
-        '[]',
-        '[]',
+        JSON.stringify(colors),
+        JSON.stringify(sizes),
         JSON.stringify(images)
       ]);
 

@@ -572,6 +572,10 @@ function initializeDatabase() {
     )
   `).run();
 
+  try {
+    db.prepare('ALTER TABLE local_products ADD COLUMN product_id TEXT').run();
+  } catch(e) {}
+
   // Create default admin if not exists
   const adminExists = db.prepare('SELECT id FROM admins WHERE username = ?').get('admin');
   if (!adminExists) {
@@ -604,7 +608,7 @@ function initializeDatabase() {
     chatbot_welcome_ar: 'مرحباً! كيف يمكنني مساعدتك؟',
     chatbot_welcome_en: 'Hello! How can I help you?',
     chatbot_welcome_tr: 'Merhaba! Size nasıl yardımcı olabilirim?',
-    etkin_ebayi_eposta: 'info@zakariaprom.com',
+    etkin_ebayi_eposta: 'info@karmedya.com',
     etkin_hash: '655af889baa94a38ae39ec4703be2021',
     etkin_auto_sync: '1',
     etkin_sync_time: '03:30'
@@ -614,6 +618,8 @@ function initializeDatabase() {
   for (const [key, value] of Object.entries(defaultSettings)) {
     insertSetting.run(key, value);
   }
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('etkin_ebayi_eposta', 'info@karmedya.com')").run();
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('etkin_hash', '655af889baa94a38ae39ec4703be2021')").run();
 
   // Insert default chatbot FAQs
   const faqExists = db.prepare('SELECT id FROM chatbot_faq LIMIT 1').get();

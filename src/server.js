@@ -176,80 +176,93 @@ async function startServer() {
   // Public products API
   app.get('/api/products', async (req, res) => {
     try {
-      const { category, search, page = 1, limit = 24, sort, lang = 'tr' } = req.query;
-      let products = [];
-      try { products = await fetchAndParseProducts(); } catch(xmlErr) { console.error("XML fetch failed, using local only:", xmlErr.message); }
+      const { category, search, lang = 'ar', page = 1, limit = 24, sort } = req.query;
+      const { translateProductName, translateCategory } = require('./translations');
 
-      // Filter hidden products
+      // Fetch all products directly from local_products database table
+      const dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+      
       const hiddenProducts = db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);
-      products = products.filter(p => !hiddenProducts.includes(p.id));
-      // Apply category overrides
-      const categoryOverrides = db.prepare('SELECT * FROM product_category_overrides').all();
-      if (categoryOverrides.length > 0) {
-        const overrideMap = {};
-        categoryOverrides.forEach(o => { overrideMap[o.product_id] = o; });
-        products = products.map(p => {
-          const override = overrideMap[p.id] || overrideMap[p.model];
-          if (override) {
-            return {
-              ...p,
-              categories: { tr: [override.new_category_tr], ar: [override.new_category_ar || override.new_category_tr], en: [override.new_category_en || override.new_category_tr] },
-              topCategory: { tr: override.new_category_tr.split(' > ')[0], ar: (override.new_category_ar || override.new_category_tr).split(' > ')[0], en: (override.new_category_en || override.new_category_tr).split(' > ')[0] }
-            };
-          }
-          return p;
-        });
-      }
-      // Merge local products
-      const localProducts = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
-      if (localProducts.length > 0) {
-        const localMapped = localProducts.map(lp => {
-          const catTr = lp.category_tr || '';
-          const catAr = lp.category_ar || catTr;
-          const catEn = lp.category_en || catTr;
-          return {
-            id: lp.product_id || ('local_' + lp.id),
-            name: { tr: lp.name_tr, ar: lp.name_ar || lp.name_tr, en: lp.name_en || lp.name_tr },
-            model: lp.model || ('LP' + lp.id),
-            categories: { tr: [catTr], ar: [catAr], en: [catEn] },
-            topCategory: {
-              tr: catTr.split(' > ')[0].trim(),
-              ar: catAr.split(' > ')[0].trim(),
-              en: catEn.split(' > ')[0].trim()
-            },
-            description: lp.description || '',
-            price: lp.price || 0,
-            quantity: lp.quantity || 0,
-            images: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?[s]:[]}})(lp.images),
-            options: [],
-            colors: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?s.split(',').map(function(x){return x.trim()}):[]}})(lp.colors),
-            sizes: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?s.split(',').map(function(x){return x.trim()}):[]}})(lp.sizes),
-            status: true,
-            isLocal: true
-          };
-        });
-        const seenIds = new Set(localMapped.map(p => p.id));
-        const xmlFiltered = products.filter(p => !seenIds.has(p.id));
-        products = [...localMapped, ...xmlFiltered];
-      }
-
-      // Filter hidden categories
       const hiddenCategories = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
-      products = products.filter(p => !p.categories.tr.some(c => hiddenCategories.includes(c.split(' > ')[0])));
 
-      // Apply product name translation overrides (keyed by model)
-      const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'product'").all();
-      if (overrides.length > 0) {
-        const overrideMap = {};
-        overrides.forEach(o => {
-          if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
-          overrideMap[o.original_key][o.lang] = o.translation;
-        });
-        products = products.map(p => {
-          if (overrideMap[p.model]) {
-            return { ...p, name: { ...p.name, ...overrideMap[p.model] } };
-          }
-          return p;
+      const categoryOverrides = db.prepare('SELECT * FROM product_category_overrides').all();
+      const categoryOverrideMap = {};
+      categoryOverrides.forEach(o => { categoryOverrideMap[o.product_id] = o; });
+
+      const nameOverrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'product'").all();
+      const nameOverrideMap = {};
+      nameOverrides.forEach(o => {
+        if (!nameOverrideMap[o.original_key]) nameOverrideMap[o.original_key] = {};
+        nameOverrideMap[o.original_key][o.lang] = o.translation;
+      });
+
+      let products = [];
+      const seenProductKeys = new Set();
+
+      for (const lp of dbRows) {
+        const pId = lp.product_id || ('local_' + lp.id);
+        
+        if (hiddenProducts.includes(pId)) continue;
+
+        // Deduplicate by product_id
+        if (seenProductKeys.has(pId)) continue;
+        seenProductKeys.add(pId);
+
+        let catTr = lp.category_tr || '';
+        let catAr = lp.category_ar || translateCategory(catTr, 'ar');
+        let catEn = lp.category_en || translateCategory(catTr, 'en');
+
+        // Check category override
+        const catOverride = categoryOverrideMap[pId] || categoryOverrideMap[lp.model];
+        if (catOverride) {
+          catTr = catOverride.new_category_tr;
+          catAr = catOverride.new_category_ar || translateCategory(catTr, 'ar');
+          catEn = catOverride.new_category_en || translateCategory(catTr, 'en');
+        }
+
+        // Skip hidden categories
+        const topCatTr = catTr.split(' > ')[0].trim();
+        if (hiddenCategories.includes(topCatTr)) continue;
+
+        let nameTr = lp.name_tr || '';
+        let nameAr = lp.name_ar || translateProductName(nameTr, 'ar');
+        let nameEn = lp.name_en || translateProductName(nameTr, 'en');
+
+        // Check name override
+        if (nameOverrideMap[lp.model]) {
+          if (nameOverrideMap[lp.model].tr) nameTr = nameOverrideMap[lp.model].tr;
+          if (nameOverrideMap[lp.model].ar) nameAr = nameOverrideMap[lp.model].ar;
+          if (nameOverrideMap[lp.model].en) nameEn = nameOverrideMap[lp.model].en;
+        }
+
+        let images = [];
+        try { images = JSON.parse(lp.images || '[]'); } catch(e) { if (lp.images) images = [lp.images]; }
+
+        let colors = [];
+        try { colors = JSON.parse(lp.colors || '[]'); } catch(e) { if (lp.colors) colors = lp.colors.split(',').map(s=>s.trim()); }
+
+        let sizes = [];
+        try { sizes = JSON.parse(lp.sizes || '[]'); } catch(e) { if (lp.sizes) sizes = lp.sizes.split(',').map(s=>s.trim()); }
+
+        products.push({
+          id: pId,
+          name: { tr: nameTr, ar: nameAr, en: nameEn },
+          model: lp.model || ('LP' + lp.id),
+          categories: { tr: [catTr], ar: [catAr], en: [catEn] },
+          topCategory: {
+            tr: topCatTr,
+            ar: catAr.split(' > ')[0].trim(),
+            en: catEn.split(' > ')[0].trim()
+          },
+          description: lp.description || '',
+          price: lp.price || 0,
+          quantity: lp.quantity || 0,
+          images: images,
+          options: [],
+          colors: colors,
+          sizes: sizes,
+          status: true,
+          isLocal: true
         });
       }
 

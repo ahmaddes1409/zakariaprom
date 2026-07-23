@@ -40,5 +40,9 @@ public/uploads/
 pnpm-lock.yaml
 pnpm-workspace.yaml
 
+# Backup directories
+u424368414.*/
+
 # Database files (stored on server only, not in repo)
 # data/zakariaprom.db is created/maintained on the server
+

@@ -2,15 +2,85 @@ const path = require('path');
 const fs = require('fs');
 const { parseStringPromise } = require('xml2js');
 const initSqlJs = require('sql.js');
-const { translateProductName, translateCategory } = require('../src/translations');
 
 const XML_URL = 'https://karmedya.com/xml/xml_export_product.xml';
+
+const TOP_CATEGORY_MAP = {
+  'Kalemler': { ar: 'أقلام دعاية وإعلان', en: 'Promotional Pens' },
+  'Teknoloji Ürünleri': { ar: 'منتجات تكنولوجية وبادج', en: 'Technology Products' },
+  'Teknoloji': { ar: 'منتجات تكنولوجية وبادج', en: 'Technology Products' },
+  'Termos - Matara': { ar: 'حافظات حرارية وترمس', en: 'Thermos & Flasks' },
+  'Termos': { ar: 'حافظات حرارية وترمس', en: 'Thermos & Flasks' },
+  'Anahtarlık - Rozet': { ar: 'ميداليات مفاتيح وشعارات', en: 'Keychains & Badges' },
+  'Anahtarlık': { ar: 'ميداليات مفاتيح وشعارات', en: 'Keychains & Badges' },
+  'Saatler': { ar: 'ساعات حائط ومكتب', en: 'Clocks & Watches' },
+  'Kalem Setleri': { ar: 'أطقم أقلام فاخرة', en: 'Pen Sets' },
+  'Kırtasiye Ürünleri': { ar: 'أدوات قرطاسية ومكتبية', en: 'Stationery Products' },
+  'Kırtasiye': { ar: 'أدوات قرطاسية ومكتبية', en: 'Stationery Products' },
+  'Ajanda -Defter': { ar: 'أجندات ودفاتر 2026', en: 'Agendas & Notebooks' },
+  'Ajanda': { ar: 'أجندات ودفاتر 2026', en: 'Agendas & Notebooks' },
+  'Kutulu Setler': { ar: 'أطقم هدايا دعائية', en: 'Gift Sets' },
+  'Çakmaklar': { ar: 'قداحات وولاعات', en: 'Lighters' },
+  'Çakmak': { ar: 'قداحات وولاعات', en: 'Lighters' },
+  'Masaüstü Ürünler': { ar: 'مستلزمات وطقم مكتب', en: 'Desk Accessories' },
+  'Çanta': { ar: 'حقائب دعائية', en: 'Bags' },
+  'Matbaa Ürünleri': { ar: 'مطبوعات ورقية وتقاويم', en: 'Printing & Calendars' },
+  'Seramik - Cam Ürünler': { ar: 'أكواب سيراميك وزجاج', en: 'Mugs & Glassware' },
+  'Kutu - Aksesuar': { ar: 'علب وهدايا', en: 'Boxes & Accessories' },
+  'Çeşitli Araç Gereç': { ar: 'أدوات ومستلزمات متنوعة', en: 'Miscellaneous Tools' },
+  'Plaket - Ödül Ürünleri': { ar: 'دروع تذكارية وجوائز', en: 'Plaques & Awards' },
+  'Plaket': { ar: 'دروع تذكارية وجوائز', en: 'Plaques & Awards' },
+  'Byrak': { ar: 'أعلام ورايات', en: 'Flags & Banners' },
+  'اعلام': { ar: 'أعلام ورايات', en: 'Flags & Banners' },
+  'Şapka - Tişört': { ar: 'قبعات وتيشيرتات', en: 'Caps & T-Shirts' },
+  'VIP Setler': { ar: 'مجموعات VIP فاخرة', en: 'VIP Gift Sets' }
+};
 
 function extractCategories(item) {
   if (!item.CATEGORIES || !item.CATEGORIES.CATEGORY) return [];
   const cats = item.CATEGORIES.CATEGORY;
   if (Array.isArray(cats)) return cats;
   return [cats];
+}
+
+function cleanCategoryString(rawStr) {
+  if (!rawStr) return '';
+  // Remove redundant pipe duplications like "Anahtarlık - Rozet | Anahtarlık - Rozet > Metal Anahtarlık"
+  let clean = rawStr;
+  if (clean.includes('|')) {
+    clean = clean.split('|')[0].trim();
+  }
+  const parts = clean.split('>').map(p => p.trim()).filter(Boolean);
+  // Deduplicate consecutive parts
+  const uniqueParts = [];
+  for (const p of parts) {
+    if (uniqueParts.length === 0 || uniqueParts[uniqueParts.length - 1] !== p) {
+      uniqueParts.push(p);
+    }
+  }
+  return uniqueParts.join(' > ');
+}
+
+function getCategoryTranslations(catTr) {
+  if (!catTr) return { tr: '', ar: '', en: '' };
+  const parts = catTr.split(' > ');
+  const topTr = parts[0].trim();
+  const topMap = TOP_CATEGORY_MAP[topTr] || { ar: topTr, en: topTr };
+  
+  if (parts.length > 1) {
+    const subTr = parts.slice(1).join(' > ');
+    return {
+      tr: catTr,
+      ar: `${topMap.ar} > ${subTr}`,
+      en: `${topMap.en} > ${subTr}`
+    };
+  }
+
+  return {
+    tr: topTr,
+    ar: topMap.ar,
+    en: topMap.en
+  };
 }
 
 async function syncXmlToDatabase() {
@@ -59,7 +129,7 @@ async function syncXmlToDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name_ar TEXT NOT NULL,
       name_en TEXT DEFAULT '',
-      name_tr TEXT DEFAULT '',
+      name_tr TEXT UNIQUE NOT NULL,
       image_url TEXT DEFAULT '',
       sort_order INTEGER DEFAULT 0,
       active INTEGER DEFAULT 1,
@@ -69,11 +139,9 @@ async function syncXmlToDatabase() {
 
   try {
     sqliteDb.exec("ALTER TABLE local_products ADD COLUMN product_id TEXT");
-  } catch (e) {
-    // Column already exists
-  }
+  } catch (e) {}
 
-  const categoryMap = new Map();
+  const uniqueTopCategories = new Map();
   let insertedCount = 0;
 
   sqliteDb.exec('BEGIN TRANSACTION');
@@ -88,13 +156,16 @@ async function syncXmlToDatabase() {
     const rawCats = extractCategories(item).filter(c => !c.match(/^\d+$/) && c !== '--Kapalı Ürünler Kategorisi');
     if (rawCats.length === 0) continue;
 
-    // Determine main subcategory and top category
-    const mainCategoryTr = rawCats[rawCats.length - 1].split('>').pop().trim() || rawCats[0].split('>')[0].trim();
-    const mainCategoryAr = translateCategory(mainCategoryTr, 'ar');
-    const mainCategoryEn = translateCategory(mainCategoryTr, 'en');
+    // Pick longest category path and clean string
+    const longestRawCat = rawCats.reduce((a, b) => b.length > a.length ? b : a, rawCats[0]);
+    const cleanCatTr = cleanCategoryString(longestRawCat);
+    const catTrans = getCategoryTranslations(cleanCatTr);
 
-    if (!categoryMap.has(mainCategoryTr)) {
-      categoryMap.set(mainCategoryTr, { tr: mainCategoryTr, ar: mainCategoryAr, en: mainCategoryEn });
+    const topCatTr = cleanCatTr.split(' > ')[0].trim();
+    const topCatTrans = getCategoryTranslations(topCatTr);
+
+    if (topCatTr && !uniqueTopCategories.has(topCatTr)) {
+      uniqueTopCategories.set(topCatTr, topCatTrans);
     }
 
     const images = [];
@@ -108,8 +179,8 @@ async function syncXmlToDatabase() {
     }
 
     const nameTr = item.NAME || '';
-    const nameAr = translateProductName(nameTr, 'ar');
-    const nameEn = translateProductName(nameTr, 'en');
+    const nameAr = item.NAME || '';
+    const nameEn = item.NAME || '';
 
     const priceStr = (item.PRICE || '0').replace('TL', '').replace(',', '.').trim();
     const price = parseFloat(priceStr) || 0;
@@ -125,9 +196,9 @@ async function syncXmlToDatabase() {
       item.DESCRIPTION || '',
       price,
       quantity,
-      mainCategoryTr,
-      mainCategoryAr,
-      mainCategoryEn,
+      catTrans.tr,
+      catTrans.ar,
+      catTrans.en,
       '[]',
       '[]',
       JSON.stringify(images)
@@ -137,12 +208,13 @@ async function syncXmlToDatabase() {
   }
   stmt.free();
 
-  // Insert categories into custom_categories table
+  // Re-populate custom_categories cleanly with unique top categories only
+  sqliteDb.exec('DELETE FROM custom_categories');
   const catStmt = sqliteDb.prepare(`
-    INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)
+    INSERT OR REPLACE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)
   `);
-  for (const [key, c] of categoryMap) {
-    catStmt.run([c.tr, c.ar, c.en]);
+  for (const [topTr, cat] of uniqueTopCategories) {
+    catStmt.run([cat.tr, cat.ar, cat.en]);
   }
   catStmt.free();
 
@@ -151,7 +223,7 @@ async function syncXmlToDatabase() {
   const exportedData = Buffer.from(sqliteDb.export());
   fs.writeFileSync(dbPath, exportedData);
 
-  console.log(`[XML Sync Success] Inserted/Updated ${insertedCount} products under ${categoryMap.size} categories into database.`);
+  console.log(`[XML Sync Success] Inserted/Updated ${insertedCount} products under ${uniqueTopCategories.size} clean top categories into database.`);
 }
 
 if (require.main === module) {

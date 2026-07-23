@@ -125,9 +125,16 @@ function getCategories(products) {
 
   for (const product of products) {
     for (let i = 0; i < product.categories.tr.length; i++) {
-      const topTr = product.categories.tr[i].split(' > ')[0].trim();
-      const topAr = product.categories.ar[i].split(' > ')[0].trim();
-      const topEn = product.categories.en[i].split(' > ')[0].trim();
+      let rawTr = product.categories.tr[i] || '';
+      let rawAr = product.categories.ar[i] || rawTr;
+      let rawEn = product.categories.en[i] || rawTr;
+      if (rawTr.includes('|')) rawTr = rawTr.split('|')[0].trim();
+      if (rawAr.includes('|')) rawAr = rawAr.split('|')[0].trim();
+      if (rawEn.includes('|')) rawEn = rawEn.split('|')[0].trim();
+
+      const topTr = rawTr.split(' > ')[0].trim();
+      const topAr = rawAr.split(' > ')[0].trim();
+      const topEn = rawEn.split(' > ')[0].trim();
 
       if (!catMap[topTr]) {
         catMap[topTr] = { tr: topTr, ar: topAr, en: topEn, count: 0, subcategories: {} };

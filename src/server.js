@@ -81,12 +81,19 @@ async function syncXmlToDb(db, saveDatabase) {
     `);
 
     for (const p of products) {
-      const catTr = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : '';
+      let rawCat = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : '';
+      if (rawCat.includes('|')) {
+        rawCat = rawCat.split('|')[0].trim();
+      }
+      const topCatTr = rawCat.split('>')[0].trim();
+      const catTr = rawCat;
       const catAr = (p.categories && p.categories.ar && p.categories.ar.length > 0) ? p.categories.ar[p.categories.ar.length - 1] : translateCategory(catTr, 'ar');
       const catEn = (p.categories && p.categories.en && p.categories.en.length > 0) ? p.categories.en[p.categories.en.length - 1] : translateCategory(catTr, 'en');
 
-      if (catTr && !categoryMap.has(catTr)) {
-        categoryMap.set(catTr, { tr: catTr, ar: catAr, en: catEn });
+      if (topCatTr && !categoryMap.has(topCatTr)) {
+        const topCatAr = translateCategory(topCatTr, 'ar');
+        const topCatEn = translateCategory(topCatTr, 'en');
+        categoryMap.set(topCatTr, { tr: topCatTr, ar: topCatAr, en: topCatEn });
       }
 
       insertStmt.run(
@@ -108,7 +115,8 @@ async function syncXmlToDb(db, saveDatabase) {
       inserted++;
     }
 
-    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
+    db.exec('DELETE FROM custom_categories');
+    const catStmt = db.prepare('INSERT OR REPLACE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
     for (const [key, c] of categoryMap) {
       catStmt.run(c.tr, c.ar, c.en);
     }
@@ -116,7 +124,7 @@ async function syncXmlToDb(db, saveDatabase) {
     if (typeof saveDatabase === 'function') {
       saveDatabase();
     }
-    console.log(`[Auto XML Sync] Successfully synced ${inserted} products and ${categoryMap.size} categories to active database!`);
+    console.log(`[Auto XML Sync] Successfully synced ${inserted} products and ${categoryMap.size} clean categories to active database!`);
   } catch (err) {
     console.error('[Auto XML Sync Error]:', err.message);
   }

@@ -63,19 +63,81 @@ app.use(cookieParser());
 // Serve static files (React build + admin panel)
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+async function syncXmlToDb(db, saveDatabase) {
+  try {
+    const { fetchAndParseProducts } = require('./dataService');
+    const { translateCategory } = require('./translations');
+    console.log('[Auto XML Sync] Starting background sync of XML feed to database...');
+    const products = await fetchAndParseProducts();
+    if (!products || products.length === 0) return;
+
+    let inserted = 0;
+    const categoryMap = new Map();
+
+    const insertStmt = db.prepare(`
+      INSERT OR REPLACE INTO local_products 
+      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+
+    for (const p of products) {
+      const catTr = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : '';
+      const catAr = (p.categories && p.categories.ar && p.categories.ar.length > 0) ? p.categories.ar[p.categories.ar.length - 1] : translateCategory(catTr, 'ar');
+      const catEn = (p.categories && p.categories.en && p.categories.en.length > 0) ? p.categories.en[p.categories.en.length - 1] : translateCategory(catTr, 'en');
+
+      if (catTr && !categoryMap.has(catTr)) {
+        categoryMap.set(catTr, { tr: catTr, ar: catAr, en: catEn });
+      }
+
+      insertStmt.run(
+        (p.id || '').toString(),
+        p.name ? (p.name.tr || '') : '',
+        p.name ? (p.name.ar || p.name.tr || '') : '',
+        p.name ? (p.name.en || p.name.tr || '') : '',
+        p.model || '',
+        p.description || '',
+        p.price || 0,
+        p.quantity || 0,
+        catTr,
+        catAr,
+        catEn,
+        JSON.stringify(p.colors || []),
+        JSON.stringify(p.sizes || []),
+        JSON.stringify(p.images || [])
+      );
+      inserted++;
+    }
+
+    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
+    for (const [key, c] of categoryMap) {
+      catStmt.run(c.tr, c.ar, c.en);
+    }
+
+    if (typeof saveDatabase === 'function') {
+      saveDatabase();
+    }
+    console.log(`[Auto XML Sync] Successfully synced ${inserted} products and ${categoryMap.size} categories to active database!`);
+  } catch (err) {
+    console.error('[Auto XML Sync Error]:', err.message);
+  }
+}
+
 // Start server after async DB initialization
 async function startServer() {
   // Initialize sql.js database
   await initDatabaseAsync();
   
   // Now we can safely require modules that use db
-  const { db } = require('./database');
+  const { db, saveDatabase } = require('./database');
   const adminRoutes = require('./routes/admin');
   const userRoutes = require('./routes/user');
   const chatbotRoutes = require('./routes/chatbot');
   
   // Initialize schema and seed data
   initializeDatabase();
+
+  // Run XML auto-sync into DB
+  syncXmlToDb(db, saveDatabase);
 
   // API Routes
   app.use('/api/admin', adminRoutes);

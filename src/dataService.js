@@ -8,7 +8,6 @@ let cachedProducts = null;
 let lastFetchTime = 0;
 
 async function fetchXML() {
-  const fetch = (await import('node-fetch')).default;
   const response = await fetch(XML_URL);
   const text = await response.text();
   return text;

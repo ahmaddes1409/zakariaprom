@@ -428,49 +428,96 @@ async function startServer() {
   });
   app.get('/api/product/:id', async (req, res) => {
     try {
-      let products = [];
-      try { products = await fetchAndParseProducts(); } catch(xmlErr) { console.error("XML fetch failed:", xmlErr.message); }
-      let product = getProductById(products, req.params.id);
-      // Check local products if not found in XML
-      if (!product && req.params.id.startsWith('local_')) {
-        const localId = req.params.id.replace('local_', '');
-        const lp = db.prepare('SELECT * FROM local_products WHERE id = ?').get(localId);
-        if (lp) {
-          product = {
-            id: 'local_' + lp.id,
-            name: { tr: lp.name_tr, ar: lp.name_ar || lp.name_tr, en: lp.name_en || lp.name_tr },
-            model: lp.model || ('LP' + lp.id),
-            categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || lp.category_tr || ''], en: [lp.category_en || lp.category_tr || ''] },
-            topCategory: { tr: (lp.category_tr || '').split(' > ')[0], ar: (lp.category_ar || lp.category_tr || '').split(' > ')[0], en: (lp.category_en || lp.category_tr || '').split(' > ')[0] },
-            description: lp.description || '',
-            price: lp.price || 0,
-            quantity: lp.quantity || 0,
-            images: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?[s]:[]}})(lp.images),
-            options: [],
-            colors: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?s.split(',').map(function(x){return x.trim()}):[]}})(lp.colors),
-            sizes: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?s.split(',').map(function(x){return x.trim()}):[]}})(lp.sizes),
-            status: true,
-            isLocal: true
+      const { translateProductName, translateCategory } = require('./translations');
+      const reqId = req.params.id;
+
+      let lp = null;
+      if (reqId.startsWith('etkin_') || reqId.startsWith('xml_') || isNaN(Number(reqId))) {
+        lp = db.prepare('SELECT * FROM local_products WHERE product_id = ?').get(reqId);
+      } else {
+        lp = db.prepare('SELECT * FROM local_products WHERE product_id = ? OR id = ?').get(reqId, Number(reqId));
+      }
+      
+      if (!lp && reqId.startsWith('local_')) {
+        const numericId = Number(reqId.replace('local_', '')) || 0;
+        lp = db.prepare('SELECT * FROM local_products WHERE id = ?').get(numericId);
+      }
+
+      let product = null;
+
+      if (lp) {
+        let catTr = lp.category_tr || '';
+        let catAr = lp.category_ar || translateCategory(catTr, 'ar');
+        let catEn = lp.category_en || translateCategory(catTr, 'en');
+
+        let nameTr = lp.name_tr || '';
+        let nameAr = lp.name_ar || translateProductName(nameTr, 'ar');
+        let nameEn = lp.name_en || translateProductName(nameTr, 'en');
+
+        let images = [];
+        try { images = JSON.parse(lp.images || '[]'); } catch(e) { if (lp.images) images = [lp.images]; }
+
+        let colors = [];
+        try { colors = JSON.parse(lp.colors || '[]'); } catch(e) { if (lp.colors) colors = lp.colors.split(',').map(s=>s.trim()); }
+
+        let sizes = [];
+        try { sizes = JSON.parse(lp.sizes || '[]'); } catch(e) { if (lp.sizes) sizes = lp.sizes.split(',').map(s=>s.trim()); }
+
+        const topCatTr = catTr.split(' > ')[0].trim();
+
+        product = {
+          id: lp.product_id || ('local_' + lp.id),
+          name: { tr: nameTr, ar: nameAr, en: nameEn },
+          model: lp.model || ('LP' + lp.id),
+          categories: { tr: [catTr], ar: [catAr], en: [catEn] },
+          topCategory: {
+            tr: topCatTr,
+            ar: catAr.split(' > ')[0].trim(),
+            en: catEn.split(' > ')[0].trim()
+          },
+          description: lp.description || '',
+          price: lp.price || 0,
+          quantity: lp.quantity || 0,
+          images: images,
+          options: [],
+          colors: colors,
+          sizes: sizes,
+          status: true,
+          isLocal: true
+        };
+      } else {
+        // Fallback to XML live lookup
+        let products = [];
+        try { products = await fetchAndParseProducts(); } catch(xmlErr) {}
+        product = getProductById(products, reqId);
+      }
+
+      if (product) {
+        // Apply category override if exists
+        const catOverride = db.prepare('SELECT * FROM product_category_overrides WHERE product_id = ?').get(product.id);
+        if (catOverride) {
+          product.categories = {
+            tr: [catOverride.new_category_tr],
+            ar: [catOverride.new_category_ar || catOverride.new_category_tr],
+            en: [catOverride.new_category_en || catOverride.new_category_tr]
+          };
+          product.topCategory = {
+            tr: catOverride.new_category_tr.split(' > ')[0].trim(),
+            ar: (catOverride.new_category_ar || catOverride.new_category_tr).split(' > ')[0].trim(),
+            en: (catOverride.new_category_en || catOverride.new_category_tr).split(' > ')[0].trim()
           };
         }
-      }
-      if (product) {
-        // Apply translation override if exists
-        const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'product' AND original_key = ?").all(req.params.id);
-        if (overrides.length > 0) {
-          const nameOverrides = {};
-          overrides.forEach(o => { nameOverrides[o.lang] = o.translation; });
-          product.name = { ...product.name, ...nameOverrides };
-        }
-        // Add USD price
+
+        // Apply USD price
         let exRate = null;
         try { exRate = await getExchangeRate(db); } catch(e) {}
-        const uRate = exRate ? exRate.usdPerTry : 0.0213;
-        product.price_usd = product.price ? parseFloat((product.price * uRate).toFixed(2)) : 0;
-        res.json(product);
-      } else {
-        res.status(404).json({ error: 'Product not found' });
+        const usdRate = exRate ? exRate.usdPerTry : 0.0213;
+        product.price_usd = product.price ? parseFloat((product.price * usdRate).toFixed(2)) : 0;
+
+        return res.json(product);
       }
+
+      res.status(404).json({ error: 'Product not found' });
     } catch (error) {
       console.error('Error fetching product:', error);
       res.status(500).json({ error: 'Failed to fetch product' });

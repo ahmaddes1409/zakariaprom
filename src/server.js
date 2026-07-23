@@ -125,23 +125,34 @@ async function startServer() {
       // Merge local products
       const localProducts = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       if (localProducts.length > 0) {
-        const localMapped = localProducts.map(lp => ({
-          id: 'local_' + lp.id,
-          name: { tr: lp.name_tr, ar: lp.name_ar || lp.name_tr, en: lp.name_en || lp.name_tr },
-          model: lp.model || ('LP' + lp.id),
-          categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || lp.category_tr || ''], en: [lp.category_en || lp.category_tr || ''] },
-          topCategory: { tr: (lp.category_tr || '').split(' > ')[0], ar: (lp.category_ar || lp.category_tr || '').split(' > ')[0], en: (lp.category_en || lp.category_tr || '').split(' > ')[0] },
-          description: lp.description || '',
-          price: lp.price || 0,
-          quantity: lp.quantity || 0,
-          images: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?[s]:[]}})(lp.images),
-          options: [],
-          colors: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?s.split(',').map(function(x){return x.trim()}):[]}})(lp.colors),
-          sizes: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?s.split(',').map(function(x){return x.trim()}):[]}})(lp.sizes),
-          status: true,
-          isLocal: true
-        }));
-        products = [...localMapped, ...products];
+        const localMapped = localProducts.map(lp => {
+          const catTr = lp.category_tr || '';
+          const catAr = lp.category_ar || catTr;
+          const catEn = lp.category_en || catTr;
+          return {
+            id: lp.product_id || ('local_' + lp.id),
+            name: { tr: lp.name_tr, ar: lp.name_ar || lp.name_tr, en: lp.name_en || lp.name_tr },
+            model: lp.model || ('LP' + lp.id),
+            categories: { tr: [catTr], ar: [catAr], en: [catEn] },
+            topCategory: {
+              tr: catTr.split(' > ')[0].trim(),
+              ar: catAr.split(' > ')[0].trim(),
+              en: catEn.split(' > ')[0].trim()
+            },
+            description: lp.description || '',
+            price: lp.price || 0,
+            quantity: lp.quantity || 0,
+            images: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?[s]:[]}})(lp.images),
+            options: [],
+            colors: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?s.split(',').map(function(x){return x.trim()}):[]}})(lp.colors),
+            sizes: (function(s){try{return JSON.parse(s||'[]')}catch(e){return s?s.split(',').map(function(x){return x.trim()}):[]}})(lp.sizes),
+            status: true,
+            isLocal: true
+          };
+        });
+        const seenIds = new Set(localMapped.map(p => p.id));
+        const xmlFiltered = products.filter(p => !seenIds.has(p.id));
+        products = [...localMapped, ...xmlFiltered];
       }
 
       // Filter hidden categories
@@ -239,12 +250,23 @@ async function startServer() {
       // Merge local products
       const localProducts = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       if (localProducts.length > 0) {
-        const localMapped = localProducts.map(lp => ({
-          id: 'local_' + lp.id,
-          categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || lp.category_tr || ''], en: [lp.category_en || lp.category_tr || ''] },
-          topCategory: { tr: (lp.category_tr || '').split(' > ')[0], ar: (lp.category_ar || lp.category_tr || '').split(' > ')[0], en: (lp.category_en || lp.category_tr || '').split(' > ')[0] }
-        }));
-        products = [...localMapped, ...products];
+        const localMapped = localProducts.map(lp => {
+          const catTr = lp.category_tr || '';
+          const catAr = lp.category_ar || catTr;
+          const catEn = lp.category_en || catTr;
+          return {
+            id: lp.product_id || ('local_' + lp.id),
+            categories: { tr: [catTr], ar: [catAr], en: [catEn] },
+            topCategory: {
+              tr: catTr.split(' > ')[0].trim(),
+              ar: catAr.split(' > ')[0].trim(),
+              en: catEn.split(' > ')[0].trim()
+            }
+          };
+        });
+        const seenIds = new Set(localMapped.map(p => p.id));
+        const xmlFiltered = products.filter(p => !seenIds.has(p.id));
+        products = [...localMapped, ...xmlFiltered];
       }
 
       // Filter hidden categories

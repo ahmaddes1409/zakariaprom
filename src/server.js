@@ -147,6 +147,14 @@ async function startServer() {
   // Run XML auto-sync into DB
   syncXmlToDb(db, saveDatabase);
 
+  // Schedule daily 03:30 AM early morning sync for Etkin Promosyon API
+  try {
+    const { scheduleDailySync } = require('./services/etkinService');
+    scheduleDailySync(db, saveDatabase);
+  } catch (e) {
+    console.error('[Etkin Scheduler Error]:', e.message);
+  }
+
   // API Routes
   app.use('/api/admin', adminRoutes);
   app.use('/api/user', userRoutes);

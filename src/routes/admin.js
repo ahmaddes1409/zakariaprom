@@ -1056,4 +1056,16 @@ router.get('/category-overrides', adminAuth, (req, res) => {
   res.json({ overrides });
 });
 
+// Trigger Etkin Promosyon API Synchronization
+router.post('/sync-etkin', adminAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const { syncEtkinProducts } = require('../services/etkinService');
+    const result = await syncEtkinProducts(db, database.saveDatabase);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

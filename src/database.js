@@ -603,7 +603,11 @@ function initializeDatabase() {
     chatbot_enabled: '1',
     chatbot_welcome_ar: 'مرحباً! كيف يمكنني مساعدتك؟',
     chatbot_welcome_en: 'Hello! How can I help you?',
-    chatbot_welcome_tr: 'Merhaba! Size nasıl yardımcı olabilirim?'
+    chatbot_welcome_tr: 'Merhaba! Size nasıl yardımcı olabilirim?',
+    etkin_ebayi_eposta: 'info@zakariaprom.com',
+    etkin_hash: '655af889baa94a38ae39ec4703be2021',
+    etkin_auto_sync: '1',
+    etkin_sync_time: '03:30'
   };
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');

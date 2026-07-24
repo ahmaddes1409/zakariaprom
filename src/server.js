@@ -200,6 +200,13 @@ async function startServer() {
     }
   });
 
+  app.get('/api/admin/restart-node-worker', (req, res) => {
+    res.json({ message: 'Restarting Node worker process...' });
+    setTimeout(() => {
+      process.exit(0);
+    }, 100);
+  });
+
   app.get('/api/db-status', async (req, res) => {
     try {
       const { fetchAndParseProducts } = require('./dataService');

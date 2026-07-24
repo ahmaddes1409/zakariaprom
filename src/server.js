@@ -618,10 +618,9 @@ async function startServer() {
   });
 }
 
-// Start the server
+// Start the server and export app for Passenger compatibility
 startServer().catch(err => {
-  console.error('Failed to start DB or background tasks during server init:', err);
-  app.listen(PORT, () => {
-    console.log(`Zakaria Prom fallback server running on port ${PORT}`);
-  });
+  console.error('Failed to start DB or background tasks during server init:', err.message);
 });
+
+module.exports = app;

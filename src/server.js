@@ -69,6 +69,7 @@ async function syncXmlToDb(db, saveDatabase) {
     const { translateCategory, translateProductName } = require('./translations');
     console.log('[Auto XML Sync] Starting background sync of Karmedya XML feed to database...');
     const products = await fetchAndParseProducts();
+    console.log(`[Auto XML Sync] Parsed ${products ? products.length : 0} products from XML`);
     if (!products || products.length === 0) return;
 
     // 1. Prepare all formatted data BEFORE starting database transaction

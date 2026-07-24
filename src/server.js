@@ -200,12 +200,17 @@ async function startServer() {
     }
   });
 
-  app.get('/api/db-status', (req, res) => {
+  app.get('/api/db-status', async (req, res) => {
     try {
+      const { fetchAndParseProducts } = require('./dataService');
+      let xmlParsed = [];
+      let xmlError = null;
+      try { xmlParsed = await fetchAndParseProducts(); } catch(e) { xmlError = e.message; }
+
       const total = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
       const xml = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
       const etkin = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
-      res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0 });
+      res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0, xmlParsedCount: xmlParsed ? xmlParsed.length : 0, xmlError });
     } catch(e) {
       res.status(500).json({ error: e.message });
     }

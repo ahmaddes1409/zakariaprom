@@ -292,8 +292,12 @@ function reloadDatabaseFromDisk() {
     if (fileBuffer && fileBuffer.length > 0 && SQLInstance) {
       const newSqliteDb = new SQLInstance.Database(fileBuffer);
       database = newSqliteDb;
-      db = new DatabaseWrapper(newSqliteDb);
-      console.log(`[DB Reload] Reloaded active database from disk (${fileBuffer.length} bytes)`);
+      if (db) {
+        db.sqliteDb = newSqliteDb;
+      } else {
+        db = new DatabaseWrapper(newSqliteDb);
+      }
+      console.log(`[DB Reload] Reloaded active database instance (${fileBuffer.length} bytes)`);
       return true;
     }
   } catch(e) {

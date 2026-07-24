@@ -200,7 +200,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/admin/restart-node-worker', (req, res) => {
+  app.get('/api/restart-node-worker', (req, res) => {
     res.json({ message: 'Restarting Node worker process...' });
     setTimeout(() => {
       process.exit(0);

@@ -464,8 +464,9 @@ ensureDbReady();
       const categoryOverrides = safeQuery('SELECT * FROM product_category_overrides');
       if (categoryOverrides.length > 0) {
         const overrideMap = {};
-        categoryOverrides.forEach(o => { overrideMap[o.product_id] = o; });
-        products = products.map(p => {
+        categoryOverrides.forEach(o => { if (o && o.product_id) overrideMap[o.product_id] = o; });
+        products = (Array.isArray(products) ? products : []).map(p => {
+          if (!p || !p.id) return p;
           const override = overrideMap[p.id];
           if (override && override.new_category_tr) {
             return {
@@ -482,6 +483,7 @@ ensureDbReady();
       const localProducts = safeQuery('SELECT * FROM local_products WHERE hidden = 0');
       if (localProducts.length > 0) {
         const localMapped = localProducts.map(lp => {
+          if (!lp) return null;
           const catTr = lp.category_tr || '';
           const catAr = lp.category_ar || catTr;
           const catEn = lp.category_en || catTr;
@@ -494,25 +496,27 @@ ensureDbReady();
               en: catEn ? catEn.split(' > ')[0].trim() : ''
             }
           };
-        });
+        }).filter(Boolean);
         const seenIds = new Set(localMapped.map(p => p.id));
-        const xmlFiltered = products.filter(p => !seenIds.has(p.id));
+        const xmlFiltered = (Array.isArray(products) ? products : []).filter(p => p && p.id && !seenIds.has(p.id));
         products = [...localMapped, ...xmlFiltered];
       }
 
       // Filter hidden categories
-      const hiddenCategories = safeQuery('SELECT category_name FROM hidden_categories').map(h => h.category_name);
-      products = products.filter(p => {
+      const hiddenCategories = safeQuery('SELECT category_name FROM hidden_categories').map(h => h ? h.category_name : null).filter(Boolean);
+      products = (Array.isArray(products) ? products : []).filter(p => {
         if (!p || !p.categories || !Array.isArray(p.categories.tr)) return true;
         return !p.categories.tr.some(c => typeof c === 'string' && hiddenCategories.includes(c.split(' > ')[0]));
       });
-      const categories = getCategories(products);
+
+      let categories = [];
+      try { categories = getCategories(products); } catch(e) { console.error("getCategories error:", e); }
 
       // Apply category translation overrides
       const overrides = safeQuery("SELECT * FROM translation_overrides WHERE type = 'category'");
       const overrideMap = {};
       overrides.forEach(o => {
-        if (o.original_key) {
+        if (o && o.original_key) {
           if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
           overrideMap[o.original_key][o.lang] = o.translation;
         }
@@ -521,23 +525,23 @@ ensureDbReady();
       // Get category images
       const images = safeQuery('SELECT * FROM category_images');
       const imageMap = {};
-      images.forEach(i => { if (i.category_name) imageMap[i.category_name] = i.image_url; });
+      images.forEach(i => { if (i && i.category_name) imageMap[i.category_name] = i.image_url; });
 
       // Build custom categories image map as fallback
       const allCustomCats = safeQuery('SELECT name_tr, image_url, name_ar, name_en FROM custom_categories');
       const customImageMap = {};
-      allCustomCats.forEach(cc => { if (cc.name_tr && cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
+      allCustomCats.forEach(cc => { if (cc && cc.name_tr && cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
 
-      let result = categories.map(cat => ({
+      let result = (Array.isArray(categories) ? categories : []).map(cat => ({
         ...cat,
-        ...(overrideMap[cat.tr] || {}),
-        image: imageMap[cat.tr] || customImageMap[cat.tr] || ''
+        ...(cat && cat.tr ? (overrideMap[cat.tr] || {}) : {}),
+        image: cat && cat.tr ? (imageMap[cat.tr] || customImageMap[cat.tr] || '') : ''
       }));
 
       // Add custom categories (that are active and not hidden)
       const customCats = safeQuery('SELECT * FROM custom_categories WHERE active = 1');
       customCats.forEach(cc => {
-        if (cc.name_tr && !hiddenCategories.includes(cc.name_tr) && !result.find(r => r.tr === cc.name_tr)) {
+        if (cc && cc.name_tr && !hiddenCategories.includes(cc.name_tr) && !result.find(r => r && r.tr === cc.name_tr)) {
           const catImage = imageMap[cc.name_tr] || cc.image_url || '';
           const catOverrides = overrideMap[cc.name_tr] || {};
           result.push({
@@ -551,10 +555,10 @@ ensureDbReady();
         }
       });
 
-      res.json(result);
+      return res.json(result);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      res.json({ isError500: true, error: error.message, stack: error.stack });
+      return res.json({ isError500: true, error: error.message, stack: error.stack });
     }
   });
   app.get('/api/product/:id', async (req, res) => {

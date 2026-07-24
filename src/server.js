@@ -258,13 +258,16 @@ async function startServer() {
           const xmlProds = await fetchAndParseProducts();
           if (xmlProds && xmlProds.length > 0) {
             const mappedXml = xmlProds.map(p => {
-              const catTr = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : 'Promosyon Ürünleri';
-              const topCatTr = catTr.split('>')[0].trim() || 'Promosyon Ürünleri';
+              const catArray = (p.categories && Array.isArray(p.categories.tr)) ? p.categories.tr : [];
+              const catTr = catArray.length > 0 ? (catArray[catArray.length - 1] || 'Promosyon Ürünleri') : 'Promosyon Ürünleri';
+              const nameTr = (p.name && typeof p.name.tr === 'string') ? p.name.tr : (typeof p.name === 'string' ? p.name : '');
+              const pId = p.id ? p.id.toString() : Math.random().toString(36).substring(7);
+
               return {
-                product_id: p.id.toString(),
-                name_tr: p.name ? p.name.tr : '',
-                name_ar: p.name ? (p.name.ar || translateProductName(p.name.tr, 'ar')) : '',
-                name_en: p.name ? (p.name.en || translateProductName(p.name.tr, 'en')) : '',
+                product_id: pId,
+                name_tr: nameTr,
+                name_ar: p.name && p.name.ar ? p.name.ar : translateProductName(nameTr, 'ar'),
+                name_en: p.name && p.name.en ? p.name.en : translateProductName(nameTr, 'en'),
                 model: p.model || '',
                 description: p.description || '',
                 price: p.price || 0,
@@ -279,7 +282,9 @@ async function startServer() {
             });
             dbRows = [...dbRows, ...mappedXml];
           }
-        } catch(fallbackErr) {}
+        } catch(fallbackErr) {
+          console.error('[API Products XML Fallback Error]:', fallbackErr.message);
+        }
       }
       
       const hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);

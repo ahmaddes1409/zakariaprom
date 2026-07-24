@@ -283,6 +283,9 @@ async function initDatabaseAsync() {
   database = sqliteDb;
   db = new DatabaseWrapper(sqliteDb);
 
+  // Automatically initialize database schema and migrations
+  initializeDatabase();
+
   // Save immediately to ensure path & file exist
   saveDatabase();
 
@@ -573,7 +576,7 @@ function initializeDatabase() {
   `).run();
 
   try {
-    db.prepare('ALTER TABLE local_products ADD COLUMN product_id TEXT').run();
+    sqliteDb.exec("ALTER TABLE local_products ADD COLUMN product_id TEXT");
   } catch(e) {}
 
   // Create default admin if not exists

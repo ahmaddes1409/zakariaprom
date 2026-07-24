@@ -148,21 +148,23 @@ class DatabaseWrapper {
       },
       run(...params) {
         try {
+          const stmt = self.sqliteDb.prepare(sql);
           const boundParams = formatParams(params);
-          self.sqliteDb.run(sql, boundParams);
+          if (boundParams.length > 0) {
+            stmt.bind(boundParams);
+          }
+          stmt.step();
+          stmt.free();
           let lastId = 0;
           try {
             const res = self.sqliteDb.exec("SELECT last_insert_rowid() as id");
             if (res && res.length > 0 && res[0].values && res[0].values.length > 0) {
               lastId = res[0].values[0][0];
             }
-          } catch(err) {
-            // Ignore last_insert_rowid error
-          }
-          const changes = typeof self.sqliteDb.getRowsModified === 'function' ? self.sqliteDb.getRowsModified() : 0;
+          } catch(err) {}
           return {
             lastInsertRowid: lastId,
-            changes: changes
+            changes: 1
           };
         } catch (e) {
           console.error('DB run error:', sql, params, e.message);

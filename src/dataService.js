@@ -9,30 +9,43 @@ let lastFetchTime = 0;
 
 async function fetchXML() {
   const localBackup = path.join(__dirname, '..', 'data', 'xml_export_product.xml');
+  
+  if (fs.existsSync(localBackup)) {
+    try {
+      const stats = fs.statSync(localBackup);
+      if (stats.size > 1000) {
+        let text = fs.readFileSync(localBackup, 'utf8');
+        if (text.includes('<')) text = text.substring(text.indexOf('<'));
+        
+        // Refresh local backup asynchronously in background if older than 6 hours
+        if (Date.now() - stats.mtimeMs > 6 * 60 * 60 * 1000) {
+          fetch(XML_URL, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0' } })
+            .then(res => res.ok ? res.text() : null)
+            .then(t => {
+              if (t && t.includes('<SHOP>')) {
+                fs.writeFileSync(localBackup, t.includes('<') ? t.substring(t.indexOf('<')) : t, 'utf8');
+              }
+            })
+            .catch(() => {});
+        }
+        return text;
+      }
+    } catch(e) {}
+  }
+
+  // Remote fallback if local file does not exist
   try {
-    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } });
+    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0' } });
     if (response.ok) {
       let text = await response.text();
       if (text && text.includes('<SHOP>')) {
         if (text.includes('<')) text = text.substring(text.indexOf('<'));
-        try {
-          const targetDir = path.dirname(localBackup);
-          if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
-          fs.writeFileSync(localBackup, text, 'utf8');
-        } catch(e) {}
+        try { fs.writeFileSync(localBackup, text, 'utf8'); } catch(e) {}
         return text;
       }
     }
-  } catch(e) {
-    console.warn('[XML Fetch Warning] Remote fetch failed:', e.message);
-  }
+  } catch(e) {}
 
-  if (fs.existsSync(localBackup)) {
-    console.log('[XML Fetch] Fallback: Reading from local backup file...');
-    let text = fs.readFileSync(localBackup, 'utf8');
-    if (text.includes('<')) text = text.substring(text.indexOf('<'));
-    return text;
-  }
   throw new Error('Could not fetch XML from remote or local backup');
 }
 

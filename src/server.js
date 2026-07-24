@@ -613,9 +613,11 @@ async function startServer() {
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
   });
 
-  app.listen(PORT, () => {
-    console.log(`Zakaria Prom server running on port ${PORT}`);
-  });
+  if (require.main === module) {
+    app.listen(PORT, () => {
+      console.log(`Zakaria Prom server running on port ${PORT}`);
+    });
+  }
 }
 
 // Start the server and export app for Passenger compatibility

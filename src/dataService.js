@@ -13,26 +13,12 @@ async function fetchXML() {
   const localBackup = path.join(__dirname, '..', 'data', 'xml_export_product.xml');
   
   if (fs.existsSync(localBackup)) {
-    try {
-      const stats = fs.statSync(localBackup);
-      if (stats.size > 1000) {
-        let text = fs.readFileSync(localBackup, 'utf8');
-        if (text.includes('<')) text = text.substring(text.indexOf('<'));
-        
-        // Refresh local backup asynchronously in background if older than 6 hours
-        if (Date.now() - stats.mtimeMs > 6 * 60 * 60 * 1000) {
-          fetch(XML_URL, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0' } })
-            .then(res => res.ok ? res.text() : null)
-            .then(t => {
-              if (t && t.includes('<SHOP>')) {
-                fs.writeFileSync(localBackup, t.includes('<') ? t.substring(t.indexOf('<')) : t, 'utf8');
-              }
-            })
-            .catch(() => {});
-        }
-        return text;
-      }
-    } catch(e) {}
+    const stats = fs.statSync(localBackup);
+    if (stats.size > 1000) {
+      let text = fs.readFileSync(localBackup, 'utf8');
+      if (text.includes('<')) text = text.substring(text.indexOf('<'));
+      return text;
+    }
   }
 
   // Remote fallback if local file does not exist

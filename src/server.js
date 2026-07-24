@@ -198,6 +198,17 @@ async function startServer() {
     }
   });
 
+  app.get('/api/db-status', (req, res) => {
+    try {
+      const total = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+      const xml = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+      const etkin = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+      res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0 });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Public trigger to run full feed sync and get DB counts
   app.get('/api/sync-all-now', async (req, res) => {
     try {

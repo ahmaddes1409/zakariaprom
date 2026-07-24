@@ -1068,4 +1068,60 @@ router.post('/sync-etkin', adminAuth, async (req, res) => {
   }
 });
 
+// Trigger Full Synchronization for all feeds (Karmedya XML + Etkin Promosyon)
+router.post('/sync-all', async (req, res) => {
+  try {
+    const db = getDb();
+    const { syncEtkinProducts } = require('../services/etkinService');
+    const { fetchAndParseProducts } = require('../dataService');
+    const { translateCategory, translateProductName } = require('../translations');
+
+    // 1. Sync XML products
+    const products = await fetchAndParseProducts();
+    let xmlCount = 0;
+    if (products && products.length > 0) {
+      db.exec('BEGIN TRANSACTION');
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO local_products 
+        (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `);
+      for (const p of products) {
+        if (!p.id) continue;
+        let catTr = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : '';
+        if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
+        const catAr = (p.categories && p.categories.ar && p.categories.ar.length > 0) ? p.categories.ar[p.categories.ar.length - 1] : translateCategory(catTr, 'ar');
+        const catEn = (p.categories && p.categories.en && p.categories.en.length > 0) ? p.categories.en[p.categories.en.length - 1] : translateCategory(catTr, 'en');
+
+        stmt.run([
+          p.id.toString(),
+          p.name ? (p.name.tr || '') : '',
+          p.name ? (p.name.ar || translateProductName(p.name.tr || '', 'ar')) : '',
+          p.name ? (p.name.en || translateProductName(p.name.tr || '', 'en')) : '',
+          p.model || '',
+          p.description || '',
+          p.price || 0,
+          p.quantity || 0,
+          catTr,
+          catAr,
+          catEn,
+          JSON.stringify(p.colors || []),
+          JSON.stringify(p.sizes || []),
+          JSON.stringify(p.images || [])
+        ]);
+        xmlCount++;
+      }
+      db.exec('COMMIT');
+    }
+
+    // 2. Sync Etkin products
+    const etkinResult = await syncEtkinProducts(db, database.saveDatabase);
+
+    const total = db.prepare('SELECT COUNT(*) as count FROM local_products WHERE hidden = 0').get()?.count || 0;
+    res.json({ success: true, totalProducts: total, xmlSynced: xmlCount, etkinResult });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

@@ -154,17 +154,20 @@ async function startServer() {
   // Initialize schema and seed data
   initializeDatabase();
 
-  // Trigger background sync 10 seconds after server startup to ensure instant HTTP response
-  setTimeout(() => {
-    syncXmlToDb(db, saveDatabase).catch(e => console.error('[XML Sync Startup Error]:', e.message));
+  // Trigger background sync 5 seconds after server startup (sequential to avoid transaction collisions)
+  setTimeout(async () => {
     try {
+      console.log('[Startup Auto Sync] Starting sequential feed sync...');
+      await syncXmlToDb(db, saveDatabase);
+      console.log('[Startup Auto Sync] Karmedya XML sync finished. Starting Etkin sync...');
       const { scheduleDailySync, syncEtkinProducts } = require('./services/etkinService');
-      syncEtkinProducts(db, saveDatabase).catch(e => console.error('[Etkin Sync Startup Error]:', e.message));
+      await syncEtkinProducts(db, saveDatabase);
       scheduleDailySync(db, saveDatabase);
+      console.log('[Startup Auto Sync] All feeds successfully synced!');
     } catch (e) {
-      console.error('[Etkin Scheduler Error]:', e.message);
+      console.error('[Startup Auto Sync Error]:', e.message);
     }
-  }, 10000);
+  }, 5000);
 
   // API Routes
   app.use('/api/admin', adminRoutes);

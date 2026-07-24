@@ -244,25 +244,15 @@ async function startServer() {
       // Fetch all products directly from local_products database table
       let dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       
-      // Fallback: If DB has <= 1 product, try reloading DB from disk first
+      // Fallback: If DB has <= 1 product, populate XML feed products synchronously right now
       if (!dbRows || dbRows.length <= 1) {
-        const { reloadDatabaseFromDisk } = require('./database');
-        const reloaded = reloadDatabaseFromDisk();
-        if (reloaded) {
+        console.log('[API Products] DB has <= 1 product. Synchronously populating Karmedya XML feed...');
+        try {
+          await syncXmlToDb(database.db, saveDatabase);
           dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+        } catch (syncErr) {
+          console.error('[API Products Sync Error]:', syncErr.message);
         }
-      }
-
-      // If still <= 1 product, trigger background feed sync
-      if (!dbRows || dbRows.length <= 1) {
-        setImmediate(async () => {
-          try {
-            console.log('[API Products] Triggering background feed sync...');
-            await syncXmlToDb(database.db, saveDatabase);
-            const { syncEtkinProducts } = require('./services/etkinService');
-            await syncEtkinProducts(database.db, saveDatabase);
-          } catch(e) {}
-        });
       }
       
       const hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);

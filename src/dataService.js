@@ -12,8 +12,9 @@ async function fetchXML() {
   try {
     const response = await fetch(XML_URL, { signal: AbortSignal.timeout(15000) });
     if (response.ok) {
-      const text = await response.text();
+      let text = await response.text();
       if (text && text.includes('<SHOP>')) {
+        if (text.includes('<')) text = text.substring(text.indexOf('<'));
         try {
           const targetDir = path.dirname(localBackup);
           if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
@@ -27,7 +28,9 @@ async function fetchXML() {
   }
   if (fs.existsSync(localBackup)) {
     console.log('[XML Fetch] Reading from local backup file...');
-    return fs.readFileSync(localBackup, 'utf8');
+    let text = fs.readFileSync(localBackup, 'utf8');
+    if (text.includes('<')) text = text.substring(text.indexOf('<'));
+    return text;
   }
   throw new Error('Could not fetch XML from remote or local backup');
 }

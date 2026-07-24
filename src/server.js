@@ -144,6 +144,7 @@ async function syncXmlToDb(db, saveDatabase) {
   } catch (err) {
     try { db.exec('ROLLBACK'); } catch(e) {}
     console.error('[Auto XML Sync Error]:', err.message, err.stack);
+    throw err;
   }
 }
 

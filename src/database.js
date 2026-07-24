@@ -213,11 +213,12 @@ let db = null;
 
 // Async initialization (preferred for sql.js WASM)
 async function initDatabaseAsync() {
+  if (db) return db;
+
   let SQL;
   try {
     SQL = await initSqlJs();
   } catch (err1) {
-    console.warn('[DB Init Warning] Standard sql.js init failed, trying with custom locateFile:', err1.message);
     try {
       SQL = await initSqlJs({
         locateFile: file => resolveWasmFile(file)
@@ -227,7 +228,8 @@ async function initDatabaseAsync() {
       throw err2;
     }
   }
-  
+  SQLInstance = SQL;
+
   DB_PATH = findBestDatabasePath();
 
   const targetDir = path.dirname(DB_PATH);
@@ -279,6 +281,25 @@ async function initDatabaseAsync() {
   process.on('SIGTERM', () => { saveDatabase(); process.exit(); });
 
   return db;
+}
+
+let SQLInstance = null;
+
+function reloadDatabaseFromDisk() {
+  if (!DB_PATH || !fs.existsSync(DB_PATH)) return false;
+  try {
+    const fileBuffer = fs.readFileSync(DB_PATH);
+    if (fileBuffer && fileBuffer.length > 0 && SQLInstance) {
+      const newSqliteDb = new SQLInstance.Database(fileBuffer);
+      database = newSqliteDb;
+      db = new DatabaseWrapper(newSqliteDb);
+      console.log(`[DB Reload] Reloaded active database from disk (${fileBuffer.length} bytes)`);
+      return true;
+    }
+  } catch(e) {
+    console.error('[DB Reload Error]:', e.message);
+  }
+  return false;
 }
 
 function initializeDatabase() {
@@ -695,5 +716,6 @@ module.exports = {
   getDbPath: () => DB_PATH,
   initializeDatabase,
   initDatabaseAsync,
-  saveDatabase
+  saveDatabase,
+  reloadDatabaseFromDisk
 };

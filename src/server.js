@@ -217,11 +217,20 @@ async function startServer() {
       // Fetch all products directly from local_products database table
       let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       
-      // Fallback: If DB has only 1 product or less, trigger background feed sync
+      // Fallback: If DB has <= 1 product, try reloading DB from disk first
+      if (!dbRows || dbRows.length <= 1) {
+        const { reloadDatabaseFromDisk } = require('./database');
+        const reloaded = reloadDatabaseFromDisk();
+        if (reloaded) {
+          dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+        }
+      }
+
+      // If still <= 1 product, trigger background feed sync
       if (!dbRows || dbRows.length <= 1) {
         setImmediate(async () => {
           try {
-            console.log('[API Products] DB has <= 1 product! Triggering background feed sync...');
+            console.log('[API Products] Triggering background feed sync...');
             await syncXmlToDb(db, saveDatabase);
             const { syncEtkinProducts } = require('./services/etkinService');
             await syncEtkinProducts(db, saveDatabase);

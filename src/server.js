@@ -119,20 +119,19 @@ async function syncXmlToDb(db, saveDatabase) {
     // 2. Perform lightning-fast DB transaction (< 10ms)
     db.exec('BEGIN TRANSACTION');
 
-    const insertStmt = db.prepare(`
-      INSERT OR REPLACE INTO local_products 
-      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `);
-
     for (const row of preparedRows) {
-      insertStmt.run(row);
+      const sqlVal = row.map(v => typeof v === 'number' ? v : ("'" + String(v).replace(/'/g, "''") + "'")).join(', ');
+      db.exec(`INSERT OR REPLACE INTO local_products 
+        (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+        VALUES (${sqlVal}, CURRENT_TIMESTAMP)`);
     }
 
-    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_ar, name_en, name_tr) VALUES (?, ?, ?)');
     for (const [key, c] of categoryMap) {
       if (c && c.tr) {
-        catStmt.run([c.ar || c.tr, c.en || c.tr, c.tr]);
+        const arEsc = (c.ar || c.tr).replace(/'/g, "''");
+        const enEsc = (c.en || c.tr).replace(/'/g, "''");
+        const trEsc = c.tr.replace(/'/g, "''");
+        db.exec(`INSERT OR IGNORE INTO custom_categories (name_ar, name_en, name_tr) VALUES ('${arEsc}', '${enEsc}', '${trEsc}')`);
       }
     }
 

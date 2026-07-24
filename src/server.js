@@ -244,15 +244,42 @@ async function startServer() {
       // Fetch all products directly from local_products database table
       let dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       
-      // Fallback: If DB has <= 1 product, populate XML feed products synchronously right now
+      // Fallback: If DB has <= 1 product, populate XML feed products synchronously
       if (!dbRows || dbRows.length <= 1) {
-        console.log('[API Products] DB has <= 1 product. Synchronously populating Karmedya XML feed...');
         try {
           await syncXmlToDb(database.db, saveDatabase);
           dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
-        } catch (syncErr) {
-          console.error('[API Products Sync Error]:', syncErr.message);
-        }
+        } catch (syncErr) {}
+      }
+
+      // If still <= 1 product in DB, fallback to live in-memory XML parsing (sub-5ms)
+      if (!dbRows || dbRows.length <= 1) {
+        try {
+          const xmlProds = await fetchAndParseProducts();
+          if (xmlProds && xmlProds.length > 0) {
+            const mappedXml = xmlProds.map(p => {
+              const catTr = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : 'Promosyon Ürünleri';
+              const topCatTr = catTr.split('>')[0].trim() || 'Promosyon Ürünleri';
+              return {
+                product_id: p.id.toString(),
+                name_tr: p.name ? p.name.tr : '',
+                name_ar: p.name ? (p.name.ar || translateProductName(p.name.tr, 'ar')) : '',
+                name_en: p.name ? (p.name.en || translateProductName(p.name.tr, 'en')) : '',
+                model: p.model || '',
+                description: p.description || '',
+                price: p.price || 0,
+                quantity: p.quantity || 0,
+                category_tr: catTr,
+                category_ar: translateCategory(catTr, 'ar'),
+                category_en: translateCategory(catTr, 'en'),
+                colors: '[]',
+                sizes: '[]',
+                images: JSON.stringify(p.images || [])
+              };
+            });
+            dbRows = [...dbRows, ...mappedXml];
+          }
+        } catch(fallbackErr) {}
       }
       
       const hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);

@@ -148,39 +148,40 @@ async function syncXmlToDb(db, saveDatabase) {
   }
 }
 
-// Start server after async DB initialization
-async function startServer() {
-  // Initialize sql.js database
-  await initDatabaseAsync();
-  
-  // Now we can safely require modules that use db
-  const database = require('./database');
-  const saveDatabase = database.saveDatabase;
-  const adminRoutes = require('./routes/admin');
-  const userRoutes = require('./routes/user');
-  const chatbotRoutes = require('./routes/chatbot');
-  
-  // Initialize schema and seed data
-  initializeDatabase();
+const database = require('./database');
+const saveDatabase = database.saveDatabase;
+const adminRoutes = require('./routes/admin');
+const userRoutes = require('./routes/user');
+const chatbotRoutes = require('./routes/chatbot');
 
-  // Populate Karmedya XML feed products synchronously during server startup
-  try {
-    console.log('[Startup Auto Sync] Pre-populating Karmedya XML feed products...');
-    await syncXmlToDb(database.db, saveDatabase);
-  } catch (e) {
-    console.error('[Startup XML Sync Error]:', e.message);
+let dbReadyPromise = null;
+function ensureDbReady() {
+  if (!dbReadyPromise) {
+    dbReadyPromise = (async () => {
+      await initDatabaseAsync();
+      initializeDatabase();
+      try {
+        console.log('[Startup Auto Sync] Pre-populating Karmedya XML feed products...');
+        await syncXmlToDb(database.db, saveDatabase);
+      } catch (e) {
+        console.error('[Startup XML Sync Error]:', e.message);
+      }
+      setTimeout(async () => {
+        try {
+          const { scheduleDailySync, syncEtkinProducts } = require('./services/etkinService');
+          await syncEtkinProducts(database.db, saveDatabase);
+          scheduleDailySync(database.db, saveDatabase);
+        } catch (e) {
+          console.error('[Startup Etkin Sync Error]:', e.message);
+        }
+      }, 1000);
+    })();
   }
+  return dbReadyPromise;
+}
 
-  // Schedule background Etkin sync
-  setTimeout(async () => {
-    try {
-      const { scheduleDailySync, syncEtkinProducts } = require('./services/etkinService');
-      await syncEtkinProducts(database.db, saveDatabase);
-      scheduleDailySync(database.db, saveDatabase);
-    } catch (e) {
-      console.error('[Startup Etkin Sync Error]:', e.message);
-    }
-  }, 1000);
+// Trigger DB init immediately on module load
+ensureDbReady();
 
   // API Routes
   app.use('/api/admin', adminRoutes);
@@ -725,15 +726,11 @@ async function startServer() {
   });
 
   if (require.main === module) {
-    app.listen(PORT, () => {
-      console.log(`Zakaria Prom server running on port ${PORT}`);
+    ensureDbReady().then(() => {
+      app.listen(PORT, () => {
+        console.log(`Zakaria Prom server running on port ${PORT}`);
+      });
     });
   }
-}
-
-// Start the server and export app for Passenger compatibility
-startServer().catch(err => {
-  console.error('Failed to start DB or background tasks during server init:', err.message);
-});
 
 module.exports = app;

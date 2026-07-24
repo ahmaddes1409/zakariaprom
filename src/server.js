@@ -156,16 +156,15 @@ async function startServer() {
   // Initialize schema and seed data
   initializeDatabase();
 
-  // Trigger background sync 3 seconds after server startup (independent try/catch to prevent blocking)
+  // Trigger background sync 500ms after server startup
   setTimeout(async () => {
-    console.log('[Startup Auto Sync] Syncing Karmedya XML products...');
+    console.log('[Startup Auto Sync] Starting background feed sync...');
     try {
       await syncXmlToDb(db, saveDatabase);
     } catch (e) {
       console.error('[Startup XML Sync Error]:', e.message);
     }
 
-    console.log('[Startup Auto Sync] Syncing Etkin Promosyon products...');
     try {
       const { scheduleDailySync, syncEtkinProducts } = require('./services/etkinService');
       await syncEtkinProducts(db, saveDatabase);
@@ -173,7 +172,7 @@ async function startServer() {
     } catch (e) {
       console.error('[Startup Etkin Sync Error]:', e.message);
     }
-  }, 3000);
+  }, 500);
 
   // API Routes
   app.use('/api/admin', adminRoutes);

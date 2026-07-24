@@ -162,7 +162,9 @@ class DatabaseWrapper {
   exec(sql) {
     try {
       this.sqliteDb.exec(sql);
-      saveDatabase();
+      if (!sql.toUpperCase().includes('BEGIN')) {
+        saveDatabase();
+      }
     } catch (e) {
       console.error('DB exec error:', e.message);
     }

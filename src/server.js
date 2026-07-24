@@ -496,7 +496,10 @@ ensureDbReady();
 
       // Filter hidden categories
       const hiddenCategories = database.db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
-      products = products.filter(p => !p.categories.tr.some(c => hiddenCategories.includes(c.split(' > ')[0])));
+      products = products.filter(p => {
+        if (!p || !p.categories || !Array.isArray(p.categories.tr)) return true;
+        return !p.categories.tr.some(c => typeof c === 'string' && hiddenCategories.includes(c.split(' > ')[0]));
+      });
       const categories = getCategories(products);
 
       // Apply category translation overrides

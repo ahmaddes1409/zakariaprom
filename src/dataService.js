@@ -36,6 +36,78 @@ async function fetchXML() {
   throw new Error('Could not fetch XML from remote or local backup');
 }
 
+function parseXmlFast(xmlText) {
+  const products = [];
+  const itemRegex = /<SHOPITEM>([\s\S]*?)<\/SHOPITEM>/gi;
+  let match;
+  while ((match = itemRegex.exec(xmlText)) !== null) {
+    const block = match[1];
+
+    const getVal = (tag) => {
+      const tagRegex = new RegExp(`<${tag}>(.*?)</${tag}>`, 'i');
+      const m = block.match(tagRegex);
+      return m ? m[1].trim() : '';
+    };
+
+    const getHtmlVal = (tag) => {
+      const tagRegex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
+      const m = block.match(tagRegex);
+      return m ? m[1].trim() : '';
+    };
+
+    const productId = getVal('PRODUCT_ID');
+    const name = getVal('NAME');
+    const model = getVal('MODEL');
+    const priceRaw = getVal('PRICE');
+    const quantityRaw = getVal('QUANTITY');
+    let description = getHtmlVal('DESCRIPTION');
+    if (description.includes('&lt;')) {
+      description = description.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    }
+    description = description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Extract categories
+    const categories = [];
+    const catRegex = /<CATEGORY>(.*?)<\/CATEGORY>/gi;
+    let catMatch;
+    while ((catMatch = catRegex.exec(block)) !== null) {
+      if (catMatch[1] && catMatch[1].trim() !== '--Kapalı Ürünler Kategorisi') {
+        categories.push(catMatch[1].trim());
+      }
+    }
+
+    // Extract images
+    const images = [];
+    const imgRegex = /<IMAGE_\d+>(.*?)<\/IMAGE_\d+>/gi;
+    let imgMatch;
+    while ((imgMatch = imgRegex.exec(block)) !== null) {
+      const url = imgMatch[1].trim();
+      if (url && !images.includes(url)) {
+        images.push(url);
+      }
+    }
+
+    if (productId && name) {
+      const price = parseFloat(priceRaw.replace(/[^0-9.]/g, '')) || 0;
+      const quantity = parseInt(quantityRaw, 10) || 0;
+
+      products.push({
+        id: productId,
+        name: { tr: name },
+        model: model,
+        categories: { tr: categories },
+        description: description,
+        price: price,
+        quantity: quantity,
+        images: images,
+        colors: [],
+        sizes: []
+      });
+    }
+  }
+  return products;
+}
+
 async function fetchAndParseProducts() {
   const now = Date.now();
   if (cachedProducts && (now - lastFetchTime) < CACHE_DURATION) {
@@ -45,20 +117,11 @@ async function fetchAndParseProducts() {
   try {
     console.log('Fetching XML data from karmedya.com...');
     const xml = await fetchXML();
-    const result = await parseStringPromise(xml, { explicitArray: false, trim: true });
-
-    const items = Array.isArray(result.SHOP.SHOPITEM) ? result.SHOP.SHOPITEM : [result.SHOP.SHOPITEM];
-
-    const products = items
-      .filter(item => {
-        const cats = extractCategories(item);
-        return !cats.includes('--Kapalı Ürünler Kategorisi');
-      })
-      .map(item => parseProduct(item));
+    const products = parseXmlFast(xml);
 
     cachedProducts = products;
     lastFetchTime = now;
-    console.log(`Parsed ${products.length} products successfully`);
+    console.log(`[Fast XML Parser] Parsed ${products.length} products successfully`);
     return products;
   } catch (error) {
     console.error('Error fetching/parsing XML:', error);

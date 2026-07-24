@@ -123,9 +123,11 @@ async function syncXmlToDb(db, saveDatabase) {
       inserted++;
     }
 
-    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
+    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_ar, name_en, name_tr) VALUES (?, ?, ?)');
     for (const [key, c] of categoryMap) {
-      catStmt.run([c.tr, c.ar, c.en]);
+      if (c && c.tr) {
+        catStmt.run([c.ar || c.tr, c.en || c.tr, c.tr]);
+      }
     }
 
     db.exec('COMMIT');

@@ -241,12 +241,20 @@ function parseProduct(item) {
 
 function getCategories(products) {
   const catMap = {};
+  if (!Array.isArray(products)) return [];
 
   for (const product of products) {
-    for (let i = 0; i < product.categories.tr.length; i++) {
-      let rawTr = product.categories.tr[i] || '';
-      let rawAr = product.categories.ar[i] || rawTr;
-      let rawEn = product.categories.en[i] || rawTr;
+    if (!product || !product.categories || !Array.isArray(product.categories.tr)) continue;
+    const catTrArr = product.categories.tr;
+    const catArArr = Array.isArray(product.categories.ar) ? product.categories.ar : catTrArr;
+    const catEnArr = Array.isArray(product.categories.en) ? product.categories.en : catTrArr;
+
+    for (let i = 0; i < catTrArr.length; i++) {
+      let rawTr = catTrArr[i] || '';
+      if (typeof rawTr !== 'string') continue;
+      let rawAr = (typeof catArArr[i] === 'string' ? catArArr[i] : rawTr);
+      let rawEn = (typeof catEnArr[i] === 'string' ? catEnArr[i] : rawTr);
+
       if (rawTr.includes('|')) rawTr = rawTr.split('|')[0].trim();
       if (rawAr.includes('|')) rawAr = rawAr.split('|')[0].trim();
       if (rawEn.includes('|')) rawEn = rawEn.split('|')[0].trim();
@@ -255,18 +263,20 @@ function getCategories(products) {
       const topAr = rawAr.split(' > ')[0].trim();
       const topEn = rawEn.split(' > ')[0].trim();
 
+      if (!topTr) continue;
+
       if (!catMap[topTr]) {
         catMap[topTr] = { tr: topTr, ar: topAr, en: topEn, count: 0, subcategories: {} };
       }
       catMap[topTr].count++;
 
       // Subcategories
-      const parts = product.categories.tr[i].split(' > ');
+      const parts = rawTr.split(' > ');
       if (parts.length > 1) {
         const subTr = parts[1].trim();
-        const subParts = product.categories.ar[i].split(' > ');
+        const subParts = rawAr.split(' > ');
         const subAr = subParts.length > 1 ? subParts[1].trim() : subTr;
-        const subPartsEn = product.categories.en[i].split(' > ');
+        const subPartsEn = rawEn.split(' > ');
         const subEn = subPartsEn.length > 1 ? subPartsEn[1].trim() : subTr;
 
         if (!catMap[topTr].subcategories[subTr]) {

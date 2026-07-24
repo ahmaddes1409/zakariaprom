@@ -154,7 +154,8 @@ async function startServer() {
   await initDatabaseAsync();
   
   // Now we can safely require modules that use db
-  const { db, saveDatabase } = require('./database');
+  const database = require('./database');
+  const saveDatabase = database.saveDatabase;
   const adminRoutes = require('./routes/admin');
   const userRoutes = require('./routes/user');
   const chatbotRoutes = require('./routes/chatbot');
@@ -165,7 +166,7 @@ async function startServer() {
   // Populate Karmedya XML feed products synchronously during server startup
   try {
     console.log('[Startup Auto Sync] Pre-populating Karmedya XML feed products...');
-    await syncXmlToDb(db, saveDatabase);
+    await syncXmlToDb(database.db, saveDatabase);
   } catch (e) {
     console.error('[Startup XML Sync Error]:', e.message);
   }
@@ -174,8 +175,8 @@ async function startServer() {
   setTimeout(async () => {
     try {
       const { scheduleDailySync, syncEtkinProducts } = require('./services/etkinService');
-      await syncEtkinProducts(db, saveDatabase);
-      scheduleDailySync(db, saveDatabase);
+      await syncEtkinProducts(database.db, saveDatabase);
+      scheduleDailySync(database.db, saveDatabase);
     } catch (e) {
       console.error('[Startup Etkin Sync Error]:', e.message);
     }
@@ -190,7 +191,7 @@ async function startServer() {
   app.post('/api/analytics', (req, res) => {
     const { page, product_id, category, action, session_id } = req.body;
     try {
-      db.prepare(
+      database.db.prepare(
         'INSERT INTO analytics (page, product_id, category, action, session_id, user_agent, ip) VALUES (?, ?, ?, ?, ?, ?, ?)'
       ).run(page || '/', product_id || null, category || null, action || 'view', session_id || '', req.headers['user-agent'] || '', req.ip || '');
       res.json({ success: true });
@@ -201,9 +202,9 @@ async function startServer() {
 
   app.get('/api/db-status', (req, res) => {
     try {
-      const total = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
-      const xml = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
-      const etkin = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+      const total = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+      const xml = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+      const etkin = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
       res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0 });
     } catch(e) {
       res.status(500).json({ error: e.message });
@@ -214,20 +215,20 @@ async function startServer() {
   app.get('/api/sync-all-now', async (req, res) => {
     try {
       console.log('[Manual Sync-All] Starting XML feed sync...');
-      await syncXmlToDb(db, saveDatabase);
+      await syncXmlToDb(database.db, saveDatabase);
       
       let etkinRes = null;
       try {
         const { syncEtkinProducts } = require('./services/etkinService');
-        etkinRes = await syncEtkinProducts(db, saveDatabase);
+        etkinRes = await syncEtkinProducts(database.db, saveDatabase);
       } catch (etkinErr) {
         console.warn('[Manual Sync-All] Etkin sync skipped:', etkinErr.message);
         etkinRes = { success: false, error: etkinErr.message };
       }
 
-      const total = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
-      const xml = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
-      const etkin = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+      const total = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+      const xml = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+      const etkin = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
       res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0, etkinRes });
     } catch (e) {
       res.status(500).json({ error: e.message, stack: e.stack });
@@ -241,14 +242,14 @@ async function startServer() {
       const { translateProductName, translateCategory } = require('./translations');
 
       // Fetch all products directly from local_products database table
-      let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+      let dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       
       // Fallback: If DB has <= 1 product, try reloading DB from disk first
       if (!dbRows || dbRows.length <= 1) {
         const { reloadDatabaseFromDisk } = require('./database');
         const reloaded = reloadDatabaseFromDisk();
         if (reloaded) {
-          dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+          dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
         }
       }
 
@@ -257,21 +258,21 @@ async function startServer() {
         setImmediate(async () => {
           try {
             console.log('[API Products] Triggering background feed sync...');
-            await syncXmlToDb(db, saveDatabase);
+            await syncXmlToDb(database.db, saveDatabase);
             const { syncEtkinProducts } = require('./services/etkinService');
-            await syncEtkinProducts(db, saveDatabase);
+            await syncEtkinProducts(database.db, saveDatabase);
           } catch(e) {}
         });
       }
       
-      const hiddenProducts = db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);
-      const hiddenCategories = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
+      const hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);
+      const hiddenCategories = database.db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
 
-      const categoryOverrides = db.prepare('SELECT * FROM product_category_overrides').all();
+      const categoryOverrides = database.db.prepare('SELECT * FROM product_category_overrides').all();
       const categoryOverrideMap = {};
       categoryOverrides.forEach(o => { categoryOverrideMap[o.product_id] = o; });
 
-      const nameOverrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'product'").all();
+      const nameOverrides = database.db.prepare("SELECT * FROM translation_overrides WHERE type = 'product'").all();
       const nameOverrideMap = {};
       nameOverrides.forEach(o => {
         if (!nameOverrideMap[o.original_key]) nameOverrideMap[o.original_key] = {};
@@ -414,7 +415,7 @@ async function startServer() {
       try { products = await fetchAndParseProducts(); } catch(xmlErr) { console.error("XML fetch failed, using local only:", xmlErr.message); }
       
       // Apply category overrides to products
-      const categoryOverrides = db.prepare('SELECT * FROM product_category_overrides').all();
+      const categoryOverrides = database.db.prepare('SELECT * FROM product_category_overrides').all();
       if (categoryOverrides.length > 0) {
         const overrideMap = {};
         categoryOverrides.forEach(o => { overrideMap[o.product_id] = o; });
@@ -432,7 +433,7 @@ async function startServer() {
       }
 
       // Merge local products
-      const localProducts = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+      const localProducts = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       if (localProducts.length > 0) {
         const localMapped = localProducts.map(lp => {
           const catTr = lp.category_tr || '';
@@ -454,25 +455,25 @@ async function startServer() {
       }
 
       // Filter hidden categories
-      const hiddenCategories = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
+      const hiddenCategories = database.db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
       products = products.filter(p => !p.categories.tr.some(c => hiddenCategories.includes(c.split(' > ')[0])));
       const categories = getCategories(products);
 
       // Apply category translation overrides
-      const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'category'").all();
+      const overrides = database.db.prepare("SELECT * FROM translation_overrides WHERE type = 'category'").all();
       const overrideMap = {};
       overrides.forEach(o => {
         if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
         overrideMap[o.original_key][o.lang] = o.translation;
       });
       // Get category images
-      const images = db.prepare('SELECT * FROM category_images').all();
+      const images = database.db.prepare('SELECT * FROM category_images').all();
       const imageMap = {};
       images.forEach(i => { imageMap[i.category_name] = i.image_url; });
 
       // Build result from XML + local products
       // Build custom categories image map as fallback
-      const allCustomCats = db.prepare('SELECT name_tr, image_url, name_ar, name_en FROM custom_categories').all();
+      const allCustomCats = database.db.prepare('SELECT name_tr, image_url, name_ar, name_en FROM custom_categories').all();
       const customImageMap = {};
       allCustomCats.forEach(cc => { if (cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
       let result = categories.map(cat => ({
@@ -482,7 +483,7 @@ async function startServer() {
       }));
 
       // Add custom categories (that are active and not hidden)
-      const customCats = db.prepare('SELECT * FROM custom_categories WHERE active = 1').all();
+      const customCats = database.db.prepare('SELECT * FROM custom_categories WHERE active = 1').all();
       customCats.forEach(cc => {
         if (!hiddenCategories.includes(cc.name_tr) && !result.find(r => r.tr === cc.name_tr)) {
           // Use category_images override if available, otherwise use custom_categories image_url
@@ -513,14 +514,14 @@ async function startServer() {
 
       let lp = null;
       if (reqId.startsWith('etkin_') || reqId.startsWith('xml_') || isNaN(Number(reqId))) {
-        lp = db.prepare('SELECT * FROM local_products WHERE product_id = ?').get(reqId);
+        lp = database.db.prepare('SELECT * FROM local_products WHERE product_id = ?').get(reqId);
       } else {
-        lp = db.prepare('SELECT * FROM local_products WHERE product_id = ? OR id = ?').get(reqId, Number(reqId));
+        lp = database.db.prepare('SELECT * FROM local_products WHERE product_id = ? OR id = ?').get(reqId, Number(reqId));
       }
       
       if (!lp && reqId.startsWith('local_')) {
         const numericId = Number(reqId.replace('local_', '')) || 0;
-        lp = db.prepare('SELECT * FROM local_products WHERE id = ?').get(numericId);
+        lp = database.db.prepare('SELECT * FROM local_products WHERE id = ?').get(numericId);
       }
 
       let product = null;
@@ -574,7 +575,7 @@ async function startServer() {
 
       if (product) {
         // Apply category override if exists
-        const catOverride = db.prepare('SELECT * FROM product_category_overrides WHERE product_id = ?').get(product.id);
+        const catOverride = database.db.prepare('SELECT * FROM product_category_overrides WHERE product_id = ?').get(product.id);
         if (catOverride) {
           product.categories = {
             tr: [catOverride.new_category_tr],
@@ -590,7 +591,7 @@ async function startServer() {
 
         // Apply USD price
         let exRate = null;
-        try { exRate = await getExchangeRate(db); } catch(e) {}
+        try { exRate = await getExchangeRate(database.db); } catch(e) {}
         const usdRate = exRate ? exRate.usdPerTry : 0.0213;
         product.price_usd = product.price ? parseFloat((product.price * usdRate).toFixed(2)) : 0;
 

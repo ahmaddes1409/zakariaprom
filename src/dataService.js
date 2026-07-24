@@ -38,14 +38,18 @@ async function fetchXML() {
 
 function parseXmlFast(xmlText) {
   const products = [];
-  const itemRegex = /<SHOPITEM>([\s\S]*?)<\/SHOPITEM>/gi;
-  let match;
-  while ((match = itemRegex.exec(xmlText)) !== null) {
-    const block = match[1];
+  if (!xmlText) return products;
+
+  const blocks = xmlText.split(/<\/SHOPITEM>/i);
+  for (const block of blocks) {
+    const shopItemIdx = block.toLowerCase().indexOf('<shopitem>');
+    if (shopItemIdx === -1) continue;
+
+    const itemContent = block.substring(shopItemIdx + 10);
 
     const getVal = (tag) => {
-      const tagRegex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
-      const m = block.match(tagRegex);
+      const re = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
+      const m = itemContent.match(re);
       return m ? m[1].trim() : '';
     };
 
@@ -62,21 +66,19 @@ function parseXmlFast(xmlText) {
 
     // Extract categories
     const categories = [];
-    const catRegex = /<CATEGORY>([\s\S]*?)<\/CATEGORY>/gi;
-    let catMatch;
-    while ((catMatch = catRegex.exec(block)) !== null) {
-      const cStr = catMatch[1].trim();
-      if (cStr && cStr !== '--Kapalı Ürünler Kategorisi') {
-        categories.push(cStr);
+    const catMatches = itemContent.match(/<CATEGORY>([\s\S]*?)<\/CATEGORY>/gi) || [];
+    for (const cTag of catMatches) {
+      const cVal = cTag.replace(/<\/?CATEGORY>/gi, '').trim();
+      if (cVal && cVal !== '--Kapalı Ürünler Kategorisi' && !categories.includes(cVal)) {
+        categories.push(cVal);
       }
     }
 
     // Extract images
     const images = [];
-    const imgRegex = /<IMAGE_\d+>([\s\S]*?)<\/IMAGE_\d+>/gi;
-    let imgMatch;
-    while ((imgMatch = imgRegex.exec(block)) !== null) {
-      const url = imgMatch[1].trim();
+    const imgMatches = itemContent.match(/<IMAGE_\d+>([\s\S]*?)<\/IMAGE_\d+>/gi) || [];
+    for (const iTag of imgMatches) {
+      const url = iTag.replace(/<\/?IMAGE_\d+>/gi, '').trim();
       if (url && !images.includes(url)) {
         images.push(url);
       }

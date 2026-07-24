@@ -65,11 +65,12 @@ function parseXmlFast(xmlText) {
         if (end === -1) return '';
         rawVal = itemContent.substring(start + openTag.length, end).trim();
       }
-      try {
-        if (/[\u00C0-\u00FF]/.test(rawVal)) {
-          return Buffer.from(rawVal, 'latin1').toString('utf8');
-        }
-      } catch(e) {}
+      if (rawVal.includes('Ã') || rawVal.includes('Å') || rawVal.includes('Ä')) {
+        rawVal = rawVal.replace(/Ã¶/g, 'ö').replace(/Ã§/g, 'ç').replace(/ÅŸ/g, 'ş')
+                       .replace(/ÄŸ/g, 'ğ').replace(/Ä±/g, 'ı').replace(/Ã¼/g, 'ü')
+                       .replace(/Ã–/g, 'Ö').replace(/Ã‡/g, 'Ç').replace(/Åž/g, 'Ş')
+                       .replace(/Ä°/g, 'İ').replace(/Ãœ/g, 'Ü');
+      }
       return rawVal;
     };
 
@@ -89,11 +90,12 @@ function parseXmlFast(xmlText) {
     const catMatches = itemContent.match(/<CATEGORY>([\s\S]*?)<\/CATEGORY>/gi) || [];
     for (const cTag of catMatches) {
       let cVal = cTag.replace(/<\/?CATEGORY>/gi, '').trim();
-      try {
-        if (/[\u00C0-\u00FF]/.test(cVal)) {
-          cVal = Buffer.from(cVal, 'latin1').toString('utf8');
-        }
-      } catch(e) {}
+      if (cVal.includes('Ã') || cVal.includes('Å') || cVal.includes('Ä')) {
+        cVal = cVal.replace(/Ã¶/g, 'ö').replace(/Ã§/g, 'ç').replace(/ÅŸ/g, 'ş')
+                   .replace(/ÄŸ/g, 'ğ').replace(/Ä±/g, 'ı').replace(/Ã¼/g, 'ü')
+                   .replace(/Ã–/g, 'Ö').replace(/Ã‡/g, 'Ç').replace(/Åž/g, 'Ş')
+                   .replace(/Ä°/g, 'İ').replace(/Ãœ/g, 'Ü');
+      }
       if (cVal && cVal !== '--Kapalı Ürünler Kategorisi' && !categories.includes(cVal)) {
         categories.push(cVal);
       }

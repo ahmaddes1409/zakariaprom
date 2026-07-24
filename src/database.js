@@ -7,46 +7,14 @@ const bcrypt = require('bcryptjs');
 let DB_PATH = null;
 
 function findBestDatabasePath() {
-  const candidatePaths = [
-    process.env.DB_PATH,
-    path.join(__dirname, '..', 'data', 'zakariaprom.db'),
-    path.join(process.cwd(), 'data', 'zakariaprom.db'),
-    path.join(process.cwd(), 'nodejs', 'data', 'zakariaprom.db'),
-    path.join(__dirname, '..', '..', 'data', 'zakariaprom.db'),
-    path.join(__dirname, '..', '..', 'nodejs', 'data', 'zakariaprom.db'),
-    path.join(__dirname, 'data', 'zakariaprom.db'),
-    path.join(process.cwd(), '..', 'data', 'zakariaprom.db'),
-    path.join(process.cwd(), '..', 'nodejs', 'data', 'zakariaprom.db')
-  ].filter(Boolean);
-
-  let bestPath = null;
-  let maxBytes = -1;
-
-  for (const cand of candidatePaths) {
-    try {
-      const resolved = path.resolve(cand);
-      if (fs.existsSync(resolved)) {
-        const stats = fs.statSync(resolved);
-        console.log(`[DB Search] Candidate "${resolved}" exists (${stats.size} bytes)`);
-        if (stats.size > maxBytes) {
-          maxBytes = stats.size;
-          bestPath = resolved;
-        }
-      }
-    } catch (e) {
-      // ignore
-    }
+  const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'zakariaprom.db');
+  const resolvedPath = path.resolve(dbPath);
+  const targetDir = path.dirname(resolvedPath);
+  if (!fs.existsSync(targetDir)) {
+    try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
   }
-
-  if (bestPath && maxBytes > 0) {
-    console.log(`[DB Init] Selected best database file: "${bestPath}" (${maxBytes} bytes)`);
-    return bestPath;
-  }
-
-  const defaultPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'zakariaprom.db');
-  const resolvedDefault = path.resolve(defaultPath);
-  console.log(`[DB Init] No pre-existing non-empty DB found. Will use path: "${resolvedDefault}"`);
-  return resolvedDefault;
+  console.log(`[DB Path] Using fixed database file path: "${resolvedPath}"`);
+  return resolvedPath;
 }
 
 function resolveWasmFile(file) {

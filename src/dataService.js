@@ -63,9 +63,20 @@ function parseXmlFast(xmlText) {
     const itemContent = block.substring(shopItemIdx + 10);
 
     const getVal = (tag) => {
-      const re = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
-      const m = itemContent.match(re);
-      return m ? m[1].trim() : '';
+      const openTag = '<' + tag + '>';
+      const closeTag = '</' + tag + '>';
+      const start = itemContent.indexOf(openTag);
+      if (start === -1) {
+        const lower = itemContent.toLowerCase();
+        const lStart = lower.indexOf(openTag.toLowerCase());
+        if (lStart === -1) return '';
+        const lEnd = lower.indexOf(closeTag.toLowerCase(), lStart + openTag.length);
+        if (lEnd === -1) return '';
+        return itemContent.substring(lStart + openTag.length, lEnd).trim();
+      }
+      const end = itemContent.indexOf(closeTag, start + openTag.length);
+      if (end === -1) return '';
+      return itemContent.substring(start + openTag.length, end).trim();
     };
 
     const productId = getVal('PRODUCT_ID');

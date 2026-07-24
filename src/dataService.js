@@ -10,7 +10,7 @@ let lastFetchTime = 0;
 async function fetchXML() {
   const localBackup = path.join(__dirname, '..', 'data', 'xml_export_product.xml');
   try {
-    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(15000) });
+    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } });
     if (response.ok) {
       let text = await response.text();
       if (text && text.includes('<SHOP>')) {
@@ -24,10 +24,11 @@ async function fetchXML() {
       }
     }
   } catch(e) {
-    console.warn('[XML Fetch Warning] Remote fetch failed, attempting local backup:', e.message);
+    console.warn('[XML Fetch Warning] Remote fetch failed:', e.message);
   }
+
   if (fs.existsSync(localBackup)) {
-    console.log('[XML Fetch] Reading from local backup file...');
+    console.log('[XML Fetch] Fallback: Reading from local backup file...');
     let text = fs.readFileSync(localBackup, 'utf8');
     if (text.includes('<')) text = text.substring(text.indexOf('<'));
     return text;

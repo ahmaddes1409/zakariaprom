@@ -324,11 +324,18 @@ const uiTranslations = {
   }
 };
 
+let cachedSortedTerms = null;
+function getSortedTerms() {
+  if (!cachedSortedTerms) {
+    cachedSortedTerms = Object.keys(termTranslations).sort((a, b) => b.length - a.length);
+  }
+  return cachedSortedTerms;
+}
+
 function translateProductName(name, targetLang) {
-  if (targetLang === 'tr') return name;
+  if (targetLang === 'tr' || !name) return name;
   let translated = name;
-  // Sort by length descending to replace longer phrases first
-  const sortedTerms = Object.keys(termTranslations).sort((a, b) => b.length - a.length);
+  const sortedTerms = getSortedTerms();
   for (const term of sortedTerms) {
     if (translated.includes(term) && termTranslations[term][targetLang]) {
       translated = translated.replace(new RegExp(term, 'gi'), termTranslations[term][targetLang]);

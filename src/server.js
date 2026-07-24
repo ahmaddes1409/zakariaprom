@@ -231,15 +231,15 @@ async function startServer() {
         seenProductKeys.add(pId);
 
         let catTr = lp.category_tr || '';
-        let catAr = lp.category_ar || translateCategory(catTr, 'ar');
-        let catEn = lp.category_en || translateCategory(catTr, 'en');
+        let catAr = lp.category_ar || catTr;
+        let catEn = lp.category_en || catTr;
 
         // Check category override
         const catOverride = categoryOverrideMap[pId] || categoryOverrideMap[lp.model];
         if (catOverride) {
           catTr = catOverride.new_category_tr;
-          catAr = catOverride.new_category_ar || translateCategory(catTr, 'ar');
-          catEn = catOverride.new_category_en || translateCategory(catTr, 'en');
+          catAr = catOverride.new_category_ar || catTr;
+          catEn = catOverride.new_category_en || catTr;
         }
 
         // Skip hidden categories
@@ -247,8 +247,8 @@ async function startServer() {
         if (hiddenCategories.includes(topCatTr)) continue;
 
         let nameTr = lp.name_tr || '';
-        let nameAr = lp.name_ar || translateProductName(nameTr, 'ar');
-        let nameEn = lp.name_en || translateProductName(nameTr, 'en');
+        let nameAr = lp.name_ar || nameTr;
+        let nameEn = lp.name_en || nameTr;
 
         // Check name override
         if (nameOverrideMap[lp.model]) {

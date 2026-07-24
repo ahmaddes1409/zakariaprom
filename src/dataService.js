@@ -44,12 +44,6 @@ function parseXmlFast(xmlText) {
     const block = match[1];
 
     const getVal = (tag) => {
-      const tagRegex = new RegExp(`<${tag}>(.*?)</${tag}>`, 'i');
-      const m = block.match(tagRegex);
-      return m ? m[1].trim() : '';
-    };
-
-    const getHtmlVal = (tag) => {
       const tagRegex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
       const m = block.match(tagRegex);
       return m ? m[1].trim() : '';
@@ -60,7 +54,7 @@ function parseXmlFast(xmlText) {
     const model = getVal('MODEL');
     const priceRaw = getVal('PRICE');
     const quantityRaw = getVal('QUANTITY');
-    let description = getHtmlVal('DESCRIPTION');
+    let description = getVal('DESCRIPTION');
     if (description.includes('&lt;')) {
       description = description.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     }
@@ -68,17 +62,18 @@ function parseXmlFast(xmlText) {
 
     // Extract categories
     const categories = [];
-    const catRegex = /<CATEGORY>(.*?)<\/CATEGORY>/gi;
+    const catRegex = /<CATEGORY>([\s\S]*?)<\/CATEGORY>/gi;
     let catMatch;
     while ((catMatch = catRegex.exec(block)) !== null) {
-      if (catMatch[1] && catMatch[1].trim() !== '--Kapalı Ürünler Kategorisi') {
-        categories.push(catMatch[1].trim());
+      const cStr = catMatch[1].trim();
+      if (cStr && cStr !== '--Kapalı Ürünler Kategorisi') {
+        categories.push(cStr);
       }
     }
 
     // Extract images
     const images = [];
-    const imgRegex = /<IMAGE_\d+>(.*?)<\/IMAGE_\d+>/gi;
+    const imgRegex = /<IMAGE_\d+>([\s\S]*?)<\/IMAGE_\d+>/gi;
     let imgMatch;
     while ((imgMatch = imgRegex.exec(block)) !== null) {
       const url = imgMatch[1].trim();

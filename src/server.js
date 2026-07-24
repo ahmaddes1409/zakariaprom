@@ -120,7 +120,7 @@ async function syncXmlToDb(db, saveDatabase) {
     db.exec('BEGIN TRANSACTION');
 
     for (const row of preparedRows) {
-      const sqlVal = row.map(v => typeof v === 'number' ? v : ("'" + String(v).replace(/'/g, "''") + "'")).join(', ');
+      const sqlVal = row.map(v => typeof v === 'number' ? v : ("'" + String(v).replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'")).join(', ');
       db.exec(`INSERT OR REPLACE INTO local_products 
         (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
         VALUES (${sqlVal}, CURRENT_TIMESTAMP)`);

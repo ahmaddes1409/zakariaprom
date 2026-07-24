@@ -200,11 +200,16 @@ async function startServer() {
     }
   });
 
-  app.get('/api/restart-node-worker', (req, res) => {
-    res.json({ message: 'Restarting Node worker process...' });
-    setTimeout(() => {
-      process.exit(0);
-    }, 100);
+  app.get('/api/sync-xml-now', async (req, res) => {
+    try {
+      console.log('[Manual XML Sync] Starting XML feed sync...');
+      await syncXmlToDb(database.db, saveDatabase);
+      const total = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+      const xml = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+      res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0 });
+    } catch(e) {
+      res.status(500).json({ error: e.message, stack: e.stack });
+    }
   });
 
   app.get('/api/db-status', async (req, res) => {

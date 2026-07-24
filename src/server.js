@@ -324,6 +324,17 @@ async function startServer() {
         products.sort((a, b) => b.price - a.price);
       } else if (sort === 'name') {
         products.sort((a, b) => (a.name[lang] || a.name.tr).localeCompare(b.name[lang] || b.name.tr));
+      } else {
+        // Interleave Karmedya XML and Etkin products evenly for a balanced mix on Page 1 and every page
+        const xmlProds = products.filter(p => !p.id.startsWith('etkin_'));
+        const etkinProds = products.filter(p => p.id.startsWith('etkin_'));
+        const mixed = [];
+        const maxLen = Math.max(xmlProds.length, etkinProds.length);
+        for (let i = 0; i < maxLen; i++) {
+          if (i < xmlProds.length) mixed.push(xmlProds[i]);
+          if (i < etkinProds.length) mixed.push(etkinProds[i]);
+        }
+        products = mixed;
       }
 
       // Pagination

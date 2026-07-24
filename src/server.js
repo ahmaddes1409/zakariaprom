@@ -144,7 +144,7 @@ async function syncXmlToDb(db, saveDatabase) {
     console.log(`[Auto XML Sync] Successfully synced ${preparedRows.length} Karmedya XML products and ${categoryMap.size} clean categories to active database!`);
   } catch (err) {
     try { db.exec('ROLLBACK'); } catch(e) {}
-    console.error('[Auto XML Sync Error]:', err.message);
+    console.error('[Auto XML Sync Error]:', err.message, err.stack);
   }
 }
 
@@ -213,16 +213,24 @@ async function startServer() {
   // Public trigger to run full feed sync and get DB counts
   app.get('/api/sync-all-now', async (req, res) => {
     try {
-      console.log('[Manual Sync-All] Starting sequential feed sync...');
+      console.log('[Manual Sync-All] Starting XML feed sync...');
       await syncXmlToDb(db, saveDatabase);
-      const { syncEtkinProducts } = require('./services/etkinService');
-      const etkinRes = await syncEtkinProducts(db, saveDatabase);
+      
+      let etkinRes = null;
+      try {
+        const { syncEtkinProducts } = require('./services/etkinService');
+        etkinRes = await syncEtkinProducts(db, saveDatabase);
+      } catch (etkinErr) {
+        console.warn('[Manual Sync-All] Etkin sync skipped:', etkinErr.message);
+        etkinRes = { success: false, error: etkinErr.message };
+      }
+
       const total = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
       const xml = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
       const etkin = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
       res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0, etkinRes });
-    } catch(e) {
-      res.status(500).json({ error: e.message });
+    } catch (e) {
+      res.status(500).json({ error: e.message, stack: e.stack });
     }
   });
 

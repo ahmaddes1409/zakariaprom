@@ -451,17 +451,23 @@ ensureDbReady();
 
   app.get('/api/categories', async (req, res) => {
     try {
+      await ensureDbReady();
       let products = [];
       try { products = await fetchAndParseProducts(); } catch(xmlErr) { console.error("XML fetch failed, using local only:", xmlErr.message); }
       
+      // Safe DB helper
+      const safeQuery = (sql) => {
+        try { return database.db.prepare(sql).all(); } catch(e) { return []; }
+      };
+
       // Apply category overrides to products
-      const categoryOverrides = database.db.prepare('SELECT * FROM product_category_overrides').all();
+      const categoryOverrides = safeQuery('SELECT * FROM product_category_overrides');
       if (categoryOverrides.length > 0) {
         const overrideMap = {};
         categoryOverrides.forEach(o => { overrideMap[o.product_id] = o; });
         products = products.map(p => {
           const override = overrideMap[p.id];
-          if (override) {
+          if (override && override.new_category_tr) {
             return {
               ...p,
               categories: { tr: [override.new_category_tr], ar: [override.new_category_ar || override.new_category_tr], en: [override.new_category_en || override.new_category_tr] },
@@ -473,7 +479,7 @@ ensureDbReady();
       }
 
       // Merge local products
-      const localProducts = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+      const localProducts = safeQuery('SELECT * FROM local_products WHERE hidden = 0');
       if (localProducts.length > 0) {
         const localMapped = localProducts.map(lp => {
           const catTr = lp.category_tr || '';
@@ -483,9 +489,9 @@ ensureDbReady();
             id: lp.product_id || ('local_' + lp.id),
             categories: { tr: [catTr], ar: [catAr], en: [catEn] },
             topCategory: {
-              tr: catTr.split(' > ')[0].trim(),
-              ar: catAr.split(' > ')[0].trim(),
-              en: catEn.split(' > ')[0].trim()
+              tr: catTr ? catTr.split(' > ')[0].trim() : '',
+              ar: catAr ? catAr.split(' > ')[0].trim() : '',
+              en: catEn ? catEn.split(' > ')[0].trim() : ''
             }
           };
         });
@@ -495,7 +501,7 @@ ensureDbReady();
       }
 
       // Filter hidden categories
-      const hiddenCategories = database.db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
+      const hiddenCategories = safeQuery('SELECT category_name FROM hidden_categories').map(h => h.category_name);
       products = products.filter(p => {
         if (!p || !p.categories || !Array.isArray(p.categories.tr)) return true;
         return !p.categories.tr.some(c => typeof c === 'string' && hiddenCategories.includes(c.split(' > ')[0]));
@@ -503,22 +509,25 @@ ensureDbReady();
       const categories = getCategories(products);
 
       // Apply category translation overrides
-      const overrides = database.db.prepare("SELECT * FROM translation_overrides WHERE type = 'category'").all();
+      const overrides = safeQuery("SELECT * FROM translation_overrides WHERE type = 'category'");
       const overrideMap = {};
       overrides.forEach(o => {
-        if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
-        overrideMap[o.original_key][o.lang] = o.translation;
+        if (o.original_key) {
+          if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
+          overrideMap[o.original_key][o.lang] = o.translation;
+        }
       });
-      // Get category images
-      const images = database.db.prepare('SELECT * FROM category_images').all();
-      const imageMap = {};
-      images.forEach(i => { imageMap[i.category_name] = i.image_url; });
 
-      // Build result from XML + local products
+      // Get category images
+      const images = safeQuery('SELECT * FROM category_images');
+      const imageMap = {};
+      images.forEach(i => { if (i.category_name) imageMap[i.category_name] = i.image_url; });
+
       // Build custom categories image map as fallback
-      const allCustomCats = database.db.prepare('SELECT name_tr, image_url, name_ar, name_en FROM custom_categories').all();
+      const allCustomCats = safeQuery('SELECT name_tr, image_url, name_ar, name_en FROM custom_categories');
       const customImageMap = {};
-      allCustomCats.forEach(cc => { if (cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
+      allCustomCats.forEach(cc => { if (cc.name_tr && cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
+
       let result = categories.map(cat => ({
         ...cat,
         ...(overrideMap[cat.tr] || {}),
@@ -526,12 +535,10 @@ ensureDbReady();
       }));
 
       // Add custom categories (that are active and not hidden)
-      const customCats = database.db.prepare('SELECT * FROM custom_categories WHERE active = 1').all();
+      const customCats = safeQuery('SELECT * FROM custom_categories WHERE active = 1');
       customCats.forEach(cc => {
-        if (!hiddenCategories.includes(cc.name_tr) && !result.find(r => r.tr === cc.name_tr)) {
-          // Use category_images override if available, otherwise use custom_categories image_url
+        if (cc.name_tr && !hiddenCategories.includes(cc.name_tr) && !result.find(r => r.tr === cc.name_tr)) {
           const catImage = imageMap[cc.name_tr] || cc.image_url || '';
-          // Also apply translation overrides
           const catOverrides = overrideMap[cc.name_tr] || {};
           result.push({
             tr: cc.name_tr || cc.name_ar,

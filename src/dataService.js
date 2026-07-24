@@ -51,6 +51,7 @@ function parseXmlFast(xmlText) {
     const getVal = (tag) => {
       const openTag = '<' + tag + '>';
       const closeTag = '</' + tag + '>';
+      let rawVal = '';
       const start = itemContent.indexOf(openTag);
       if (start === -1) {
         const lower = itemContent.toLowerCase();
@@ -58,11 +59,18 @@ function parseXmlFast(xmlText) {
         if (lStart === -1) return '';
         const lEnd = lower.indexOf(closeTag.toLowerCase(), lStart + openTag.length);
         if (lEnd === -1) return '';
-        return itemContent.substring(lStart + openTag.length, lEnd).trim();
+        rawVal = itemContent.substring(lStart + openTag.length, lEnd).trim();
+      } else {
+        const end = itemContent.indexOf(closeTag, start + openTag.length);
+        if (end === -1) return '';
+        rawVal = itemContent.substring(start + openTag.length, end).trim();
       }
-      const end = itemContent.indexOf(closeTag, start + openTag.length);
-      if (end === -1) return '';
-      return itemContent.substring(start + openTag.length, end).trim();
+      try {
+        if (/[\u00C0-\u00FF]/.test(rawVal)) {
+          return Buffer.from(rawVal, 'latin1').toString('utf8');
+        }
+      } catch(e) {}
+      return rawVal;
     };
 
     const productId = getVal('PRODUCT_ID');
@@ -80,7 +88,12 @@ function parseXmlFast(xmlText) {
     const categories = [];
     const catMatches = itemContent.match(/<CATEGORY>([\s\S]*?)<\/CATEGORY>/gi) || [];
     for (const cTag of catMatches) {
-      const cVal = cTag.replace(/<\/?CATEGORY>/gi, '').trim();
+      let cVal = cTag.replace(/<\/?CATEGORY>/gi, '').trim();
+      try {
+        if (/[\u00C0-\u00FF]/.test(cVal)) {
+          cVal = Buffer.from(cVal, 'latin1').toString('utf8');
+        }
+      } catch(e) {}
       if (cVal && cVal !== '--Kapalı Ürünler Kategorisi' && !categories.includes(cVal)) {
         categories.push(cVal);
       }

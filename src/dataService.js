@@ -107,7 +107,7 @@ function parseXmlFast(xmlText) {
 
 async function fetchAndParseProducts() {
   const now = Date.now();
-  if (cachedProducts && (now - lastFetchTime) < CACHE_DURATION) {
+  if (cachedProducts && cachedProducts.length > 0 && (now - lastFetchTime) < CACHE_DURATION) {
     return cachedProducts;
   }
 
@@ -116,15 +116,18 @@ async function fetchAndParseProducts() {
     const xml = await fetchXML();
     const products = parseXmlFast(xml);
 
-    cachedProducts = products;
-    lastFetchTime = now;
-    console.log(`[Fast XML Parser] Parsed ${products.length} products successfully`);
-    return products;
+    if (products && products.length > 0) {
+      cachedProducts = products;
+      lastFetchTime = now;
+      console.log(`[Fast XML Parser] Parsed ${products.length} products successfully`);
+      return products;
+    }
   } catch (error) {
     console.error('Error fetching/parsing XML:', error);
-    if (cachedProducts) return cachedProducts;
-    throw error;
   }
+
+  if (cachedProducts && cachedProducts.length > 0) return cachedProducts;
+  return [];
 }
 
 function extractCategories(item) {

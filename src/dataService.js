@@ -8,9 +8,28 @@ let cachedProducts = null;
 let lastFetchTime = 0;
 
 async function fetchXML() {
-  const response = await fetch(XML_URL);
-  const text = await response.text();
-  return text;
+  const localBackup = path.join(__dirname, '..', 'data', 'xml_export_product.xml');
+  try {
+    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(15000) });
+    if (response.ok) {
+      const text = await response.text();
+      if (text && text.includes('<SHOP>')) {
+        try {
+          const targetDir = path.dirname(localBackup);
+          if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+          fs.writeFileSync(localBackup, text, 'utf8');
+        } catch(e) {}
+        return text;
+      }
+    }
+  } catch(e) {
+    console.warn('[XML Fetch Warning] Remote fetch failed, attempting local backup:', e.message);
+  }
+  if (fs.existsSync(localBackup)) {
+    console.log('[XML Fetch] Reading from local backup file...');
+    return fs.readFileSync(localBackup, 'utf8');
+  }
+  throw new Error('Could not fetch XML from remote or local backup');
 }
 
 async function fetchAndParseProducts() {

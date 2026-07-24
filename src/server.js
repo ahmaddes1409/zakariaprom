@@ -547,7 +547,7 @@ ensureDbReady();
       res.json(result);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      res.status(500).json({ error: error.message, stack: error.stack });
+      res.json({ isError500: true, error: error.message, stack: error.stack });
     }
   });
   app.get('/api/product/:id', async (req, res) => {

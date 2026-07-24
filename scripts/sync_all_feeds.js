@@ -96,11 +96,13 @@ async function syncAllFeeds() {
     const rawItems = Array.isArray(result.SHOP.SHOPITEM) ? result.SHOP.SHOPITEM : [result.SHOP.SHOPITEM];
 
     for (const item of rawItems) {
-      const rawCats = extractCategories(item).filter(c => !c.match(/^\d+$/) && c !== '--Kapalı Ürünler Kategorisi');
-      if (rawCats.length === 0) continue;
+      const allCats = extractCategories(item).filter(c => c !== '--Kapalı Ürünler Kategorisi');
+      if (allCats.length === 0) continue;
 
-      const longestRawCat = rawCats.reduce((a, b) => b.length > a.length ? b : a, rawCats[0]);
-      const cleanCatTr = cleanCategoryString(longestRawCat);
+      const textCats = allCats.filter(c => !c.match(/^\d+$/));
+      const chosenCat = textCats.length > 0 ? textCats.reduce((a, b) => b.length > a.length ? b : a, textCats[0]) : 'Promosyon Ürünleri';
+
+      const cleanCatTr = cleanCategoryString(chosenCat);
       const catTrans = getCategoryTranslations(cleanCatTr);
 
       const images = [];

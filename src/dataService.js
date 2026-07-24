@@ -28,9 +28,8 @@ async function fetchAndParseProducts() {
 
     const products = items
       .filter(item => {
-        // Filter out items with only numeric categories or closed categories
         const cats = extractCategories(item);
-        return cats.some(c => !c.match(/^\d+$/) && c !== '--Kapalı Ürünler Kategorisi');
+        return !cats.includes('--Kapalı Ürünler Kategorisi');
       })
       .map(item => parseProduct(item));
 
@@ -53,8 +52,15 @@ function extractCategories(item) {
 }
 
 function parseProduct(item) {
-  const categories = extractCategories(item)
-    .filter(c => !c.match(/^\d+$/) && c !== '--Kapalı Ürünler Kategorisi');
+  let categories = extractCategories(item)
+    .filter(c => c !== '--Kapalı Ürünler Kategorisi');
+
+  const textCats = categories.filter(c => !c.match(/^\d+$/));
+  if (textCats.length > 0) {
+    categories = textCats;
+  } else {
+    categories = ['Promosyon Ürünleri'];
+  }
 
   const images = [];
   if (item.IMAGES) {

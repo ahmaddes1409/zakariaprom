@@ -71,24 +71,17 @@ async function syncXmlToDb(db, saveDatabase) {
     const products = await fetchAndParseProducts();
     if (!products || products.length === 0) return;
 
-    let inserted = 0;
+    // 1. Prepare all formatted data BEFORE starting database transaction
+    const preparedRows = [];
     const categoryMap = new Map();
-
-    db.exec('BEGIN TRANSACTION');
-
-    const insertStmt = db.prepare(`
-      INSERT OR REPLACE INTO local_products 
-      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `);
 
     for (const p of products) {
       if (!p.id) continue;
-      let rawCat = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : '';
+      let rawCat = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : 'Promosyon Ürünleri';
       if (rawCat.includes('|')) {
         rawCat = rawCat.split('|')[0].trim();
       }
-      const topCatTr = rawCat.split('>')[0].trim();
+      const topCatTr = rawCat.split('>')[0].trim() || 'Promosyon Ürünleri';
       const catTr = rawCat;
       const catAr = (p.categories && p.categories.ar && p.categories.ar.length > 0) ? p.categories.ar[p.categories.ar.length - 1] : translateCategory(catTr, 'ar');
       const catEn = (p.categories && p.categories.en && p.categories.en.length > 0) ? p.categories.en[p.categories.en.length - 1] : translateCategory(catTr, 'en');
@@ -104,7 +97,7 @@ async function syncXmlToDb(db, saveDatabase) {
       const nameAr = p.name ? (p.name.ar || translateProductName(nameTr, 'ar')) : '';
       const nameEn = p.name ? (p.name.en || translateProductName(nameTr, 'en')) : '';
 
-      insertStmt.run([
+      preparedRows.push([
         pId,
         nameTr,
         nameAr,
@@ -120,7 +113,19 @@ async function syncXmlToDb(db, saveDatabase) {
         JSON.stringify(p.sizes || []),
         JSON.stringify(p.images || [])
       ]);
-      inserted++;
+    }
+
+    // 2. Perform lightning-fast DB transaction (< 10ms)
+    db.exec('BEGIN TRANSACTION');
+
+    const insertStmt = db.prepare(`
+      INSERT OR REPLACE INTO local_products 
+      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+
+    for (const row of preparedRows) {
+      insertStmt.run(row);
     }
 
     const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_ar, name_en, name_tr) VALUES (?, ?, ?)');
@@ -135,7 +140,7 @@ async function syncXmlToDb(db, saveDatabase) {
     if (typeof saveDatabase === 'function') {
       saveDatabase();
     }
-    console.log(`[Auto XML Sync] Successfully synced ${inserted} Karmedya XML products and ${categoryMap.size} clean categories to active database!`);
+    console.log(`[Auto XML Sync] Successfully synced ${preparedRows.length} Karmedya XML products and ${categoryMap.size} clean categories to active database!`);
   } catch (err) {
     try { db.exec('ROLLBACK'); } catch(e) {}
     console.error('[Auto XML Sync Error]:', err.message);

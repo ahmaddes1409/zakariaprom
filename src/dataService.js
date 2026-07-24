@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { parseStringPromise } = require('xml2js');
 const { translateProductName, translateCategory } = require('./translations');
 

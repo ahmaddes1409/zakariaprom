@@ -187,6 +187,22 @@ async function startServer() {
     }
   });
 
+  // Public trigger to run full feed sync and get DB counts
+  app.get('/api/sync-all-now', async (req, res) => {
+    try {
+      console.log('[Manual Sync-All] Starting sequential feed sync...');
+      await syncXmlToDb(db, saveDatabase);
+      const { syncEtkinProducts } = require('./services/etkinService');
+      const etkinRes = await syncEtkinProducts(db, saveDatabase);
+      const total = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+      const xml = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+      const etkin = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+      res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0, etkinRes });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Public products API
   app.get('/api/products', async (req, res) => {
     try {

@@ -169,7 +169,6 @@ class DatabaseWrapper {
         try {
           const boundParams = formatParams(params);
           self.sqliteDb.run(sql, boundParams);
-          saveDatabase();
           let lastId = 0;
           try {
             const res = self.sqliteDb.exec("SELECT last_insert_rowid() as id");

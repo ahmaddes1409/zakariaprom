@@ -67,9 +67,22 @@ function saveDatabase() {
       const buffer = Buffer.from(data);
       const targetDir = path.dirname(DB_PATH);
       if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
+        try { fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 }); } catch(e) {}
       }
-      fs.writeFileSync(DB_PATH, buffer);
+      try {
+        fs.writeFileSync(DB_PATH, buffer);
+        try { fs.chmodSync(DB_PATH, 0o666); } catch(e) {}
+      } catch(writeErr) {
+        console.error('[DB Save Write Error]:', writeErr.message);
+        try {
+          const tmpPath = DB_PATH + '.tmp';
+          fs.writeFileSync(tmpPath, buffer);
+          fs.renameSync(tmpPath, DB_PATH);
+          try { fs.chmodSync(DB_PATH, 0o666); } catch(e) {}
+        } catch(fallbackErr) {
+          console.error('[DB Save Fallback Error]:', fallbackErr.message);
+        }
+      }
     } catch (err) {
       console.error('[DB Save Error]:', err.message);
     }

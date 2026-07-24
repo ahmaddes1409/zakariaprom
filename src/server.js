@@ -66,13 +66,15 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 async function syncXmlToDb(db, saveDatabase) {
   try {
     const { fetchAndParseProducts } = require('./dataService');
-    const { translateCategory } = require('./translations');
-    console.log('[Auto XML Sync] Starting background sync of XML feed to database...');
+    const { translateCategory, translateProductName } = require('./translations');
+    console.log('[Auto XML Sync] Starting background sync of Karmedya XML feed to database...');
     const products = await fetchAndParseProducts();
     if (!products || products.length === 0) return;
 
     let inserted = 0;
     const categoryMap = new Map();
+
+    db.exec('BEGIN TRANSACTION');
 
     const insertStmt = db.prepare(`
       INSERT OR REPLACE INTO local_products 
@@ -81,6 +83,7 @@ async function syncXmlToDb(db, saveDatabase) {
     `);
 
     for (const p of products) {
+      if (!p.id) continue;
       let rawCat = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : '';
       if (rawCat.includes('|')) {
         rawCat = rawCat.split('|')[0].trim();
@@ -96,11 +99,16 @@ async function syncXmlToDb(db, saveDatabase) {
         categoryMap.set(topCatTr, { tr: topCatTr, ar: topCatAr, en: topCatEn });
       }
 
-      insertStmt.run(
-        (p.id || '').toString(),
-        p.name ? (p.name.tr || '') : '',
-        p.name ? (p.name.ar || p.name.tr || '') : '',
-        p.name ? (p.name.en || p.name.tr || '') : '',
+      const pId = p.id.toString();
+      const nameTr = p.name ? (p.name.tr || '') : '';
+      const nameAr = p.name ? (p.name.ar || translateProductName(nameTr, 'ar')) : '';
+      const nameEn = p.name ? (p.name.en || translateProductName(nameTr, 'en')) : '';
+
+      insertStmt.run([
+        pId,
+        nameTr,
+        nameAr,
+        nameEn,
         p.model || '',
         p.description || '',
         p.price || 0,
@@ -111,21 +119,23 @@ async function syncXmlToDb(db, saveDatabase) {
         JSON.stringify(p.colors || []),
         JSON.stringify(p.sizes || []),
         JSON.stringify(p.images || [])
-      );
+      ]);
       inserted++;
     }
 
-    db.exec('DELETE FROM custom_categories');
-    const catStmt = db.prepare('INSERT OR REPLACE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
+    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
     for (const [key, c] of categoryMap) {
-      catStmt.run(c.tr, c.ar, c.en);
+      catStmt.run([c.tr, c.ar, c.en]);
     }
+
+    db.exec('COMMIT');
 
     if (typeof saveDatabase === 'function') {
       saveDatabase();
     }
-    console.log(`[Auto XML Sync] Successfully synced ${inserted} products and ${categoryMap.size} clean categories to active database!`);
+    console.log(`[Auto XML Sync] Successfully synced ${inserted} Karmedya XML products and ${categoryMap.size} clean categories to active database!`);
   } catch (err) {
+    try { db.exec('ROLLBACK'); } catch(e) {}
     console.error('[Auto XML Sync Error]:', err.message);
   }
 }
@@ -144,9 +154,11 @@ async function startServer() {
   // Initialize schema and seed data
   initializeDatabase();
 
-  // Schedule daily 03:30 AM early morning sync for Etkin Promosyon API
+  // Trigger background sync for both Karmedya XML feed and Etkin Promosyon API
+  syncXmlToDb(db, saveDatabase).catch(e => console.error('[XML Sync Startup Error]:', e.message));
   try {
-    const { scheduleDailySync } = require('./services/etkinService');
+    const { scheduleDailySync, syncEtkinProducts } = require('./services/etkinService');
+    syncEtkinProducts(db, saveDatabase).catch(e => console.error('[Etkin Sync Startup Error]:', e.message));
     scheduleDailySync(db, saveDatabase);
   } catch (e) {
     console.error('[Etkin Scheduler Error]:', e.message);

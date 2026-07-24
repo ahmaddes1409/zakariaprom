@@ -178,9 +178,10 @@ async function syncXmlToDatabase() {
       }
     }
 
+    const { translateProductName } = require('../src/translations');
     const nameTr = item.NAME || '';
-    const nameAr = item.NAME || '';
-    const nameEn = item.NAME || '';
+    const nameAr = translateProductName(nameTr, 'ar');
+    const nameEn = translateProductName(nameTr, 'en');
 
     const priceStr = (item.PRICE || '0').replace('TL', '').replace(',', '.').trim();
     const price = parseFloat(priceStr) || 0;
@@ -209,9 +210,8 @@ async function syncXmlToDatabase() {
   stmt.free();
 
   // Re-populate custom_categories cleanly with unique top categories only
-  sqliteDb.exec('DELETE FROM custom_categories');
   const catStmt = sqliteDb.prepare(`
-    INSERT OR REPLACE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)
+    INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)
   `);
   for (const [topTr, cat] of uniqueTopCategories) {
     catStmt.run([cat.tr, cat.ar, cat.en]);

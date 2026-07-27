@@ -587,9 +587,32 @@ function initializeDatabase() {
 
   try {
     const tableInfo = db.prepare("PRAGMA table_info(local_products)").all();
-    const hasProductId = tableInfo.some(col => col.name === 'product_id');
+    const hasProductId = Array.isArray(tableInfo) && tableInfo.some(col => col.name === 'product_id');
     if (!hasProductId) {
-      db.exec("ALTER TABLE local_products ADD COLUMN product_id TEXT");
+      console.log("[DB Migration] Re-creating local_products table with product_id schema...");
+      db.exec("DROP TABLE IF EXISTS local_products");
+      db.exec(`
+        CREATE TABLE local_products (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id TEXT UNIQUE,
+          name_tr TEXT DEFAULT '',
+          name_ar TEXT DEFAULT '',
+          name_en TEXT DEFAULT '',
+          model TEXT DEFAULT '',
+          description TEXT DEFAULT '',
+          price REAL DEFAULT 0,
+          quantity INTEGER DEFAULT 0,
+          category_tr TEXT DEFAULT '',
+          category_ar TEXT DEFAULT '',
+          category_en TEXT DEFAULT '',
+          colors TEXT DEFAULT '[]',
+          sizes TEXT DEFAULT '[]',
+          images TEXT DEFAULT '[]',
+          hidden INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
     }
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_local_products_product_id ON local_products(product_id)");
   } catch(e) {

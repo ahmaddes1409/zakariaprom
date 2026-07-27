@@ -139,14 +139,18 @@ async function syncXmlToDb(db, saveDatabase) {
       ]);
     }
 
-    // 2. Perform lightning-fast DB transaction (< 10ms)
     db.exec('BEGIN TRANSACTION');
 
-    for (const row of preparedRows) {
-      const sqlVal = row.map(v => typeof v === 'number' ? v : ("'" + String(v).replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'")).join(', ');
+    const formattedRows = preparedRows.map(row => 
+      `(${row.map(v => typeof v === 'number' ? v : ("'" + String(v).replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'")).join(', ')}, CURRENT_TIMESTAMP)`
+    );
+
+    const chunkSize = 100;
+    for (let i = 0; i < formattedRows.length; i += chunkSize) {
+      const chunk = formattedRows.slice(i, i + chunkSize);
       db.exec(`INSERT OR REPLACE INTO local_products 
         (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-        VALUES (${sqlVal}, CURRENT_TIMESTAMP)`);
+        VALUES ${chunk.join(', ')}`);
     }
 
     for (const [key, c] of categoryMap) {

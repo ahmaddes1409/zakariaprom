@@ -586,8 +586,15 @@ function initializeDatabase() {
   `).run();
 
   try {
-    sqliteDb.exec("ALTER TABLE local_products ADD COLUMN product_id TEXT");
-  } catch(e) {}
+    const tableInfo = db.prepare("PRAGMA table_info(local_products)").all();
+    const hasProductId = tableInfo.some(col => col.name === 'product_id');
+    if (!hasProductId) {
+      db.exec("ALTER TABLE local_products ADD COLUMN product_id TEXT");
+    }
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_local_products_product_id ON local_products(product_id)");
+  } catch(e) {
+    console.error("[Schema Migration Error]:", e.message);
+  }
 
   // Create default admin if not exists
   const adminExists = db.prepare('SELECT id FROM admins WHERE username = ?').get('admin');

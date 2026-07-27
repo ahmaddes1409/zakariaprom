@@ -169,7 +169,7 @@ class DatabaseWrapper {
           };
         } catch (e) {
           console.error('DB run error:', sql, params, e.message);
-          return { lastInsertRowid: 0, changes: 0 };
+          throw e;
         }
       }
     };

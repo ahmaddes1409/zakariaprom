@@ -72,6 +72,7 @@ async function syncEtkinProducts(db, saveDatabase) {
     }
 
     let inserted = 0;
+    let lastItemErr = null;
     const categorySet = new Map();
 
     db.exec('BEGIN TRANSACTION');
@@ -146,6 +147,7 @@ async function syncEtkinProducts(db, saveDatabase) {
 
         inserted++;
       } catch(itemErr) {
+        if (!lastItemErr) lastItemErr = itemErr.message;
         console.error('[Etkin Item Error]:', itemErr.message);
       }
     }
@@ -162,7 +164,7 @@ async function syncEtkinProducts(db, saveDatabase) {
     }
 
     console.log(`[Etkin Sync Success] Synced ${inserted} products into database.`);
-    return { success: true, count: inserted, sampleKeys: items[0] ? Object.keys(items[0]) : [], sampleItem: items[0] || null };
+    return { success: true, count: inserted, lastItemErr };
   } catch (err) {
     console.error('[Etkin Sync Error]:', err.message);
     try { db.exec('ROLLBACK'); } catch(e) {}

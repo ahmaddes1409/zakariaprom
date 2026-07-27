@@ -66,6 +66,10 @@ async function syncEtkinProducts(db, saveDatabase) {
     }
 
     console.log(`[Etkin Sync] Received ${items.length} items from Etkin API.`);
+    if (items.length > 0) {
+      console.log('[Etkin Sample Item Keys]:', Object.keys(items[0]));
+      console.log('[Etkin Sample Item]:', JSON.stringify(items[0]).substring(0, 300));
+    }
 
     let inserted = 0;
     const categorySet = new Map();
@@ -154,7 +158,7 @@ async function syncEtkinProducts(db, saveDatabase) {
     }
 
     console.log(`[Etkin Sync Success] Synced ${inserted} products into database.`);
-    return { success: true, count: inserted };
+    return { success: true, count: inserted, sampleKeys: items[0] ? Object.keys(items[0]) : [], sampleItem: items[0] || null };
   } catch (err) {
     console.error('[Etkin Sync Error]:', err.message);
     try { db.exec('ROLLBACK'); } catch(e) {}

@@ -78,7 +78,12 @@ async function syncEtkinProducts(db, saveDatabase) {
 
     db.exec('BEGIN TRANSACTION');
 
-    const cleanSql = (val) => "'" + String(val || '').replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'";
+    const cleanSql = (val) => {
+      if (val === null || val === undefined) return "''";
+      let str = String(val);
+      str = str.replace(/\0/g, '').replace(/\r/g, '').replace(/'/g, "''");
+      return "'" + str + "'";
+    };
 
     const rows = [];
     for (const item of items) {
@@ -156,7 +161,16 @@ async function syncEtkinProducts(db, saveDatabase) {
         db.exec(sql);
       } catch(chunkErr) {
         if (!lastItemErr) lastItemErr = chunkErr.message;
-        console.error('[Etkin Chunk Error]:', chunkErr.message);
+        console.error('[Etkin Chunk Error]:', chunkErr.message, 'Executing row fallback...');
+        for (const singleRowSql of chunk) {
+          try {
+            db.exec(`INSERT OR REPLACE INTO local_products 
+              (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+              VALUES ${singleRowSql}`);
+          } catch(singleErr) {
+            console.error('[Etkin Single Row Insert Error]:', singleErr.message);
+          }
+        }
       }
       await new Promise(resolve => setTimeout(resolve, 5));
     }

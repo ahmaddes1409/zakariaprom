@@ -12,6 +12,23 @@ let lastFetchTime = 0;
 async function fetchXML() {
   const localBackup = path.join(__dirname, '..', 'data', 'xml_export_product.xml');
   
+  // Try remote fetch FIRST
+  try {
+    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (response.ok) {
+      let text = await response.text();
+      if (text && text.includes('<SHOP>')) {
+        if (text.includes('<')) text = text.substring(text.indexOf('<'));
+        try { fs.writeFileSync(localBackup, text, 'utf8'); } catch(e) {}
+        console.log(`[XML Feed] Successfully fetched live XML from remote (${text.length} bytes)`);
+        return text;
+      }
+    }
+  } catch(e) {
+    console.warn(`[XML Feed] Remote fetch failed (${e.message}), falling back to local backup.`);
+  }
+
+  // Fallback to local backup if remote fetch failed
   if (fs.existsSync(localBackup)) {
     const stats = fs.statSync(localBackup);
     if (stats.size > 1000) {
@@ -20,19 +37,6 @@ async function fetchXML() {
       return text;
     }
   }
-
-  // Remote fallback if local file does not exist
-  try {
-    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (response.ok) {
-      let text = await response.text();
-      if (text && text.includes('<SHOP>')) {
-        if (text.includes('<')) text = text.substring(text.indexOf('<'));
-        try { fs.writeFileSync(localBackup, text, 'utf8'); } catch(e) {}
-        return text;
-      }
-    }
-  } catch(e) {}
 
   throw new Error('Could not fetch XML from remote or local backup');
 }

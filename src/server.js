@@ -141,8 +141,10 @@ async function syncXmlToDb(db, saveDatabase) {
 
     db.exec('BEGIN TRANSACTION');
 
+    const esc = (v) => typeof v === 'number' ? v : ("'" + String(v || '').replace(/\0/g, '').replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'");
+
     const formattedRows = preparedRows.map(row => 
-      `(${row.map(v => typeof v === 'number' ? v : ("'" + String(v).replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'")).join(', ')}, CURRENT_TIMESTAMP)`
+      `(${row.map(esc).join(', ')}, CURRENT_TIMESTAMP)`
     );
 
     const chunkSize = 100;
@@ -152,7 +154,18 @@ async function syncXmlToDb(db, saveDatabase) {
         db.exec(`INSERT OR REPLACE INTO local_products 
           (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
           VALUES ${chunk.join(', ')}`);
-      } catch(e) {}
+      } catch(e) {
+        console.warn(`[XML Chunk Insert Warning]: Chunk failed (${e.message}), executing row-by-row fallback...`);
+        for (const singleRowSql of chunk) {
+          try {
+            db.exec(`INSERT OR REPLACE INTO local_products 
+              (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+              VALUES ${singleRowSql}`);
+          } catch(err2) {
+            console.error('[XML Single Row Insert Error]:', err2.message);
+          }
+        }
+      }
       await new Promise(resolve => setTimeout(resolve, 5));
     }
 

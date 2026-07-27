@@ -224,12 +224,19 @@ ensureDbReady();
       let xmlError = null;
       try { xmlParsed = await fetchAndParseProducts(); } catch(e) { xmlError = e.message; }
 
-      const total = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
-      const xml = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
-      const etkin = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
-      res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0, xmlParsedCount: xmlParsed ? xmlParsed.length : 0, xmlError });
+      let total = 0, xml = 0, etkin = 0;
+      try {
+        const tRow = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+        if (tRow) total = tRow.count;
+        const xRow = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+        if (xRow) xml = xRow.count;
+        const eRow = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+        if (eRow) etkin = eRow.count;
+      } catch(dbErr) {}
+
+      res.json({ success: true, total, xml, etkin, xmlParsedCount: xmlParsed ? xmlParsed.length : 0, xmlError });
     } catch(e) {
-      res.status(500).json({ error: e.message });
+      res.json({ success: false, error: e.message });
     }
   });
 

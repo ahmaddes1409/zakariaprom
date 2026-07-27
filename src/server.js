@@ -141,40 +141,29 @@ async function syncXmlToDb(db, saveDatabase) {
 
     db.exec('BEGIN TRANSACTION');
 
-    const esc = (v) => typeof v === 'number' ? v : ("'" + String(v || '').replace(/\0/g, '').replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'");
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO local_products 
+      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
 
-    const formattedRows = preparedRows.map(row => 
-      `(${row.map(esc).join(', ')}, CURRENT_TIMESTAMP)`
-    );
-
-    const chunkSize = 100;
-    for (let i = 0; i < formattedRows.length; i += chunkSize) {
-      const chunk = formattedRows.slice(i, i + chunkSize);
+    let count = 0;
+    for (const row of preparedRows) {
       try {
-        db.exec(`INSERT OR REPLACE INTO local_products 
-          (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-          VALUES ${chunk.join(', ')}`);
-      } catch(e) {
-        console.warn(`[XML Chunk Insert Warning]: Chunk failed (${e.message}), executing row-by-row fallback...`);
-        for (const singleRowSql of chunk) {
-          try {
-            db.exec(`INSERT OR REPLACE INTO local_products 
-              (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-              VALUES ${singleRowSql}`);
-          } catch(err2) {
-            console.error('[XML Single Row Insert Error]:', err2.message);
-          }
-        }
+        stmt.run(row);
+        count++;
+      } catch(itemErr) {
+        console.error('[XML Item Insert Error]:', itemErr.message);
       }
-      await new Promise(resolve => setTimeout(resolve, 5));
+      if (count % 100 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
     }
 
+    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_ar, name_en, name_tr) VALUES (?, ?, ?)');
     for (const [key, c] of categoryMap) {
       if (c && c.tr) {
-        const arEsc = (c.ar || c.tr).replace(/'/g, "''");
-        const enEsc = (c.en || c.tr).replace(/'/g, "''");
-        const trEsc = c.tr.replace(/'/g, "''");
-        db.exec(`INSERT OR IGNORE INTO custom_categories (name_ar, name_en, name_tr) VALUES ('${arEsc}', '${enEsc}', '${trEsc}')`);
+        try { catStmt.run(c.ar || c.tr, c.en || c.tr, c.tr); } catch(e) {}
       }
     }
 

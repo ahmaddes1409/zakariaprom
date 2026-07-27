@@ -157,6 +157,7 @@ async function syncEtkinProducts(db, saveDatabase) {
         if (!lastItemErr) lastItemErr = chunkErr.message;
         console.error('[Etkin Chunk Error]:', chunkErr.message);
       }
+      await new Promise(resolve => setTimeout(resolve, 5));
     }
 
     for (const [key, c] of categorySet) {

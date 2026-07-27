@@ -148,9 +148,12 @@ async function syncXmlToDb(db, saveDatabase) {
     const chunkSize = 100;
     for (let i = 0; i < formattedRows.length; i += chunkSize) {
       const chunk = formattedRows.slice(i, i + chunkSize);
-      db.exec(`INSERT OR REPLACE INTO local_products 
-        (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-        VALUES ${chunk.join(', ')}`);
+      try {
+        db.exec(`INSERT OR REPLACE INTO local_products 
+          (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+          VALUES ${chunk.join(', ')}`);
+      } catch(e) {}
+      await new Promise(resolve => setTimeout(resolve, 5));
     }
 
     for (const [key, c] of categoryMap) {

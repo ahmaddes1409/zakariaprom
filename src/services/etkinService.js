@@ -39,7 +39,8 @@ async function fetchEtkinApi(db, tip = 'tum_urunler', extraParams = {}) {
       'Content-Type': 'application/json',
       'User-Agent': SITE_DOMAIN
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(5000)
   });
 
   if (!response.ok) {

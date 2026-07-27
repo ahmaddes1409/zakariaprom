@@ -244,12 +244,11 @@ async function renderCategories() {
   const data = await api('/api/admin/categories');
   const area = document.getElementById('contentArea');
   const cats = data?.categories || [];
-  const customCats = await api('/api/admin/custom-categories') || [];
   
   area.innerHTML = `
     <div class="card">
-      <div class="card-header">
-        <h3>الفئات (${cats.length})</h3>
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;">الفئات (${cats.length})</h3>
         <button class="btn-primary btn-sm" onclick="addNewCategory()">+ إضافة فئة جديدة</button>
       </div>
       <div class="card-body">
@@ -258,7 +257,10 @@ async function renderCategories() {
             <thead><tr><th>الفئة (تركي)</th><th>الفئة (عربي)</th><th>الفئة (إنجليزي)</th><th>عدد المنتجات</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody>${cats.map(c => `
               <tr style="${c.hidden ? 'opacity:0.5;' : ''}">
-                <td>${c.tr}</td><td>${c.ar}</td><td>${c.en}</td><td>${c.count}</td>
+                <td><strong>${c.tr}</strong></td>
+                <td>${c.ar || c.tr}</td>
+                <td>${c.en || c.tr}</td>
+                <td><span class="badge">${c.count || 0}</span></td>
                 <td>${c.hidden ? '<span class="status status-cancelled">مخفي</span>' : '<span class="status status-completed">ظاهر</span>'}</td>
                 <td style="display:flex;gap:6px;flex-wrap:wrap;">
                   <button class="btn-secondary btn-sm" onclick="editCategory('${encodeURIComponent(c.tr)}')">تعديل</button>
@@ -270,27 +272,6 @@ async function renderCategories() {
         </div>
       </div>
     </div>
-    ${customCats.length > 0 ? `
-    <div class="card" style="margin-top:20px;">
-      <div class="card-header"><h3>فئات مخصصة (${customCats.length})</h3></div>
-      <div class="card-body">
-        <div class="table-responsive">
-          <table>
-            <thead><tr><th>الفئة (تركي)</th><th>الفئة (عربي)</th><th>الفئة (إنجليزي)</th><th>الحالة</th><th>إجراءات</th></tr></thead>
-            <tbody>${customCats.map(c => `
-              <tr style="${!c.active ? 'opacity:0.5;' : ''}">
-                <td>${c.name_tr || '-'}</td><td>${c.name_ar || '-'}</td><td>${c.name_en || '-'}</td>
-                <td>${c.active ? '<span class="status status-completed">نشط</span>' : '<span class="status status-cancelled">غير نشط</span>'}</td>
-                <td style="display:flex;gap:6px;flex-wrap:wrap;">
-                  <button class="btn-secondary btn-sm" onclick="editCustomCategory(${c.id})">تعديل</button>
-                  <button class="btn-danger btn-sm" onclick="deleteCustomCategory(${c.id})">حذف</button>
-                </td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>` : ''}
   `;
 }
 

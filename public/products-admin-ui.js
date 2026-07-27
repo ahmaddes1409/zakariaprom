@@ -3,10 +3,12 @@
 
 let productsPage = 1;
 let localProductsPage = 1;
-let currentProductsTab = 'xml'; // 'xml' or 'local'
+let currentProductsTab = 'all'; // 'all', 'xml', 'etkin', 'local'
 
 async function renderProducts() {
   const area = document.getElementById('contentArea');
+  const counts = await getProductCounts();
+
   area.innerHTML = `
     <div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
       <h2 style="margin:0;">إدارة المنتجات</h2>
@@ -15,28 +17,36 @@ async function renderProducts() {
         <i class="fas fa-plus"></i> إضافة منتج جديد
       </button>
     </div>
-    <div class="tabs" style="margin-bottom:20px;">
-      <button class="tab ${currentProductsTab === 'xml' ? 'active' : ''}" onclick="currentProductsTab='xml';renderProducts()">منتجات XML (${await getXmlProductCount()})</button>
-      <button class="tab ${currentProductsTab === 'local' ? 'active' : ''}" onclick="currentProductsTab='local';renderProducts()">منتجات مضافة يدوياً</button>
+    <div class="tabs" style="margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="tab ${currentProductsTab === 'all' ? 'active' : ''}" onclick="currentProductsTab='all';productsPage=1;renderProducts()">جميع المنتجات (${counts.total})</button>
+      <button class="tab ${currentProductsTab === 'xml' ? 'active' : ''}" onclick="currentProductsTab='xml';productsPage=1;renderProducts()">منتجات Karmedya XML (${counts.xml})</button>
+      <button class="tab ${currentProductsTab === 'etkin' ? 'active' : ''}" onclick="currentProductsTab='etkin';productsPage=1;renderProducts()">منتجات Etkin Promosyon (${counts.etkin})</button>
+      <button class="tab ${currentProductsTab === 'local' ? 'active' : ''}" onclick="currentProductsTab='local';productsPage=1;renderProducts()">منتجات مضافة يدوياً (${counts.local})</button>
     </div>
     <div id="productsContent"></div>
   `;
-  if (currentProductsTab === 'xml') {
-    await renderXmlProducts();
-  } else {
-    await renderLocalProducts();
+
+  await renderXmlProducts();
+}
+
+async function getProductCounts() {
+  try {
+    const data = await api('/api/admin/products?limit=10000');
+    const prods = data?.products || [];
+    let xml = 0, etkin = 0, local = 0;
+    prods.forEach(p => {
+      if (p.isEtkin || p.source === 'etkin') etkin++;
+      else if (p.isLocal || p.source === 'local') local++;
+      else xml++;
+    });
+    return { total: prods.length, xml, etkin, local };
+  } catch(e) {
+    return { total: 0, xml: 0, etkin: 0, local: 0 };
   }
 }
 
-async function getXmlProductCount() {
-  try {
-    const data = await api('/api/admin/products?limit=1');
-    return data?.total || 0;
-  } catch(e) { return 0; }
-}
-
 async function renderXmlProducts() {
-  const data = await api(`/api/admin/products?page=${productsPage}&limit=20`);
+  const data = await api(`/api/admin/products?source=${currentProductsTab}&page=${productsPage}&limit=20`);
   const products = data?.products || [];
   const total = data?.total || 0;
   const categories = await api('/api/admin/categories');
@@ -59,6 +69,7 @@ async function renderXmlProducts() {
             <th>صورة</th>
             <th>الاسم (تركي)</th>
             <th>الاسم (عربي)</th>
+            <th>المصدر</th>
             <th>الفئة</th>
             <th>الموديل</th>
             <th>السعر</th>
@@ -72,7 +83,7 @@ async function renderXmlProducts() {
     </div>
     <div class="pagination" style="display:flex;gap:10px;justify-content:center;align-items:center;margin-top:15px;">
       <button class="btn-secondary" onclick="productsPage--;renderProducts()" ${productsPage <= 1 ? 'disabled' : ''}>السابق</button>
-      <span>صفحة ${productsPage} من ${Math.ceil(total/20)}</span>
+      <span>صفحة ${productsPage} من ${Math.ceil(total/20) || 1}</span>
       <button class="btn-secondary" onclick="productsPage++;renderProducts()" ${productsPage >= Math.ceil(total/20) ? 'disabled' : ''}>التالي</button>
     </div>
   `;
@@ -80,11 +91,15 @@ async function renderXmlProducts() {
 
 function renderXmlProductRow(p) {
   const category = p.topCategory?.tr || p.categories?.tr?.[0]?.split(' > ')[0] || '-';
+  const sourceLabel = p.source === 'etkin' ? '<span class="badge" style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:4px;font-size:11px;">Etkin</span>' : 
+                     (p.source === 'local' ? '<span class="badge" style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;">يدوي</span>' : 
+                                            '<span class="badge" style="background:#ecfdf5;color:#047857;padding:2px 8px;border-radius:4px;font-size:11px;">Karmedya XML</span>');
   return `
     <tr>
       <td><img src="${p.images?.[0] || ''}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;" onerror="this.style.display='none'"></td>
       <td>${p.name?.tr || ''}</td>
       <td>${p.name?.ar || ''}</td>
+      <td>${sourceLabel}</td>
       <td><span class="badge" style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:4px;font-size:12px;">${category}</span></td>
       <td>${p.model || ''}</td>
       <td>${p.price ? p.price + ' TL' : '-'}</td>
@@ -415,7 +430,7 @@ window.deleteLocalProduct = async function(id) {
 window.searchAdminProducts = async function() {
   const q = document.getElementById('productSearch')?.value || '';
   const cat = document.getElementById('categoryFilter')?.value || '';
-  let url = `/api/admin/products?search=${encodeURIComponent(q)}&limit=${cat ? 200 : 50}`;
+  let url = `/api/admin/products?source=${currentProductsTab}&search=${encodeURIComponent(q)}&limit=${cat ? 200 : 50}`;
   if (cat) url += `&category=${encodeURIComponent(cat)}`;
   const data = await api(url);
   const products = data?.products || [];

@@ -383,6 +383,14 @@ ensureDbReady();
         nameOverrideMap[o.original_key][o.lang] = o.translation;
       });
 
+      let catTransOverrides = [];
+      try { catTransOverrides = database.db.prepare("SELECT * FROM translation_overrides WHERE type = 'category'").all(); } catch(e) {}
+      const catTransMap = {};
+      catTransOverrides.forEach(o => {
+        if (!catTransMap[o.original_key]) catTransMap[o.original_key] = {};
+        catTransMap[o.original_key][o.lang] = o.translation;
+      });
+
       let products = [];
       const seenProductKeys = new Set();
 
@@ -407,8 +415,15 @@ ensureDbReady();
           catEn = catOverride.new_category_en || catTr;
         }
 
-        // Skip hidden categories
+        // Apply category translation override if present
         const topCatTr = catTr.split(' > ')[0].trim();
+        const catTrans = catTransMap[catTr] || catTransMap[topCatTr];
+        if (catTrans) {
+          if (catTrans.ar) catAr = catTrans.ar;
+          if (catTrans.en) catEn = catTrans.en;
+        }
+
+        // Skip hidden categories
         if (hiddenCategories.includes(topCatTr)) continue;
 
         let nameTr = lp.name_tr || '';
@@ -416,10 +431,11 @@ ensureDbReady();
         let nameEn = lp.name_en || nameTr;
 
         // Check name override
-        if (nameOverrideMap[lp.model]) {
-          if (nameOverrideMap[lp.model].tr) nameTr = nameOverrideMap[lp.model].tr;
-          if (nameOverrideMap[lp.model].ar) nameAr = nameOverrideMap[lp.model].ar;
-          if (nameOverrideMap[lp.model].en) nameEn = nameOverrideMap[lp.model].en;
+        const nameOverride = nameOverrideMap[pId] || nameOverrideMap[lp.model] || nameOverrideMap[lp.name_tr];
+        if (nameOverride) {
+          if (nameOverride.tr) nameTr = nameOverride.tr;
+          if (nameOverride.ar) nameAr = nameOverride.ar;
+          if (nameOverride.en) nameEn = nameOverride.en;
         }
 
         let images = [];
@@ -658,11 +674,25 @@ ensureDbReady();
       const customImageMap = {};
       allCustomCats.forEach(cc => { if (cc && cc.name_tr && cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
 
-      let result = (Array.isArray(categories) ? categories : []).map(cat => ({
-        ...cat,
-        ...(cat && cat.tr ? (overrideMap[cat.tr] || {}) : {}),
-        image: cat && cat.tr ? (imageMap[cat.tr] || customImageMap[cat.tr] || '') : ''
-      }));
+      let result = (Array.isArray(categories) ? categories : []).map(cat => {
+        const ov = (cat && cat.tr) ? (overrideMap[cat.tr] || {}) : {};
+        const subcategories = Array.isArray(cat?.subcategories) ? cat.subcategories.map(sub => {
+          const subOv = (sub && sub.tr) ? (overrideMap[sub.tr] || {}) : {};
+          return {
+            ...sub,
+            ar: subOv.ar || sub.ar || sub.tr,
+            en: subOv.en || sub.en || sub.tr
+          };
+        }) : [];
+
+        return {
+          ...cat,
+          ar: ov.ar || cat.ar || cat.tr,
+          en: ov.en || cat.en || cat.tr,
+          subcategories,
+          image: cat && cat.tr ? (imageMap[cat.tr] || customImageMap[cat.tr] || '') : ''
+        };
+      });
 
       // Add custom categories (that are active and not hidden)
       const customCats = safeQuery('SELECT * FROM custom_categories WHERE active = 1');

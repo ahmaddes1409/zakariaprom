@@ -163,6 +163,9 @@ class DatabaseWrapper {
               lastId = res[0].values[0][0];
             }
           } catch(err) {}
+          if (!sql.toUpperCase().includes('BEGIN')) {
+            saveDatabase();
+          }
           return {
             lastInsertRowid: lastId,
             changes: 1

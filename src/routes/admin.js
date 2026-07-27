@@ -180,6 +180,36 @@ router.put('/translations', adminAuth, (req, res) => {
       ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
     `).run(type, key, en, en);
   }
+
+  // Update underlying tables so main site updates immediately
+  if (type === 'product') {
+    try {
+      db.prepare(`
+        UPDATE local_products 
+        SET name_ar = CASE WHEN ? <> '' THEN ? ELSE name_ar END,
+            name_en = CASE WHEN ? <> '' THEN ? ELSE name_en END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE product_id = ? OR model = ? OR name_tr = ?
+      `).run(ar || '', ar || '', en || '', en || '', key, key, key);
+    } catch(e) {}
+  } else if (type === 'category') {
+    try {
+      db.prepare(`
+        UPDATE custom_categories 
+        SET name_ar = CASE WHEN ? <> '' THEN ? ELSE name_ar END,
+            name_en = CASE WHEN ? <> '' THEN ? ELSE name_en END
+        WHERE name_tr = ?
+      `).run(ar || '', ar || '', en || '', en || '', key);
+
+      db.prepare(`
+        UPDATE local_products 
+        SET category_ar = CASE WHEN ? <> '' THEN ? ELSE category_ar END,
+            category_en = CASE WHEN ? <> '' THEN ? ELSE category_en END
+        WHERE category_tr = ? OR category_tr LIKE ?
+      `).run(ar || '', ar || '', en || '', en || '', key, key + ' > %');
+    } catch(e) {}
+  }
+
   res.json({ success: true });
 });
 
@@ -188,16 +218,22 @@ router.get('/translations/products', adminAuth, async (req, res) => {
   try {
     const db = getDb();
     const { page = 1, limit = 20, search = '' } = req.query;
-    let products = await fetchAndParseProducts();
+    
+    // Read all products from local_products database table
+    let products = db.prepare('SELECT product_id as id, model, name_tr, name_ar, name_en FROM local_products WHERE hidden = 0').all();
+    if (products.length === 0) {
+      products = await fetchAndParseProducts();
+    }
     
     // Apply search filter
     if (search) {
       const q = search.toLowerCase();
       products = products.filter(p => 
-        (p.name?.tr || '').toLowerCase().includes(q) ||
-        (p.name?.ar || '').toLowerCase().includes(q) ||
-        (p.name?.en || '').toLowerCase().includes(q) ||
-        (p.model || '').toLowerCase().includes(q)
+        (p.name_tr || p.name?.tr || '').toLowerCase().includes(q) ||
+        (p.name_ar || p.name?.ar || '').toLowerCase().includes(q) ||
+        (p.name_en || p.name?.en || '').toLowerCase().includes(q) ||
+        (p.model || '').toLowerCase().includes(q) ||
+        (p.id || '').toLowerCase().includes(q)
       );
     }
     
@@ -214,12 +250,21 @@ router.get('/translations/products', adminAuth, async (req, res) => {
       overrideMap[o.original_key][o.lang] = o.translation;
     });
     
-    const result = paginated.map(p => ({
-      model: p.model,
-      tr: p.name?.tr || '',
-      ar: overrideMap[p.model]?.ar || p.name?.ar || '',
-      en: overrideMap[p.model]?.en || p.name?.en || ''
-    }));
+    const result = paginated.map(p => {
+      const pId = p.id || p.product_id;
+      const pModel = p.model || pId;
+      const pTr = p.name_tr || p.name?.tr || '';
+      const pAr = p.name_ar || p.name?.ar || '';
+      const pEn = p.name_en || p.name?.en || '';
+      const ov = overrideMap[pId] || overrideMap[pModel] || overrideMap[pTr] || {};
+      return {
+        id: pId,
+        model: pModel,
+        tr: pTr,
+        ar: ov.ar || pAr || pTr,
+        en: ov.en || pEn || pTr
+      };
+    });
     
     res.json({ products: result, total, totalPages });
   } catch (error) {
@@ -268,27 +313,81 @@ router.post('/products/show', adminAuth, (req, res) => {
 // ===== PRODUCTS LIST (Admin) =====
 router.get('/products', adminAuth, async (req, res) => {
   try {
-    const { search, category, page = 1, limit = 20 } = req.query;
-    let products = await fetchAndParseProducts();
+    const db = getDb();
+    const { search, category, source = 'all', page = 1, limit = 20 } = req.query;
+
+    let dbRows = db.prepare('SELECT * FROM local_products').all();
+    let products = dbRows.map(lp => {
+      let images = [];
+      try { images = JSON.parse(lp.images || '[]'); } catch(e) { if (lp.images) images = [lp.images]; }
+      let colors = [];
+      try { colors = JSON.parse(lp.colors || '[]'); } catch(e) { if (lp.colors) colors = [lp.colors]; }
+      let sizes = [];
+      try { sizes = JSON.parse(lp.sizes || '[]'); } catch(e) { if (lp.sizes) sizes = [lp.sizes]; }
+
+      const pId = lp.product_id || ('local_' + lp.id);
+      const isEtkin = pId.startsWith('etkin_');
+      const isLocal = lp.is_local === 1 || pId.startsWith('local_');
+
+      return {
+        id: pId,
+        product_id: pId,
+        name: { tr: lp.name_tr || '', ar: lp.name_ar || lp.name_tr || '', en: lp.name_en || lp.name_tr || '' },
+        model: lp.model || '',
+        description: lp.description || '',
+        price: lp.price || 0,
+        quantity: lp.quantity || 0,
+        categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || ''], en: [lp.category_en || ''] },
+        topCategory: {
+          tr: (lp.category_tr || '').split(' > ')[0].trim(),
+          ar: (lp.category_ar || '').split(' > ')[0].trim(),
+          en: (lp.category_en || '').split(' > ')[0].trim()
+        },
+        images,
+        colors,
+        sizes,
+        isEtkin,
+        isLocal,
+        source: isEtkin ? 'etkin' : (isLocal ? 'local' : 'xml')
+      };
+    });
+
+    // Fallback if local_products table is empty
+    if (products.length === 0) {
+      const xml = await fetchAndParseProducts();
+      products = xml.map(p => ({ ...p, source: 'xml' }));
+    }
+
+    // Source filter
+    if (source && source !== 'all') {
+      products = products.filter(p => p.source === source);
+    }
+
+    // Search filter
     if (search) {
       const q = search.toLowerCase();
       products = products.filter(p => 
         (p.name?.tr || '').toLowerCase().includes(q) ||
         (p.name?.ar || '').toLowerCase().includes(q) ||
-        (p.model || '').toLowerCase().includes(q)
+        (p.name?.en || '').toLowerCase().includes(q) ||
+        (p.model || '').toLowerCase().includes(q) ||
+        (p.id || '').toLowerCase().includes(q)
       );
     }
+
+    // Category filter
     if (category) {
-      const catLower = category.toLowerCase();
+      const catLower = category.toLowerCase().trim();
       products = products.filter(p => 
-        (p.topCategory?.tr || "").toLowerCase() === catLower ||
+        (p.topCategory?.tr || "").toLowerCase().includes(catLower) ||
         (p.categories?.tr || []).some(c => c.toLowerCase().includes(catLower))
       );
     }
+
     // Add hidden status
-    const db = getDb();
     const hiddenIds = db.prepare('SELECT product_id FROM hidden_products').all().map(r => r.product_id);
     products = products.map(p => ({ ...p, hidden: hiddenIds.includes(p.id) || hiddenIds.includes(p.model) }));
+
     const total = products.length;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const paginatedProducts = products.slice(offset, offset + parseInt(limit));
@@ -301,13 +400,42 @@ router.get('/products', adminAuth, async (req, res) => {
 // GET /products/:id - get single product details
 router.get('/products/:id', adminAuth, async (req, res) => {
   try {
-    const products = await fetchAndParseProducts();
-    const product = products.find(p => p.id === req.params.id || p.model === req.params.id);
+    const db = getDb();
+    const pId = req.params.id;
+    const row = db.prepare('SELECT * FROM local_products WHERE product_id = ? OR model = ? OR id = ?').get(pId, pId, pId);
+    let product = null;
+
+    if (row) {
+      let images = [];
+      try { images = JSON.parse(row.images || '[]'); } catch(e) { if (row.images) images = [row.images]; }
+      let colors = [];
+      try { colors = JSON.parse(row.colors || '[]'); } catch(e) { if (row.colors) colors = [row.colors]; }
+      let sizes = [];
+      try { sizes = JSON.parse(row.sizes || '[]'); } catch(e) { if (row.sizes) sizes = [row.sizes]; }
+
+      product = {
+        id: row.product_id || ('local_' + row.id),
+        product_id: row.product_id,
+        name: { tr: row.name_tr || '', ar: row.name_ar || '', en: row.name_en || '' },
+        model: row.model || '',
+        description: row.description || '',
+        price: row.price || 0,
+        quantity: row.quantity || 0,
+        category_tr: row.category_tr || '',
+        categories: { tr: [row.category_tr || ''], ar: [row.category_ar || ''], en: [row.category_en || ''] },
+        images,
+        colors,
+        sizes
+      };
+    } else {
+      const products = await fetchAndParseProducts();
+      product = products.find(p => p.id === pId || p.model === pId);
+    }
+
     if (!product) return res.status(404).json({ error: 'Product not found' });
     
     // Check for name overrides
-    const db = getDb();
-    const overrides = db.prepare("SELECT lang, translation FROM translation_overrides WHERE type = 'product' AND original_key = ?").all(product.model);
+    const overrides = db.prepare("SELECT lang, translation FROM translation_overrides WHERE type = 'product' AND original_key IN (?, ?, ?)").all(product.id, product.model, product.name?.tr || '');
     if (overrides.length > 0) {
       overrides.forEach(o => { product.name[o.lang] = o.translation; });
     }
@@ -318,23 +446,43 @@ router.get('/products/:id', adminAuth, async (req, res) => {
   }
 });
 
-// PUT /products/:id - update product name translations
+// PUT /products/:id - update product name translations and details
 router.put('/products/:id', adminAuth, async (req, res) => {
   try {
     const db = getDb();
-    const { name_tr, name_ar, name_en, price } = req.body;
-    const products = await fetchAndParseProducts();
-    const product = products.find(p => p.id === req.params.id || p.model === req.params.id);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
-    
-    const model = product.model;
+    const pId = req.params.id;
+    const { name_tr, name_ar, name_en, price, description } = req.body;
+
+    const row = db.prepare('SELECT * FROM local_products WHERE product_id = ? OR model = ? OR id = ?').get(pId, pId, pId);
+    const targetId = row ? row.product_id : pId;
+    const model = row ? row.model : pId;
+
+    // Direct DB update in local_products table
+    db.prepare(`
+      UPDATE local_products
+      SET name_tr = COALESCE(NULLIF(?, ''), name_tr),
+          name_ar = COALESCE(NULLIF(?, ''), name_ar),
+          name_en = COALESCE(NULLIF(?, ''), name_en),
+          price = CASE WHEN ? > 0 THEN ? ELSE price END,
+          description = COALESCE(NULLIF(?, ''), description),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE product_id = ? OR model = ?
+    `).run(name_tr || '', name_ar || '', name_en || '', parseFloat(price) || 0, parseFloat(price) || 0, description || '', targetId, model);
+
     // Save Arabic override
     if (name_ar) {
       db.prepare(`
         INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
         VALUES ('product', ?, 'ar', ?, CURRENT_TIMESTAMP)
         ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
-      `).run(model, name_ar, name_ar);
+      `).run(targetId, name_ar, name_ar);
+      if (model) {
+        db.prepare(`
+          INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+          VALUES ('product', ?, 'ar', ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+        `).run(model, name_ar, name_ar);
+      }
     }
     // Save English override
     if (name_en) {
@@ -342,15 +490,22 @@ router.put('/products/:id', adminAuth, async (req, res) => {
         INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
         VALUES ('product', ?, 'en', ?, CURRENT_TIMESTAMP)
         ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
-      `).run(model, name_en, name_en);
+      `).run(targetId, name_en, name_en);
+      if (model) {
+        db.prepare(`
+          INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+          VALUES ('product', ?, 'en', ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+        `).run(model, name_en, name_en);
+      }
     }
-    // Save Turkish override (only if different from original)
-    if (name_tr && name_tr !== product.name.tr) {
+    // Save Turkish override
+    if (name_tr) {
       db.prepare(`
         INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
         VALUES ('product', ?, 'tr', ?, CURRENT_TIMESTAMP)
         ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
-      `).run(model, name_tr, name_tr);
+      `).run(targetId, name_tr, name_tr);
     }
     
     res.json({ success: true });
@@ -380,7 +535,18 @@ router.put('/products/:id/visibility', adminAuth, async (req, res) => {
 router.get('/categories', adminAuth, async (req, res) => {
   try {
     const db = getDb();
-    const products = await fetchAndParseProducts();
+    
+    // Read all products from local_products database table
+    let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+    let products = dbRows.map(lp => ({
+      id: lp.product_id,
+      model: lp.model,
+      categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || ''], en: [lp.category_en || ''] }
+    }));
+    if (products.length === 0) {
+      products = await fetchAndParseProducts();
+    }
+
     const categories = getCategories(products);
     const hiddenCats = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
     const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'category'").all();
@@ -389,28 +555,45 @@ router.get('/categories', adminAuth, async (req, res) => {
       if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
       overrideMap[o.original_key][o.lang] = o.translation;
     });
-    // Get category images
+
     const images = db.prepare('SELECT * FROM category_images').all();
     const imageMap = {};
     images.forEach(i => { imageMap[i.category_name] = i.image_url; });
-    const result = categories.map(cat => ({
-      ...cat,
-      ...(overrideMap[cat.tr] || {}),
-      hidden: hiddenCats.includes(cat.tr),
-      image: imageMap[cat.tr] || ''
-    }));
-    // Add custom categories
+
+    const seenCategoryKeys = new Set();
+    const result = [];
+
+    categories.forEach(cat => {
+      if (!cat || !cat.tr || seenCategoryKeys.has(cat.tr)) return;
+      seenCategoryKeys.add(cat.tr);
+      const ov = overrideMap[cat.tr] || {};
+      result.push({
+        ...cat,
+        ar: ov.ar || cat.ar || cat.tr,
+        en: ov.en || cat.en || cat.tr,
+        hidden: hiddenCats.includes(cat.tr),
+        image: imageMap[cat.tr] || ''
+      });
+    });
+
+    // Add custom categories only if not already added
     const customCats = db.prepare("SELECT * FROM custom_categories").all();
-    const customResult = customCats.map(cc => ({
-      tr: cc.name_tr,
-      ar: cc.name_ar || cc.name_tr,
-      en: cc.name_en || cc.name_tr,
-      count: 0,
-      hidden: hiddenCats.includes(cc.name_tr) || cc.active === 0,
-      image: imageMap[cc.name_tr] || cc.image_url || "",
-      isCustom: true
-    }));
-    res.json({ categories: [...result, ...customResult] });
+    customCats.forEach(cc => {
+      if (!cc || !cc.name_tr || seenCategoryKeys.has(cc.name_tr)) return;
+      seenCategoryKeys.add(cc.name_tr);
+      const ov = overrideMap[cc.name_tr] || {};
+      result.push({
+        tr: cc.name_tr,
+        ar: ov.ar || cc.name_ar || cc.name_tr,
+        en: ov.en || cc.name_en || cc.name_tr,
+        count: 0,
+        hidden: hiddenCats.includes(cc.name_tr) || cc.active === 0,
+        image: imageMap[cc.name_tr] || cc.image_url || "",
+        isCustom: true
+      });
+    });
+
+    res.json({ categories: result });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -420,10 +603,16 @@ router.get('/categories/:name', adminAuth, async (req, res) => {
   try {
     const db = getDb();
     const catName = decodeURIComponent(req.params.name);
-    const products = await fetchAndParseProducts();
+    let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+    let products = dbRows.map(lp => ({
+      id: lp.product_id,
+      model: lp.model,
+      categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || ''], en: [lp.category_en || ''] }
+    }));
+    if (products.length === 0) products = await fetchAndParseProducts();
+
     const categories = getCategories(products);
     let cat = categories.find(c => c.tr === catName);
-    // Also check custom_categories
     const customCat = db.prepare("SELECT * FROM custom_categories WHERE name_tr = ?").get(catName);
     if (!cat && !customCat) return res.status(404).json({ error: 'Category not found' });
     if (!cat && customCat) {
@@ -434,7 +623,6 @@ router.get('/categories/:name', adminAuth, async (req, res) => {
     const overrideObj = {};
     overrides.forEach(o => { overrideObj[o.lang] = o.translation; });
     const imageRow = db.prepare('SELECT image_url FROM category_images WHERE category_name = ?').get(catName);
-    // For custom categories, use image from custom_categories table if no override in category_images
     const image = imageRow?.image_url || (customCat ? customCat.image_url : '') || '';
     const isHidden = hiddenCats.includes(catName) || (customCat && customCat.active === 0);
     res.json({ category: { ...cat, ...overrideObj, hidden: isHidden, image: image, isCustom: !!customCat } });
@@ -447,11 +635,11 @@ router.put('/categories', adminAuth, (req, res) => {
   const db = getDb();
   const { category_tr, ar, en, hidden, image } = req.body;
   if (!category_tr) return res.status(400).json({ error: 'category_tr required' });
-  // Check if this is a custom category
+
+  // Update custom_categories table if present
   const customCat = db.prepare("SELECT * FROM custom_categories WHERE name_tr = ?").get(category_tr);
   if (customCat) {
-    // Update custom_categories directly
-    if (ar || en || image !== undefined) {
+    if (ar || en || image !== undefined || hidden !== undefined) {
       const updates = [];
       const params = [];
       if (ar) { updates.push('name_ar = ?'); params.push(ar); }
@@ -462,41 +650,22 @@ router.put('/categories', adminAuth, (req, res) => {
         params.push(customCat.id);
         db.prepare('UPDATE custom_categories SET ' + updates.join(', ') + ' WHERE id = ?').run(...params);
       }
-    } else if (hidden !== undefined) {
-      db.prepare('UPDATE custom_categories SET active = ? WHERE id = ?').run(hidden ? 0 : 1, customCat.id);
     }
-    // Also save in hidden_categories for consistency with public API
-    if (hidden !== undefined) {
-      if (hidden) {
-        db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_tr);
-      } else {
-        db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(category_tr);
-      }
-    }
-    // Also save image in category_images for consistency
-    if (image !== undefined) {
-      if (image) {
-        db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(category_tr, image);
-      } else {
-        db.prepare('DELETE FROM category_images WHERE category_name = ?').run(category_tr);
-      }
-    }
-    // Also save translation overrides for consistency
-    if (ar) {
-      db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
-        VALUES ('category', ?, 'ar', ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP`
-      ).run(category_tr, ar, ar);
-    }
-    if (en) {
-      db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
-        VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP`
-      ).run(category_tr, en, en);
-    }
-    return res.json({ success: true });
   }
-  // Save translations
+
+  // Update local_products category translations
+  if (ar || en) {
+    try {
+      db.prepare(`
+        UPDATE local_products 
+        SET category_ar = CASE WHEN ? <> '' THEN ? ELSE category_ar END,
+            category_en = CASE WHEN ? <> '' THEN ? ELSE category_en END
+        WHERE category_tr = ? OR category_tr LIKE ?
+      `).run(ar || '', ar || '', en || '', en || '', category_tr, category_tr + ' > %');
+    } catch(e) {}
+  }
+
+  // Save translation overrides
   if (ar) {
     db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
       VALUES ('category', ?, 'ar', ?, CURRENT_TIMESTAMP)
@@ -509,11 +678,14 @@ router.put('/categories', adminAuth, (req, res) => {
       ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP`
     ).run(category_tr, en, en);
   }
+
   // Handle hidden state
-  if (hidden) {
-    db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_tr);
-  } else {
-    db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(category_tr);
+  if (hidden !== undefined) {
+    if (hidden) {
+      db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_tr);
+    } else {
+      db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(category_tr);
+    }
   }
   // Handle image
   if (image !== undefined) {

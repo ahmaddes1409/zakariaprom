@@ -76,79 +76,83 @@ async function syncEtkinProducts(db, saveDatabase) {
 
     db.exec('BEGIN TRANSACTION');
 
-    const cleanSql = (val) => "'" + String(val || '').replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'";
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO local_products 
+      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
 
     for (const item of items) {
-      const rawId = item.urun_id || item.id || `etkin_${inserted}`;
-      const pId = 'etkin_' + rawId;
-      const nameTr = item.urun_baslik || item.urun_isim || item.name || '';
-      const nameAr = translateProductName(nameTr, 'ar');
-      const nameEn = translateProductName(nameTr, 'en');
+      try {
+        const rawId = item.urun_id || item.id || `etkin_${inserted}`;
+        const pId = 'etkin_' + rawId;
+        const nameTr = item.urun_baslik || item.urun_isim || item.name || '';
+        const nameAr = translateProductName(nameTr, 'ar');
+        const nameEn = translateProductName(nameTr, 'en');
 
-      const model = item.urun_kodu || item.model || '';
-      let desc = item.urun_aciklama || item.description || '';
-      desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const model = item.urun_kodu || item.model || '';
+        let desc = item.urun_aciklama || item.description || '';
+        desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-      const priceStr = (item.urun_fiyat || item.fiyat || '0').toString().replace(',', '.').trim();
-      const price = parseFloat(priceStr) || 0;
-      const quantity = parseInt(item.toplam_stok || item.stok || 0) || 0;
+        const priceStr = (item.urun_fiyat || item.fiyat || '0').toString().replace(',', '.').trim();
+        const price = parseFloat(priceStr) || 0;
+        const quantity = parseInt(item.toplam_stok || item.stok || 0) || 0;
 
-      let catTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
-      if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
+        let catTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
+        if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
 
-      const topCatTr = catTr.split('>')[0].trim();
-      const catAr = translateCategory(catTr, 'ar');
-      const catEn = translateCategory(catTr, 'en');
+        const topCatTr = catTr.split('>')[0].trim();
+        const catAr = translateCategory(catTr, 'ar');
+        const catEn = translateCategory(catTr, 'en');
 
-      if (topCatTr && !categorySet.has(topCatTr)) {
-        categorySet.set(topCatTr, {
-          tr: topCatTr,
-          ar: translateCategory(topCatTr, 'ar'),
-          en: translateCategory(topCatTr, 'en')
-        });
-      }
-
-      // Collect images resim1..resim9
-      const images = [];
-      for (let i = 1; i <= 9; i++) {
-        const k = `resim${i}`;
-        if (item[k] && typeof item[k] === 'string' && item[k].trim()) {
-          images.push(item[k].trim());
+        if (topCatTr && !categorySet.has(topCatTr)) {
+          categorySet.set(topCatTr, {
+            tr: topCatTr,
+            ar: translateCategory(topCatTr, 'ar'),
+            en: translateCategory(topCatTr, 'en')
+          });
         }
+
+        // Collect images resim1..resim9
+        const images = [];
+        for (let i = 1; i <= 9; i++) {
+          const k = `resim${i}`;
+          if (item[k] && typeof item[k] === 'string' && item[k].trim()) {
+            images.push(item[k].trim());
+          }
+        }
+
+        let colors = [];
+        if (item.urun_renk) colors = [item.urun_renk];
+        let sizes = [];
+        if (item.urun_ebat) sizes = [item.urun_ebat];
+
+        stmt.run(
+          pId,
+          nameTr,
+          nameAr,
+          nameEn,
+          model,
+          desc,
+          price,
+          quantity,
+          catTr,
+          catAr,
+          catEn,
+          JSON.stringify(colors),
+          JSON.stringify(sizes),
+          JSON.stringify(images)
+        );
+
+        inserted++;
+      } catch(itemErr) {
+        console.error('[Etkin Item Error]:', itemErr.message);
       }
-
-      let colors = [];
-      if (item.urun_renk) colors = [item.urun_renk];
-      let sizes = [];
-      if (item.urun_ebat) sizes = [item.urun_ebat];
-
-      const sqlVal = [
-        cleanSql(pId),
-        cleanSql(nameTr),
-        cleanSql(nameAr),
-        cleanSql(nameEn),
-        cleanSql(model),
-        cleanSql(desc),
-        price,
-        quantity,
-        cleanSql(catTr),
-        cleanSql(catAr),
-        cleanSql(catEn),
-        cleanSql(JSON.stringify(colors)),
-        cleanSql(JSON.stringify(sizes)),
-        cleanSql(JSON.stringify(images))
-      ].join(', ');
-
-      db.exec(`INSERT OR REPLACE INTO local_products 
-        (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-        VALUES (${sqlVal}, CURRENT_TIMESTAMP)`);
-
-      inserted++;
     }
 
+    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
     for (const [key, c] of categorySet) {
-      const sqlVal = [cleanSql(c.tr), cleanSql(c.ar), cleanSql(c.en)].join(', ');
-      try { db.exec(`INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (${sqlVal})`); } catch(e) {}
+      try { catStmt.run(c.tr, c.ar, c.en); } catch(e) {}
     }
 
     db.exec('COMMIT');

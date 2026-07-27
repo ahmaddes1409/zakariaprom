@@ -148,8 +148,9 @@ class DatabaseWrapper {
       },
       run(...params) {
         try {
+          const actualParams = (params.length === 1 && Array.isArray(params[0])) ? params[0] : params;
           const stmt = self.sqliteDb.prepare(sql);
-          const boundParams = formatParams(params);
+          const boundParams = formatParams(actualParams);
           if (boundParams.length > 0) {
             stmt.bind(boundParams);
           }

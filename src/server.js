@@ -247,6 +247,15 @@ ensureDbReady();
       let xmlError = null;
       try { xmlParsed = await fetchAndParseProducts(); } catch(e) { xmlError = e.message; }
 
+      let etkinRawCount = 0;
+      let etkinRawErr = null;
+      try {
+        const raw = await getCachedEtkinRaw(database.db);
+        etkinRawCount = raw ? raw.length : 0;
+      } catch(e) {
+        etkinRawErr = e.message;
+      }
+
       let total = 0, xml = 0, etkin = 0;
       try {
         const tRow = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
@@ -257,7 +266,7 @@ ensureDbReady();
         if (eRow) etkin = eRow.count;
       } catch(dbErr) {}
 
-      res.json({ success: true, total, xml, etkin, xmlParsedCount: xmlParsed ? xmlParsed.length : 0, xmlError });
+      res.json({ success: true, total, xml, etkin, xmlParsedCount: xmlParsed ? xmlParsed.length : 0, xmlError, etkinRawCount, etkinRawErr });
     } catch(e) {
       res.json({ success: false, error: e.message });
     }

@@ -50,6 +50,29 @@ async function getExchangeRate(db) {
 }
 // === End Exchange Rate ===
 
+let cachedEtkinRaw = null;
+let lastEtkinFetch = 0;
+
+async function getCachedEtkinRaw(db) {
+  const now = Date.now();
+  if (cachedEtkinRaw && (now - lastEtkinFetch < 30 * 60 * 1000)) {
+    return cachedEtkinRaw;
+  }
+  try {
+    const { fetchEtkinApi } = require('./services/etkinService');
+    const raw = await fetchEtkinApi(db, 'tum_urunler');
+    if (raw && Array.isArray(raw) && raw.length > 0) {
+      cachedEtkinRaw = raw;
+      lastEtkinFetch = now;
+      console.log(`[Etkin Raw Cache] Updated cache with ${raw.length} products`);
+      return cachedEtkinRaw;
+    }
+  } catch(e) {
+    console.error('[Etkin Raw Cache Fetch Error]:', e.message);
+  }
+  return cachedEtkinRaw || [];
+}
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -402,8 +425,7 @@ ensureDbReady();
 
       // Merge live Etkin API products directly
       try {
-        const { fetchEtkinApi } = require('./services/etkinService');
-        const rawEtkin = await fetchEtkinApi(database.db, 'tum_urunler');
+        const rawEtkin = await getCachedEtkinRaw(database.db);
         if (rawEtkin && Array.isArray(rawEtkin) && rawEtkin.length > 0) {
           const etkinProducts = rawEtkin.map(item => {
             const rawId = item.urun_id || item.id || Math.random();

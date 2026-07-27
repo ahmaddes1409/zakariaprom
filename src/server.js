@@ -400,6 +400,69 @@ ensureDbReady();
         });
       }
 
+      // Merge live Etkin API products directly
+      try {
+        const { fetchEtkinApi } = require('./services/etkinService');
+        const rawEtkin = await fetchEtkinApi(database.db, 'tum_urunler');
+        if (rawEtkin && Array.isArray(rawEtkin) && rawEtkin.length > 0) {
+          const etkinProducts = rawEtkin.map(item => {
+            const rawId = item.urun_id || item.id || Math.random();
+            const pId = 'etkin_' + rawId;
+            const nameTr = item.urun_baslik || item.urun_isim || item.name || '';
+            const nameAr = translateProductName(nameTr, 'ar');
+            const nameEn = translateProductName(nameTr, 'en');
+
+            const model = item.urun_kodu || item.model || '';
+            let desc = item.urun_aciklama || item.description || '';
+            desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+            const priceStr = (item.urun_fiyat || item.fiyat || '0').toString().replace(',', '.').trim();
+            const price = parseFloat(priceStr) || 0;
+            const quantity = parseInt(item.toplam_stok || item.stok || 0) || 0;
+
+            let catTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
+            if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
+
+            const catAr = translateCategory(catTr, 'ar');
+            const catEn = translateCategory(catTr, 'en');
+
+            const images = [];
+            for (let i = 1; i <= 9; i++) {
+              const k = `resim${i}`;
+              if (item[k] && typeof item[k] === 'string' && item[k].trim()) {
+                images.push(item[k].trim());
+              }
+            }
+
+            return {
+              id: pId,
+              name: { tr: nameTr, ar: nameAr, en: nameEn },
+              model,
+              categories: { tr: [catTr], ar: [catAr], en: [catEn] },
+              topCategory: {
+                tr: catTr.split('>')[0].trim(),
+                ar: catAr.split('>')[0].trim(),
+                en: catEn.split('>')[0].trim()
+              },
+              description: desc,
+              price,
+              quantity,
+              images,
+              options: [],
+              colors: item.urun_renk ? [item.urun_renk] : [],
+              sizes: item.urun_ebat ? [item.urun_ebat] : [],
+              status: true,
+              isEtkin: true
+            };
+          });
+          const existingEtkinIds = new Set(products.filter(p => p.id.startsWith('etkin_')).map(p => p.id));
+          const newEtkin = etkinProducts.filter(ep => !existingEtkinIds.has(ep.id) && !hiddenProducts.includes(ep.id));
+          products = [...products, ...newEtkin];
+        }
+      } catch(e) {
+        console.error('[Etkin Live Products Error]:', e.message);
+      }
+
       // Filter by category
       if (category && category !== 'all') {
         products = getProductsByCategory(products, category);

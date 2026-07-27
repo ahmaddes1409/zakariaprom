@@ -160,16 +160,18 @@ function ensureDbReady() {
     dbReadyPromise = (async () => {
       await initDatabaseAsync();
       initializeDatabase();
-      try {
-        console.log('[Startup Auto Sync] Pre-populating Karmedya XML feed products...');
-        await syncXmlToDb(database.db, saveDatabase);
-        console.log('[Startup Auto Sync] Pre-populating Etkin Promosyon API products...');
-        const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
-        await syncEtkinProducts(database.db, saveDatabase);
-        scheduleDailySync(database.db, saveDatabase);
-      } catch (e) {
-        console.error('[Startup Sync Error]:', e.message);
-      }
+      setTimeout(async () => {
+        try {
+          console.log('[Startup Auto Sync] Syncing Karmedya XML feed products...');
+          await syncXmlToDb(database.db, saveDatabase);
+          console.log('[Startup Auto Sync] Syncing Etkin Promosyon API products...');
+          const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
+          await syncEtkinProducts(database.db, saveDatabase);
+          scheduleDailySync(database.db, saveDatabase);
+        } catch (e) {
+          console.error('[Startup Sync Error]:', e.message);
+        }
+      }, 100);
     })();
   }
   return dbReadyPromise;

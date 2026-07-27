@@ -279,24 +279,31 @@ ensureDbReady();
   // Public trigger to run full feed sync and get DB counts
   app.get('/api/sync-all-now', async (req, res) => {
     try {
-      console.log('[Manual Sync-All] Starting XML feed sync...');
-      await syncXmlToDb(database.db, saveDatabase);
-      
-      let etkinRes = null;
-      try {
-        const { syncEtkinProducts } = require('./services/etkinService');
-        etkinRes = await syncEtkinProducts(database.db, saveDatabase);
-      } catch (etkinErr) {
-        console.warn('[Manual Sync-All] Etkin sync skipped:', etkinErr.message);
-        etkinRes = { success: false, error: etkinErr.message };
-      }
+      setTimeout(async () => {
+        try {
+          console.log('[Background Sync] Starting XML feed sync...');
+          await syncXmlToDb(database.db, saveDatabase);
+          console.log('[Background Sync] Starting Etkin API sync...');
+          const { syncEtkinProducts } = require('./services/etkinService');
+          await syncEtkinProducts(database.db, saveDatabase);
+        } catch (syncErr) {
+          console.error('[Background Sync Trigger Error]:', syncErr.message);
+        }
+      }, 10);
 
-      const total = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
-      const xml = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
-      const etkin = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
-      res.json({ success: true, total: total ? total.count : 0, xml: xml ? xml.count : 0, etkin: etkin ? etkin.count : 0, etkinRes });
+      let total = 0, xml = 0, etkin = 0;
+      try {
+        const tRow = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+        if (tRow) total = tRow.count;
+        const xRow = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+        if (xRow) xml = xRow.count;
+        const eRow = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+        if (eRow) etkin = eRow.count;
+      } catch(dbErr) {}
+
+      res.json({ success: true, message: "Background sync started successfully", total, xml, etkin });
     } catch (e) {
-      res.status(500).json({ error: e.message, stack: e.stack });
+      res.status(500).json({ error: e.message });
     }
   });
 

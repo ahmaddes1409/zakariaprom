@@ -201,6 +201,13 @@ ensureDbReady();
     }
   });
 
+  app.get('/api/restart-node-worker', (req, res) => {
+    res.json({ message: 'Restarting Node worker process...' });
+    setTimeout(() => {
+      process.exit(0);
+    }, 100);
+  });
+
   app.get('/api/sync-xml-now', async (req, res) => {
     try {
       console.log('[Manual XML Sync] Starting XML feed sync...');

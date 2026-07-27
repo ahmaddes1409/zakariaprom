@@ -72,11 +72,7 @@ async function syncEtkinProducts(db, saveDatabase) {
 
     db.exec('BEGIN TRANSACTION');
 
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO local_products 
-      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `);
+    const cleanSql = (val) => "'" + String(val || '').replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'";
 
     for (const item of items) {
       const rawId = item.urun_id || item.id || `etkin_${inserted}`;
@@ -86,7 +82,8 @@ async function syncEtkinProducts(db, saveDatabase) {
       const nameEn = translateProductName(nameTr, 'en');
 
       const model = item.urun_kodu || item.model || '';
-      const desc = item.urun_aciklama || item.description || '';
+      let desc = item.urun_aciklama || item.description || '';
+      desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
       const priceStr = (item.urun_fiyat || item.fiyat || '0').toString().replace(',', '.').trim();
       const price = parseFloat(priceStr) || 0;
@@ -121,29 +118,33 @@ async function syncEtkinProducts(db, saveDatabase) {
       let sizes = [];
       if (item.urun_ebat) sizes = [item.urun_ebat];
 
-      stmt.run([
-        pId,
-        nameTr,
-        nameAr,
-        nameEn,
-        model,
-        desc,
+      const sqlVal = [
+        cleanSql(pId),
+        cleanSql(nameTr),
+        cleanSql(nameAr),
+        cleanSql(nameEn),
+        cleanSql(model),
+        cleanSql(desc),
         price,
         quantity,
-        catTr,
-        catAr,
-        catEn,
-        JSON.stringify(colors),
-        JSON.stringify(sizes),
-        JSON.stringify(images)
-      ]);
+        cleanSql(catTr),
+        cleanSql(catAr),
+        cleanSql(catEn),
+        cleanSql(JSON.stringify(colors)),
+        cleanSql(JSON.stringify(sizes)),
+        cleanSql(JSON.stringify(images))
+      ].join(', ');
+
+      db.exec(`INSERT OR REPLACE INTO local_products 
+        (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+        VALUES (${sqlVal}, CURRENT_TIMESTAMP)`);
 
       inserted++;
     }
 
-    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
     for (const [key, c] of categorySet) {
-      catStmt.run([c.tr, c.ar, c.en]);
+      const sqlVal = [cleanSql(c.tr), cleanSql(c.ar), cleanSql(c.en)].join(', ');
+      try { db.exec(`INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (${sqlVal})`); } catch(e) {}
     }
 
     db.exec('COMMIT');

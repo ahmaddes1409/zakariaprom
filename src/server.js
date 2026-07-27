@@ -362,14 +362,19 @@ ensureDbReady();
         }
       }
       
-      const hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id);
-      const hiddenCategories = database.db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
+      let hiddenProducts = [];
+      try { hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id); } catch(e) {}
 
-      const categoryOverrides = database.db.prepare('SELECT * FROM product_category_overrides').all();
+      let hiddenCategories = [];
+      try { hiddenCategories = database.db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name); } catch(e) {}
+
+      let categoryOverrides = [];
+      try { categoryOverrides = database.db.prepare('SELECT * FROM product_category_overrides').all(); } catch(e) {}
       const categoryOverrideMap = {};
       categoryOverrides.forEach(o => { categoryOverrideMap[o.product_id] = o; });
 
-      const nameOverrides = database.db.prepare("SELECT * FROM translation_overrides WHERE type = 'product'").all();
+      let nameOverrides = [];
+      try { nameOverrides = database.db.prepare("SELECT * FROM translation_overrides WHERE type = 'product'").all(); } catch(e) {}
       const nameOverrideMap = {};
       nameOverrides.forEach(o => {
         if (!nameOverrideMap[o.original_key]) nameOverrideMap[o.original_key] = {};

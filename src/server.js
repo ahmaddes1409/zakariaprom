@@ -163,18 +163,13 @@ function ensureDbReady() {
       try {
         console.log('[Startup Auto Sync] Pre-populating Karmedya XML feed products...');
         await syncXmlToDb(database.db, saveDatabase);
+        console.log('[Startup Auto Sync] Pre-populating Etkin Promosyon API products...');
+        const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
+        await syncEtkinProducts(database.db, saveDatabase);
+        scheduleDailySync(database.db, saveDatabase);
       } catch (e) {
-        console.error('[Startup XML Sync Error]:', e.message);
+        console.error('[Startup Sync Error]:', e.message);
       }
-      setTimeout(async () => {
-        try {
-          const { scheduleDailySync, syncEtkinProducts } = require('./services/etkinService');
-          await syncEtkinProducts(database.db, saveDatabase);
-          scheduleDailySync(database.db, saveDatabase);
-        } catch (e) {
-          console.error('[Startup Etkin Sync Error]:', e.message);
-        }
-      }, 1000);
     })();
   }
   return dbReadyPromise;

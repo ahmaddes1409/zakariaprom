@@ -519,12 +519,20 @@ router.put('/products/:id/visibility', adminAuth, async (req, res) => {
   try {
     const db = getDb();
     const { hidden } = req.body;
-    const productId = req.params.id;
+    const productId = String(req.params.id);
+    const rawId = productId.replace(/^(etkin_|xml_|local_)/, '');
+
     if (hidden) {
       db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(productId);
+      db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(rawId);
+      db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run('etkin_' + rawId);
+      db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run('xml_' + rawId);
+      db.prepare('UPDATE local_products SET hidden = 1 WHERE product_id = ? OR id = ? OR product_id = ?').run(productId, Number(rawId) || 0, rawId);
     } else {
-      db.prepare('DELETE FROM hidden_products WHERE product_id = ?').run(productId);
+      db.prepare('DELETE FROM hidden_products WHERE product_id = ? OR product_id = ? OR product_id = ? OR product_id = ?').run(productId, rawId, 'etkin_' + rawId, 'xml_' + rawId);
+      db.prepare('UPDATE local_products SET hidden = 0 WHERE product_id = ? OR id = ? OR product_id = ?').run(productId, Number(rawId) || 0, rawId);
     }
+    database.saveDatabase();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -636,8 +644,11 @@ router.put('/categories', adminAuth, (req, res) => {
   const { category_tr, ar, en, hidden, image } = req.body;
   if (!category_tr) return res.status(400).json({ error: 'category_tr required' });
 
+  const { normalizeCategoryName } = require('../translations');
+  const normCat = normalizeCategoryName(category_tr);
+
   // Update custom_categories table if present
-  const customCat = db.prepare("SELECT * FROM custom_categories WHERE name_tr = ?").get(category_tr);
+  const customCat = db.prepare("SELECT * FROM custom_categories WHERE name_tr = ? OR name_tr = ?").get(category_tr, normCat);
   if (customCat) {
     if (ar || en || image !== undefined || hidden !== undefined) {
       const updates = [];
@@ -660,41 +671,54 @@ router.put('/categories', adminAuth, (req, res) => {
         UPDATE local_products 
         SET category_ar = CASE WHEN ? <> '' THEN ? ELSE category_ar END,
             category_en = CASE WHEN ? <> '' THEN ? ELSE category_en END
-        WHERE category_tr = ? OR category_tr LIKE ?
-      `).run(ar || '', ar || '', en || '', en || '', category_tr, category_tr + ' > %');
+        WHERE category_tr = ? OR category_tr = ? OR category_tr LIKE ?
+      `).run(ar || '', ar || '', en || '', en || '', category_tr, normCat, category_tr + ' > %');
     } catch(e) {}
   }
 
   // Save translation overrides
   if (ar) {
-    db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
-      VALUES ('category', ?, 'ar', ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP`
-    ).run(category_tr, ar, ar);
+    db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'ar'`).run(category_tr);
+    db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'ar', ?, CURRENT_TIMESTAMP)`).run(category_tr, ar);
+    if (normCat !== category_tr) {
+      db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'ar'`).run(normCat);
+      db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'ar', ?, CURRENT_TIMESTAMP)`).run(normCat, ar);
+    }
   }
   if (en) {
-    db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
-      VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP`
-    ).run(category_tr, en, en);
+    db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'en'`).run(category_tr);
+    db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)`).run(category_tr, en);
+    if (normCat !== category_tr) {
+      db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'en'`).run(normCat);
+      db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)`).run(normCat, en);
+    }
   }
 
   // Handle hidden state
   if (hidden !== undefined) {
     if (hidden) {
       db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_tr);
+      if (normCat !== category_tr) {
+        db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(normCat);
+      }
     } else {
-      db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(category_tr);
+      db.prepare('DELETE FROM hidden_categories WHERE category_name = ? OR category_name = ?').run(category_tr, normCat);
     }
   }
+
   // Handle image
   if (image !== undefined) {
     if (image) {
       db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(category_tr, image);
+      if (normCat !== category_tr) {
+        db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(normCat, image);
+      }
     } else {
-      db.prepare('DELETE FROM category_images WHERE category_name = ?').run(category_tr);
+      db.prepare('DELETE FROM category_images WHERE category_name = ? OR category_name = ?').run(category_tr, normCat);
     }
   }
+
+  database.saveDatabase();
   res.json({ success: true });
 });
 
@@ -707,15 +731,150 @@ router.get('/categories/hidden', adminAuth, (req, res) => {
 router.post('/categories/hide', adminAuth, (req, res) => {
   const db = getDb();
   const { category_name } = req.body;
+  const { normalizeCategoryName } = require('../translations');
+  const normCat = normalizeCategoryName(category_name);
+
   db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_name);
+  if (normCat !== category_name) {
+    db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(normCat);
+  }
+  db.prepare('UPDATE custom_categories SET active = 0 WHERE name_tr = ? OR name_tr = ?').run(category_name, normCat);
+
+  database.saveDatabase();
   res.json({ success: true });
 });
 
 router.post('/categories/show', adminAuth, (req, res) => {
   const db = getDb();
   const { category_name } = req.body;
-  db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(category_name);
+  const { normalizeCategoryName } = require('../translations');
+  const normCat = normalizeCategoryName(category_name);
+
+  db.prepare('DELETE FROM hidden_categories WHERE category_name = ? OR category_name = ?').run(category_name, normCat);
+  db.prepare('UPDATE custom_categories SET active = 1 WHERE name_tr = ? OR name_tr = ?').run(category_name, normCat);
+
+  database.saveDatabase();
   res.json({ success: true });
+});
+
+// ===== CUSTOM CATEGORIES ENDPOINTS =====
+router.get('/custom-categories', adminAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const categories = db.prepare('SELECT * FROM custom_categories ORDER BY sort_order ASC, id ASC').all();
+    res.json(categories);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/custom-categories', adminAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const { name_tr, name_ar, name_en, image_url, sort_order = 0 } = req.body;
+    const cleanTr = (name_tr || name_ar || '').trim();
+    const cleanAr = (name_ar || name_tr || '').trim();
+    const cleanEn = (name_en || name_tr || '').trim();
+
+    if (!cleanTr) {
+      return res.status(400).json({ error: 'Category name is required' });
+    }
+
+    const stmt = db.prepare(`
+      INSERT INTO custom_categories (name_tr, name_ar, name_en, image_url, sort_order, active, created_at)
+      VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+    `);
+    stmt.run(cleanTr, cleanAr, cleanEn, image_url || '', sort_order);
+
+    if (cleanAr) {
+      db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'ar'`).run(cleanTr);
+      db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'ar', ?, CURRENT_TIMESTAMP)`).run(cleanTr, cleanAr);
+    }
+    if (cleanEn) {
+      db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'en'`).run(cleanTr);
+      db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)`).run(cleanTr, cleanEn);
+    }
+    if (image_url) {
+      db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(cleanTr, image_url);
+    }
+
+    database.saveDatabase();
+    res.json({ success: true, message: 'Category added successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put('/custom-categories/:id', adminAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const { name_tr, name_ar, name_en, image_url, active, sort_order } = req.body;
+    const catId = req.params.id;
+    const existing = db.prepare('SELECT * FROM custom_categories WHERE id = ?').get(catId);
+    if (!existing) return res.status(404).json({ error: 'Category not found' });
+
+    const updates = [];
+    const params = [];
+    if (name_tr !== undefined) { updates.push('name_tr = ?'); params.push(name_tr); }
+    if (name_ar !== undefined) { updates.push('name_ar = ?'); params.push(name_ar); }
+    if (name_en !== undefined) { updates.push('name_en = ?'); params.push(name_en); }
+    if (image_url !== undefined) { updates.push('image_url = ?'); params.push(image_url); }
+    if (active !== undefined) { updates.push('active = ?'); params.push(active ? 1 : 0); }
+    if (sort_order !== undefined) { updates.push('sort_order = ?'); params.push(sort_order); }
+
+    if (updates.length > 0) {
+      params.push(catId);
+      db.prepare('UPDATE custom_categories SET ' + updates.join(', ') + ' WHERE id = ?').run(...params);
+    }
+
+    const targetTr = name_tr || existing.name_tr;
+    if (name_ar) {
+      db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'ar'`).run(targetTr);
+      db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'ar', ?, CURRENT_TIMESTAMP)`).run(targetTr, name_ar);
+    }
+    if (name_en) {
+      db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'en'`).run(targetTr);
+      db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)`).run(targetTr, name_en);
+    }
+    if (image_url !== undefined) {
+      if (image_url) {
+        db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(targetTr, image_url);
+      } else {
+        db.prepare('DELETE FROM category_images WHERE category_name = ?').run(targetTr);
+      }
+    }
+
+    if (active !== undefined) {
+      if (active === 0 || active === false) {
+        db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(targetTr);
+      } else {
+        db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(targetTr);
+      }
+    }
+
+    database.saveDatabase();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/custom-categories/:id', adminAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const catId = req.params.id;
+    const existing = db.prepare('SELECT * FROM custom_categories WHERE id = ?').get(catId);
+    if (existing) {
+      db.prepare('DELETE FROM custom_categories WHERE id = ?').run(catId);
+      db.prepare('DELETE FROM category_images WHERE category_name = ?').run(existing.name_tr);
+      db.prepare('DELETE FROM hidden_categories WHERE category_name = ?').run(existing.name_tr);
+      db.prepare("DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ?").run(existing.name_tr);
+    }
+    database.saveDatabase();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ===== ORDERS =====
@@ -1192,7 +1351,19 @@ router.delete('/local-products/:id', adminAuth, (req, res) => {
 router.put('/local-products/:id/visibility', adminAuth, (req, res) => {
   const db = getDb();
   const { hidden } = req.body;
-  db.prepare('UPDATE local_products SET hidden = ? WHERE id = ?').run(hidden ? 1 : 0, req.params.id);
+  const id = req.params.id;
+  const lp = db.prepare('SELECT * FROM local_products WHERE id = ? OR product_id = ?').get(Number(id) || 0, id);
+  const pId = lp ? (lp.product_id || ('local_' + lp.id)) : String(id);
+  const rawId = pId.replace(/^(etkin_|xml_|local_)/, '');
+
+  db.prepare('UPDATE local_products SET hidden = ? WHERE id = ? OR product_id = ?').run(hidden ? 1 : 0, Number(id) || 0, id);
+  if (hidden) {
+    db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(pId);
+    db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(rawId);
+    db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(String(id));
+  } else {
+    db.prepare('DELETE FROM hidden_products WHERE product_id = ? OR product_id = ? OR product_id = ?').run(pId, rawId, String(id));
+  }
   database.saveDatabase();
   res.json({ success: true });
 });

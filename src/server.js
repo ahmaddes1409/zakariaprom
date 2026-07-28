@@ -439,11 +439,14 @@ ensureDbReady();
         }
       }
       
+      const { normalizeCategoryName } = require('./translations');
       let hiddenProducts = [];
-      try { hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => h.product_id); } catch(e) {}
+      try { hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => String(h.product_id)); } catch(e) {}
 
       let hiddenCategories = [];
       try { hiddenCategories = database.db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name); } catch(e) {}
+      const hiddenCategorySet = new Set(hiddenCategories.map(c => normalizeCategoryName(c)));
+      hiddenCategories.forEach(c => hiddenCategorySet.add(c));
 
       let categoryOverrides = [];
       try { categoryOverrides = database.db.prepare('SELECT * FROM product_category_overrides').all(); } catch(e) {}
@@ -470,9 +473,11 @@ ensureDbReady();
       const seenProductKeys = new Set();
 
       for (const lp of dbRows) {
-        const pId = lp.product_id || ('local_' + lp.id);
-        
-        if (hiddenProducts.includes(pId)) continue;
+        if (lp.hidden === 1) continue;
+        const pId = String(lp.product_id || ('local_' + lp.id));
+        const rawId = pId.replace(/^(etkin_|xml_|local_)/, '');
+
+        if (hiddenProducts.includes(pId) || hiddenProducts.includes(rawId) || hiddenProducts.includes(String(lp.id)) || (lp.model && hiddenProducts.includes(lp.model))) continue;
 
         // Deduplicate by product_id
         if (seenProductKeys.has(pId)) continue;
@@ -499,7 +504,9 @@ ensureDbReady();
         }
 
         // Skip hidden categories
-        if (hiddenCategories.includes(topCatTr)) continue;
+        const normCatTr = normalizeCategoryName(catTr);
+        const normTopCatTr = normalizeCategoryName(topCatTr);
+        if (hiddenCategorySet.has(topCatTr) || hiddenCategorySet.has(catTr) || hiddenCategorySet.has(normCatTr) || hiddenCategorySet.has(normTopCatTr)) continue;
 
         let nameTr = lp.name_tr || '';
         let nameAr = lp.name_ar || nameTr;
@@ -599,7 +606,13 @@ ensureDbReady();
             };
           });
           const existingEtkinIds = new Set(products.filter(p => p.id.startsWith('etkin_')).map(p => p.id));
-          const newEtkin = etkinProducts.filter(ep => !existingEtkinIds.has(ep.id) && !hiddenProducts.includes(ep.id));
+          const newEtkin = etkinProducts.filter(ep => {
+            const rawId = String(ep.id).replace(/^etkin_/, '');
+            return !existingEtkinIds.has(ep.id) &&
+                   !hiddenProducts.includes(ep.id) &&
+                   !hiddenProducts.includes(rawId) &&
+                   !(ep.model && hiddenProducts.includes(ep.model));
+          });
           products = [...products, ...newEtkin];
         }
       } catch(e) {
@@ -637,10 +650,12 @@ ensureDbReady();
       }
 
       // Pagination
+      const pageNum = parseInt(page) || 1;
+      const limitNum = parseInt(limit) || 24;
       const total = products.length;
-      const totalPages = Math.ceil(total / limit);
-      const offset = (page - 1) * limit;
-      const paginatedProducts = products.slice(offset, offset + parseInt(limit));
+      const totalPages = Math.ceil(total / limitNum);
+      const start = (pageNum - 1) * limitNum;
+      const paginatedProducts = products.slice(start, start + limitNum);
 
       // Add USD price to products
       let exRate = null;
@@ -653,8 +668,8 @@ ensureDbReady();
       res.json({
         products: productsWithUsd,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: pageNum,
+          limit: limitNum,
           total,
           totalPages
         },
@@ -721,9 +736,17 @@ ensureDbReady();
 
       // Filter hidden categories
       const hiddenCategories = safeQuery('SELECT category_name FROM hidden_categories').map(h => h ? h.category_name : null).filter(Boolean);
+      const hiddenCategorySet = new Set(hiddenCategories.map(c => normalizeCategoryName(c)));
+      hiddenCategories.forEach(c => hiddenCategorySet.add(c));
       products = (Array.isArray(products) ? products : []).filter(p => {
         if (!p || !p.categories || !Array.isArray(p.categories.tr)) return true;
-        return !p.categories.tr.some(c => typeof c === 'string' && hiddenCategories.includes(c.split(' > ')[0]));
+        return !p.categories.tr.some(c => {
+          if (typeof c !== 'string') return false;
+          const top = c.split(' > ')[0].trim();
+          const normC = normalizeCategoryName(c);
+          const normT = normalizeCategoryName(top);
+          return hiddenCategorySet.has(c) || hiddenCategorySet.has(top) || hiddenCategorySet.has(normC) || hiddenCategorySet.has(normT);
+        });
       });
 
       let categories = [];
@@ -787,7 +810,8 @@ ensureDbReady();
       // Add custom categories (that are active and not hidden)
       const customCats = safeQuery('SELECT * FROM custom_categories WHERE active = 1');
       customCats.forEach(cc => {
-        if (cc && cc.name_tr && !hiddenCategories.includes(cc.name_tr) && !result.find(r => r && r.tr === cc.name_tr)) {
+        const normCc = cc ? normalizeCategoryName(cc.name_tr) : '';
+        if (cc && cc.name_tr && !hiddenCategorySet.has(cc.name_tr) && !hiddenCategorySet.has(normCc) && !result.find(r => r && (r.tr === cc.name_tr || normalizeCategoryName(r.tr) === normCc))) {
           const catImage = imageMap[cc.name_tr] || cc.image_url || '';
           const catOverrides = overrideMap[cc.name_tr] || {};
           result.push({

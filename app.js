@@ -1,4 +1,4 @@
-// Hostinger LiteSpeed / Passenger Node entry point (v1.2.8)
+// Hostinger LiteSpeed / Passenger Node entry point (v1.2.9)
 const app = require('./src/server.js');
 
 module.exports = app;

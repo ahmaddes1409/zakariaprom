@@ -244,6 +244,7 @@ function parseProduct(item) {
 }
 
 function getCategories(products) {
+  const { normalizeCategoryName } = require('./translations');
   const catMap = {};
   if (!Array.isArray(products)) return [];
 
@@ -262,6 +263,8 @@ function getCategories(products) {
       if (rawTr.includes('|')) rawTr = rawTr.split('|')[0].trim();
       if (rawAr.includes('|')) rawAr = rawAr.split('|')[0].trim();
       if (rawEn.includes('|')) rawEn = rawEn.split('|')[0].trim();
+
+      rawTr = normalizeCategoryName(rawTr);
 
       const topTr = rawTr.split(' > ')[0].trim();
       const topAr = rawAr.split(' > ')[0].trim();
@@ -301,8 +304,11 @@ function getCategories(products) {
 }
 
 function getProductsByCategory(products, category) {
+  const { normalizeCategoryName } = require('./translations');
+  const normSearchCat = normalizeCategoryName(category);
+
   return products.filter(p => {
-    return p.categories.tr.some(c => c.includes(category)) ||
+    return p.categories.tr.some(c => normalizeCategoryName(c) === normSearchCat || c.includes(category) || c.includes(normSearchCat)) ||
            p.categories.ar.some(c => c.includes(category)) ||
            p.categories.en.some(c => c.includes(category));
   });

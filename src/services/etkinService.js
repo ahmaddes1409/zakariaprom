@@ -1,4 +1,4 @@
-const { translateCategory, translateProductName } = require('../translations');
+const { translateCategory, translateProductName, normalizeCategoryName } = require('../translations');
 
 const ETKIN_API_URL = 'http://www.birikimpromosyon.com/api/json/';
 const DEFAULT_HASH = '655af889baa94a38ae39ec4703be2021';
@@ -102,8 +102,9 @@ async function syncEtkinProducts(db, saveDatabase) {
 
         let catTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
         if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
+        catTr = normalizeCategoryName(catTr);
 
-        const topCatTr = catTr.split('>')[0].trim();
+        const topCatTr = normalizeCategoryName(catTr.split('>')[0].trim());
         const catAr = translateCategory(catTr, 'ar');
         const catEn = translateCategory(catTr, 'en');
 

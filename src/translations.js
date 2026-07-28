@@ -332,6 +332,54 @@ function getSortedTerms() {
   return cachedSortedTerms;
 }
 
+function normalizeCategoryName(catTr) {
+  if (!catTr) return 'Promosyon Ürünleri';
+  let str = String(catTr).trim();
+  str = str.replace(/&gt;/g, '>').trim();
+
+  // Plastic Pens
+  if (str === 'Kalemler > Plastik Kalem' || str === 'Plastik Kalem' || str === 'Plastik Kalemleri' || str === 'Promosyon Kalemler > Plastik Kalem') {
+    return 'Plastik Kalemler';
+  }
+
+  // Metal Pens
+  if (str === 'Kalemler > Metal Kalem' || str === 'Metal Kalem' || str === 'Metal Kalemleri' || str === 'Metal Tükenmez - Roller Kalemler') {
+    return 'Metal Kalemler';
+  }
+
+  // Pen Sets
+  if (str === 'Kalem Setleri > Kalem Seti' || str === 'KalemSetleri > Kalem Seti' || str === 'Kalem Seti' || str === 'Hediyelik Kalem Setleri') {
+    return 'Kalem Setleri';
+  }
+
+  // Wall Clocks
+  if (str === 'Saatler > Plastik Duvar Saati' || str === 'Plastik Duvar Saati' || str === 'Duvar Saatleri' || str === 'Saatler > Duvar Saati') {
+    return 'Plastik Duvar Saatleri';
+  }
+
+  // USB Drives
+  if (str === 'Teknoloji Ürünleri > USB Bellek' || str === 'Usb Bellekler' || str === 'USB Bellek') {
+    return 'USB Bellekler';
+  }
+
+  // Powerbanks
+  if (str === 'Teknoloji Ürünleri > Powerbank' || str === 'Powerbanklar' || str === 'Power Bank') {
+    return 'Powerbank';
+  }
+
+  // Thermoses
+  if (str === 'Termos - Matara > Diğer Termos - Matara' || str === 'Termos - Mug' || str === 'Termos Bardaklar (Mug)') {
+    return 'Termoslar';
+  }
+
+  // Agendas / Notebooks
+  if (str === 'Ajanda - Defter' || str === 'Not Defterleri' || str === 'Notluk - Defterler') {
+    return 'Defterler';
+  }
+
+  return str;
+}
+
 function translateProductName(name, targetLang) {
   if (targetLang === 'tr' || !name) return name;
   let translated = name;
@@ -345,8 +393,12 @@ function translateProductName(name, targetLang) {
 }
 
 function translateCategory(category, targetLang) {
-  if (targetLang === 'tr') return category;
-  const parts = category.split(' > ');
+  const normCat = normalizeCategoryName(category);
+  if (categoryTranslations[normCat] && categoryTranslations[normCat][targetLang]) {
+    return categoryTranslations[normCat][targetLang];
+  }
+  if (targetLang === 'tr') return normCat;
+  const parts = normCat.split(' > ');
   const translatedParts = parts.map(part => {
     const trimmed = part.trim();
     if (categoryTranslations[trimmed] && categoryTranslations[trimmed][targetLang]) {
@@ -357,4 +409,4 @@ function translateCategory(category, targetLang) {
   return translatedParts.join(' > ');
 }
 
-module.exports = { categoryTranslations, termTranslations, uiTranslations, translateProductName, translateCategory };
+module.exports = { categoryTranslations, termTranslations, uiTranslations, translateProductName, translateCategory, normalizeCategoryName };

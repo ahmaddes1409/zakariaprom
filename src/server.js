@@ -142,11 +142,13 @@ async function syncXmlToDb(db, saveDatabase) {
 
     for (const p of products) {
       if (!p.id) continue;
+      const { translateCategory, translateProductName, normalizeCategoryName } = require('./translations');
       let rawCat = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : 'Promosyon Ürünleri';
       if (rawCat.includes('|')) {
         rawCat = rawCat.split('|')[0].trim();
       }
-      const topCatTr = rawCat.split('>')[0].trim() || 'Promosyon Ürünleri';
+      rawCat = normalizeCategoryName(rawCat);
+      const topCatTr = normalizeCategoryName(rawCat.split('>')[0].trim() || 'Promosyon Ürünleri');
       const catTr = rawCat;
       const catAr = (p.categories && p.categories.ar && p.categories.ar.length > 0) ? p.categories.ar[p.categories.ar.length - 1] : translateCategory(catTr, 'ar');
       const catEn = (p.categories && p.categories.en && p.categories.en.length > 0) ? p.categories.en[p.categories.en.length - 1] : translateCategory(catTr, 'en');
@@ -227,12 +229,43 @@ const adminRoutes = require('./routes/admin');
 const userRoutes = require('./routes/user');
 const chatbotRoutes = require('./routes/chatbot');
 
+function migrateCategories(db) {
+  if (!db) return;
+  try {
+    const { normalizeCategoryName, translateCategory } = require('./translations');
+    const rows = db.prepare('SELECT id, category_tr, top_category_tr FROM local_products').all();
+    let updated = 0;
+    const updateStmt = db.prepare('UPDATE local_products SET category_tr = ?, category_ar = ?, category_en = ?, top_category_tr = ? WHERE id = ?');
+
+    db.exec('BEGIN TRANSACTION');
+    for (const r of rows) {
+      const normCat = normalizeCategoryName(r.category_tr);
+      const normTop = normalizeCategoryName(r.top_category_tr || normCat);
+      if (normCat !== r.category_tr || normTop !== r.top_category_tr) {
+        const catAr = translateCategory(normCat, 'ar');
+        const catEn = translateCategory(normCat, 'en');
+        updateStmt.run(normCat, catAr, catEn, normTop, r.id);
+        updated++;
+      }
+    }
+    db.exec('COMMIT');
+    if (updated > 0) {
+      console.log(`[Category Migration] Successfully merged ${updated} products under clean unified categories!`);
+      if (typeof saveDatabase === 'function') saveDatabase();
+    }
+  } catch(e) {
+    try { db.exec('ROLLBACK'); } catch(_) {}
+    console.error('[Category Migration Error]:', e.message);
+  }
+}
+
 let dbReadyPromise = null;
 function ensureDbReady() {
   if (!dbReadyPromise) {
     dbReadyPromise = (async () => {
       await initDatabaseAsync();
       initializeDatabase();
+      migrateCategories(database.db);
       setTimeout(async () => {
         try {
           console.log('[Startup Auto Sync] Syncing Karmedya XML feed products...');
@@ -240,6 +273,7 @@ function ensureDbReady() {
           console.log('[Startup Auto Sync] Syncing Etkin Promosyon API products...');
           const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
           await syncEtkinProducts(database.db, saveDatabase);
+          migrateCategories(database.db);
           scheduleDailySync(database.db, saveDatabase);
         } catch (e) {
           console.error('[Startup Sync Error]:', e.message);

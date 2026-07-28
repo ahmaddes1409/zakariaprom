@@ -19,6 +19,18 @@ function fixImageUrl(url: string): string {
   return url;
 }
 
+function cleanSocialUrl(url?: string): string {
+  if (!url) return '';
+  let str = url.trim();
+  if (str.startsWith('/http://') || str.startsWith('/https://')) {
+    str = str.substring(1);
+  }
+  if (!str.startsWith('http://') && !str.startsWith('https://')) {
+    str = `https://${str}`;
+  }
+  return str;
+}
+
 export default function Footer() {
   const { language, t, settings } = useLanguage();
 
@@ -32,7 +44,12 @@ export default function Footer() {
   const phoneSyria = settings.phone2 || "+963112242368";
   const email = settings.email || "info@zakariaprom.com";
   const whatsapp = settings.whatsapp || "905428104208";
-  
+
+  const facebookUrl = cleanSocialUrl(settings.social_facebook);
+  const instagramUrl = cleanSocialUrl(settings.social_instagram);
+  const twitterUrl = cleanSocialUrl(settings.social_twitter);
+  const linkedinUrl = cleanSocialUrl(settings.social_linkedin);
+
   // Parse address into branches (separated by |)
   const addressKey = `address_${language}` as keyof typeof settings;
   const fullAddress = (settings[addressKey] as string) || "";
@@ -118,27 +135,27 @@ export default function Footer() {
           <div>
             <h3 className="font-bold text-white mb-4 text-lg">{t("footer.followUs")}</h3>
             <div className="flex gap-3 mb-4">
-              {settings.social_facebook && (
-                <a href={settings.social_facebook} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors">
+              {facebookUrl && (
+                <a href={facebookUrl} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors" title="Facebook">
                   <Facebook className="w-4 h-4" />
                 </a>
               )}
-              {settings.social_instagram && (
-                <a href={settings.social_instagram} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors">
+              {instagramUrl && (
+                <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors" title="Instagram">
                   <Instagram className="w-4 h-4" />
                 </a>
               )}
-              {settings.social_twitter && (
-                <a href={settings.social_twitter} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors">
+              {twitterUrl && (
+                <a href={twitterUrl} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors" title="Twitter/X">
                   <Twitter className="w-4 h-4" />
                 </a>
               )}
-              {settings.social_linkedin && (
-                <a href={settings.social_linkedin} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors">
+              {linkedinUrl && (
+                <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#00a8a8] transition-colors" title="LinkedIn">
                   <Linkedin className="w-4 h-4" />
                 </a>
               )}
-              <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#25d366] transition-colors">
+              <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-white/10 rounded-lg flex items-center justify-center hover:bg-[#25d366] transition-colors" title="WhatsApp">
                 <MessageCircle className="w-4 h-4" />
               </a>
             </div>

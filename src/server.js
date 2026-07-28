@@ -838,36 +838,61 @@ ensureDbReady();
     }
   });
   app.get('/api/settings/public', (req, res) => {
-    const settings = db.prepare('SELECT * FROM settings').all();
-    const settingsObj = {};
-    settings.forEach(s => { settingsObj[s.key] = s.value; });
-    // Only expose public settings
-    const publicKeys = ['site_name_ar', 'site_name_en', 'site_name_tr', 'site_slogan_ar', 'site_slogan_en', 'site_slogan_tr', 
-      'phone', 'phone2', 'whatsapp', 'email', 'address_ar', 'address_en', 'address_tr', 'currency',
-      'social_facebook', 'social_instagram', 'social_twitter', 'social_linkedin', 'chatbot_enabled',
-      'chatbot_welcome_ar', 'chatbot_welcome_en', 'chatbot_welcome_tr', 'logo_type', 'logo_text', 'logo_url'];
-    const publicSettings = {};
-    publicKeys.forEach(k => { if (settingsObj[k] !== undefined) publicSettings[k] = settingsObj[k]; });
-    res.json(publicSettings);
+    try {
+      const db = database.db;
+      const settings = db.prepare('SELECT * FROM settings').all();
+      const settingsObj = {};
+      settings.forEach(s => { settingsObj[s.key] = s.value; });
+
+      // Clean social media URLs if they start with extra slashes
+      ['social_facebook', 'social_instagram', 'social_twitter', 'social_linkedin'].forEach(sk => {
+        if (settingsObj[sk]) {
+          let str = String(settingsObj[sk]).trim();
+          if (str.startsWith('/http://') || str.startsWith('/https://')) str = str.substring(1);
+          settingsObj[sk] = str;
+        }
+      });
+
+      // Only expose public settings
+      const publicKeys = ['site_name_ar', 'site_name_en', 'site_name_tr', 'site_slogan_ar', 'site_slogan_en', 'site_slogan_tr', 
+        'phone', 'phone2', 'whatsapp', 'email', 'address_ar', 'address_en', 'address_tr', 'currency',
+        'social_facebook', 'social_instagram', 'social_twitter', 'social_linkedin', 'chatbot_enabled',
+        'chatbot_welcome_ar', 'chatbot_welcome_en', 'chatbot_welcome_tr', 'logo_type', 'logo_text', 'logo_url'];
+      const publicSettings = {};
+      publicKeys.forEach(k => { if (settingsObj[k] !== undefined) publicSettings[k] = settingsObj[k]; });
+      res.json(publicSettings);
+    } catch(e) {
+      console.error('[Settings Public Error]:', e.message);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Blog posts (public)
   app.get('/api/posts', (req, res) => {
-    const posts = db.prepare('SELECT * FROM posts WHERE published = 1 ORDER BY created_at DESC').all();
-    res.json(posts);
+    try {
+      const db = database.db;
+      const posts = db.prepare('SELECT * FROM posts WHERE published = 1 ORDER BY created_at DESC').all();
+      res.json(posts);
+    } catch(e) {
+      res.json([]);
+    }
   });
 
   // Public banners
   app.get('/api/banners', (req, res) => {
-    const banners = db.prepare('SELECT * FROM banners WHERE active = 1 ORDER BY sort_order ASC, id DESC').all();
-    res.json(banners);
+    try {
+      const db = database.db;
+      const banners = db.prepare('SELECT * FROM banners WHERE active = 1 ORDER BY sort_order ASC, id DESC').all();
+      res.json(banners);
+    } catch(e) {
+      res.json([]);
+    }
   });
 
-  // Public currencies
-  
   // Public exchange rate endpoint
   app.get('/api/exchange-rate', async (req, res) => {
     try {
+      const db = database.db;
       const rate = await getExchangeRate(db);
       res.json(rate);
     } catch(e) {
@@ -876,8 +901,13 @@ ensureDbReady();
   });
 
   app.get('/api/currencies', (req, res) => {
-    const currencies = db.prepare('SELECT * FROM currencies WHERE active = 1 ORDER BY id ASC').all();
-    res.json(currencies);
+    try {
+      const db = database.db;
+      const currencies = db.prepare('SELECT * FROM currencies WHERE active = 1 ORDER BY id ASC').all();
+      res.json(currencies);
+    } catch(e) {
+      res.json([]);
+    }
   });
 
 

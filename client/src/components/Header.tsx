@@ -28,6 +28,21 @@ const langLabels: Record<Language, string> = {
   tr: "Türkçe",
 };
 
+const FacebookIcon = ({ className }: { className?: string }) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>;
+const InstagramIcon = ({ className }: { className?: string }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>;
+
+function cleanSocialUrl(url?: string): string {
+  if (!url) return '';
+  let str = url.trim();
+  if (str.startsWith('/http://') || str.startsWith('/https://')) {
+    str = str.substring(1);
+  }
+  if (!str.startsWith('http://') && !str.startsWith('https://')) {
+    str = `https://${str}`;
+  }
+  return str;
+}
+
 export default function Header() {
   const { language, setLanguage, t, settings } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -42,6 +57,9 @@ export default function Header() {
   const logoUrl = (settings.logo_url as string) || '';
   const phone = settings.phone || "+90 542 810 4208";
   const email = settings.email || "info@zakariaprom.com";
+
+  const facebookUrl = cleanSocialUrl(settings.social_facebook);
+  const instagramUrl = cleanSocialUrl(settings.social_instagram);
 
   const handleSearch = useCallback((e?: React.FormEvent) => {
     e?.preventDefault();
@@ -70,6 +88,16 @@ export default function Header() {
               <Mail className="w-3.5 h-3.5" />
               <span>{email}</span>
             </a>
+            {facebookUrl && (
+              <a href={facebookUrl} target="_blank" rel="noopener noreferrer" className="hidden md:flex items-center hover:text-[#00d4d4] transition-colors" title="Facebook">
+                <FacebookIcon className="w-3.5 h-3.5" />
+              </a>
+            )}
+            {instagramUrl && (
+              <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="hidden md:flex items-center hover:text-[#00d4d4] transition-colors" title="Instagram">
+                <InstagramIcon className="w-3.5 h-3.5" />
+              </a>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {/* Login/Register Button */}

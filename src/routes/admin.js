@@ -33,6 +33,12 @@ router.get('/me', adminAuth, (req, res) => {
   res.json({ admin: req.admin });
 });
 
+// Restart Node process (Passenger spawn trigger)
+router.get('/restart', (req, res) => {
+  res.json({ restarting: true, message: 'Node process restarting...' });
+  setTimeout(() => { process.exit(0); }, 500);
+});
+
 // Check database status and statistics
 router.get('/db-status', adminAuth, (req, res) => {
   try {

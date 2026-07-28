@@ -233,7 +233,7 @@ function migrateCategories(db) {
   if (!db) return;
   try {
     db.exec(`
-      UPDATE local_products SET category_tr = 'Plastik Kalemler', top_category_tr = 'Plastik Kalemler', category_ar = 'أقلام بلاستيكية', category_en = 'Plastic Pens' WHERE category_tr IN ('Kalemler > Plastik Kalem', 'Plastik Kalem', 'Plastik Kalemleri', 'Promosyon Kalemler > Plastik Kalem');
+      UPDATE local_products SET category_tr = 'Plastik Kalemler', top_category_tr = 'Plastik Kalemler', category_ar = 'أقلام بلاستيكية', category_en = 'Plastic Pens' WHERE category_tr IN ('Kalemler > Plastik Kalem', 'Plastik Kalem', 'Plastik Kalemleri', 'Promosyon Kalemler > Plastik Kalem', 'Metal Kalem');
       UPDATE local_products SET category_tr = 'Metal Kalemler', top_category_tr = 'Metal Kalemler', category_ar = 'أقلام معدنية', category_en = 'Metal Pens' WHERE category_tr IN ('Kalemler > Metal Kalem', 'Metal Kalem', 'Metal Kalemleri', 'Metal Tükenmez - Roller Kalemler');
       UPDATE local_products SET category_tr = 'Kalem Setleri', top_category_tr = 'Kalem Setleri', category_ar = 'أطقم أقلام', category_en = 'Pen Sets' WHERE category_tr IN ('KalemSetleri > Kalem Seti', 'Kalem Setleri > Kalem Seti', 'Kalem Seti', 'Hediyelik Kalem Setleri');
       UPDATE local_products SET category_tr = 'Plastik Duvar Saatleri', top_category_tr = 'Plastik Duvar Saatleri', category_ar = 'ساعات حائط بلاستيكية', category_en = 'Plastic Wall Clocks' WHERE category_tr IN ('Saatler > Plastik Duvar Saati', 'Plastik Duvar Saati', 'Duvar Saatleri', 'Saatler > Duvar Saati');
@@ -241,7 +241,11 @@ function migrateCategories(db) {
       UPDATE local_products SET category_tr = 'Powerbank', top_category_tr = 'Powerbank', category_ar = 'بطاريات متنقلة', category_en = 'Power Banks' WHERE category_tr IN ('Teknoloji Ürünleri > Powerbank', 'Powerbanklar', 'Power Bank');
       UPDATE local_products SET category_tr = 'Termoslar', top_category_tr = 'Termoslar', category_ar = 'ترمسات', category_en = 'Thermoses' WHERE category_tr IN ('Termos - Matara > Diğer Termos - Matara', 'Termos - Mug', 'Termos Bardaklar (Mug)');
 
-      DELETE FROM translation_overrides WHERE type = 'category' AND (translation LIKE '%ler' OR translation LIKE '%lar' OR original_key IN ('Metal Kalemler', 'Plastik Kalemler'));
+      UPDATE custom_categories SET name_tr = 'Metal Kalemler', name_ar = 'أقلام معدنية', name_en = 'Metal Pens' WHERE name_tr IN ('Metal Kalem', 'Metal Kalemleri', 'Kalemler > Metal Kalem');
+      UPDATE custom_categories SET name_tr = 'Plastik Kalemler', name_ar = 'أقلام بلاستيكية', name_en = 'Plastic Pens' WHERE name_tr IN ('Plastik Kalem', 'Plastik Kalemleri', 'Kalemler > Plastik Kalem');
+      DELETE FROM custom_categories WHERE id NOT IN (SELECT min(id) FROM custom_categories GROUP BY name_tr);
+
+      DELETE FROM translation_overrides WHERE type = 'category' AND (translation LIKE '%ler' OR translation LIKE '%lar' OR original_key IN ('Metal Kalemler', 'Plastik Kalemler', 'Metal Kalem', 'Plastik Kalem'));
 
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية');
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens');
@@ -249,7 +253,7 @@ function migrateCategories(db) {
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'en', 'Plastic Pens');
     `);
     if (typeof saveDatabase === 'function') saveDatabase();
-    console.log('[Category Migration] Bulk categories merged & translation overrides cleaned successfully!');
+    console.log('[Category Migration] Bulk categories merged & custom categories cleaned successfully!');
   } catch(e) {
     console.error('[Category Migration Error]:', e.message);
   }

@@ -11,6 +11,8 @@ import Footer from "@/components/Footer";
 import { ChevronLeft, ChevronRight, MessageCircle, Package } from "lucide-react";
 import { motion } from "framer-motion";
 
+import SEO from "@/components/SEO";
+
 function fixImageUrl(url: string): string {
   if (!url) return '';
   const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
@@ -84,8 +86,46 @@ export default function ProductPage() {
     );
   }
 
+  const productName = getProductName(product);
+  const categoryName = getCategoryName(product);
+  const mainImage = product.images?.[0] ? fixImageUrl(product.images[0]) : "https://zakariaprom.com/assets/logo_zakaria.jpg";
+
+  const productSchema = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": productName,
+    "image": product.images?.map(fixImageUrl) || [mainImage],
+    "description": product.description || `${productName} - منتجات دعاية وإعلان وطباعة مخصصة.`,
+    "sku": product.model || product.id,
+    "mpn": product.model || product.id,
+    "brand": {
+      "@type": "Brand",
+      "name": "Zakaria Prom"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": `https://zakariaprom.com/product/${product.id}`,
+      "priceCurrency": "TRY",
+      "price": product.price > 0 ? product.price.toString() : "0.00",
+      "priceValidUntil": "2027-12-31",
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock",
+      "seller": {
+        "@type": "Organization",
+        "name": "مكتبة زكريا - Zakaria Prom"
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
+      <SEO
+        title={`${productName} (${product.model}) - مكتبة زكريا`}
+        description={product.description || `${productName} - منتجات دعاية وإعلان وطباعة شعارات مخصصة. أسعار خاصة للشركات والجملة.`}
+        image={mainImage}
+        url={`https://zakariaprom.com/product/${product.id}`}
+        schema={productSchema}
+      />
       <Header />
 
       {/* Breadcrumb */}

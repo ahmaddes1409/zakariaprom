@@ -174,11 +174,27 @@ export default function Footer() {
 
       {/* Bottom bar */}
       <div className="border-t border-white/10">
-        <div className="container py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-white/40 text-xs">
+        <div className="container py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <p className="text-white/50">
             &copy; {new Date().getFullYear()} {siteName}. {t("footer.rights")}.
           </p>
-          <p className="text-white/30 text-xs">zakariaprom.com</p>
+          <div className="flex items-center gap-4 flex-wrap text-white/60">
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              {language === "ar" ? "سياسة الخصوصية" : language === "tr" ? "Gizlilik Politikası" : "Privacy Policy"}
+            </Link>
+            <span>•</span>
+            <Link href="/terms" className="hover:text-white transition-colors">
+              {language === "ar" ? "الشروط والأحكام" : language === "tr" ? "Kullanım Koşulları" : "Terms of Service"}
+            </Link>
+            <span>•</span>
+            <Link href="/refund-policy" className="hover:text-white transition-colors">
+              {language === "ar" ? "سياسة الإرجاع" : language === "tr" ? "İade Politikası" : "Refund Policy"}
+            </Link>
+            <span>•</span>
+            <Link href="/shipping" className="hover:text-white transition-colors">
+              {language === "ar" ? "الشحن والتوصيل" : language === "tr" ? "Kargo & Teslimat" : "Shipping Policy"}
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

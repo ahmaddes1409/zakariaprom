@@ -920,6 +920,53 @@ ensureDbReady();
   });
 
 
+  // Dynamic XML Sitemap Generator (Full SEO Coverage)
+  app.get('/sitemap.xml', async (req, res) => {
+    try {
+      await ensureDbReady();
+      const db = database.db;
+      res.header('Content-Type', 'application/xml');
+
+      const baseUrl = 'https://zakariaprom.com';
+      const today = new Date().toISOString().split('T')[0];
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
+
+      // Static Pages
+      const staticPages = [
+        { url: '/', priority: '1.0', changefreq: 'daily' },
+        { url: '/about', priority: '0.8', changefreq: 'monthly' },
+        { url: '/contact', priority: '0.8', changefreq: 'monthly' },
+        { url: '/products', priority: '0.9', changefreq: 'daily' },
+        { url: '/blog', priority: '0.7', changefreq: 'weekly' },
+        { url: '/privacy', priority: '0.5', changefreq: 'monthly' },
+        { url: '/terms', priority: '0.5', changefreq: 'monthly' },
+        { url: '/refund-policy', priority: '0.5', changefreq: 'monthly' },
+        { url: '/shipping', priority: '0.5', changefreq: 'monthly' },
+      ];
+
+      staticPages.forEach(p => {
+        xml += `  <url>\n    <loc>${baseUrl}${p.url}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>\n  </url>\n`;
+      });
+
+      if (db) {
+        // Dynamic Products (All 3,550+ Products)
+        const products = db.prepare('SELECT id, updated_at FROM local_products WHERE hidden = 0').all();
+        products.forEach(prod => {
+          const lastmod = prod.updated_at ? String(prod.updated_at).split(' ')[0] : today;
+          xml += `  <url>\n    <loc>${baseUrl}/product/${encodeURIComponent(prod.id)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+        });
+      }
+
+      xml += `</urlset>`;
+      res.send(xml);
+    } catch(e) {
+      console.error('[Sitemap Error]:', e.message);
+      res.status(500).send('Error generating sitemap');
+    }
+  });
+
   // Admin panel - serve admin.html
   app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
@@ -928,7 +975,7 @@ ensureDbReady();
   // SPA fallback - serve React index.html for all other routes (client-side routing)
   app.get('*', (req, res) => {
     // Don't serve index.html for API routes or static files with extensions
-    if (req.path.startsWith('/api/') || req.path.includes('.')) {
+    if (req.path.startsWith('/api/') || (req.path.includes('.') && req.path !== '/sitemap.xml')) {
       return res.status(404).json({ error: 'Not found' });
     }
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));

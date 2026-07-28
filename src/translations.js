@@ -1,8 +1,12 @@
 // Category translations: Turkish -> Arabic, English
 const categoryTranslations = {
   "Promosyon Kalemler": { ar: "أقلام ترويجية", en: "Promotional Pens" },
+  "Metal Kalemler": { ar: "أقلام معدنية", en: "Metal Pens" },
   "Metal Tükenmez - Roller Kalemler": { ar: "أقلام معدنية - رولر", en: "Metal Ballpoint - Roller Pens" },
   "Plastik Kalemler": { ar: "أقلام بلاستيكية", en: "Plastic Pens" },
+  "Defterler": { ar: "دفاتر وأجندات", en: "Notebooks & Agendas" },
+  "Anahtarlıklar": { ar: "ميداليات", en: "Keychains" },
+  "Plastik Duvar Saatleri": { ar: "ساعات حائط بلاستيكية", en: "Plastic Wall Clocks" },
   "Dokunmatik Ekran Kalemleri": { ar: "أقلام شاشة لمس", en: "Touchscreen Pens" },
   "Geri Dönüşümlü Kalemler": { ar: "أقلام معاد تدويرها", en: "Recycled Pens" },
   "Kurşun Kalemler": { ar: "أقلام رصاص", en: "Pencils" },
@@ -404,7 +408,11 @@ function translateCategory(category, targetLang) {
     if (categoryTranslations[trimmed] && categoryTranslations[trimmed][targetLang]) {
       return categoryTranslations[trimmed][targetLang];
     }
-    return translateProductName(trimmed, targetLang);
+    let res = translateProductName(trimmed, targetLang);
+    if (targetLang === 'ar' || targetLang === 'en') {
+      res = res.replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
+    }
+    return res;
   });
   return translatedParts.join(' > ');
 }

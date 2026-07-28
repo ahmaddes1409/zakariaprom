@@ -232,29 +232,18 @@ const chatbotRoutes = require('./routes/chatbot');
 function migrateCategories(db) {
   if (!db) return;
   try {
-    const { normalizeCategoryName, translateCategory } = require('./translations');
-    const rows = db.prepare('SELECT id, category_tr, top_category_tr FROM local_products').all();
-    let updated = 0;
-    const updateStmt = db.prepare('UPDATE local_products SET category_tr = ?, category_ar = ?, category_en = ?, top_category_tr = ? WHERE id = ?');
-
-    db.exec('BEGIN TRANSACTION');
-    for (const r of rows) {
-      const normCat = normalizeCategoryName(r.category_tr);
-      const normTop = normalizeCategoryName(r.top_category_tr || normCat);
-      if (normCat !== r.category_tr || normTop !== r.top_category_tr) {
-        const catAr = translateCategory(normCat, 'ar');
-        const catEn = translateCategory(normCat, 'en');
-        updateStmt.run(normCat, catAr, catEn, normTop, r.id);
-        updated++;
-      }
-    }
-    db.exec('COMMIT');
-    if (updated > 0) {
-      console.log(`[Category Migration] Successfully merged ${updated} products under clean unified categories!`);
-      if (typeof saveDatabase === 'function') saveDatabase();
-    }
+    db.exec(`
+      UPDATE local_products SET category_tr = 'Plastik Kalemler', top_category_tr = 'Plastik Kalemler', category_ar = 'أقلام بلاستيكية', category_en = 'Plastic Pens' WHERE category_tr IN ('Kalemler > Plastik Kalem', 'Plastik Kalem', 'Plastik Kalemleri', 'Promosyon Kalemler > Plastik Kalem');
+      UPDATE local_products SET category_tr = 'Metal Kalemler', top_category_tr = 'Metal Kalemler', category_ar = 'أقلام معدنية', category_en = 'Metal Pens' WHERE category_tr IN ('Kalemler > Metal Kalem', 'Metal Kalem', 'Metal Kalemleri', 'Metal Tükenmez - Roller Kalemler');
+      UPDATE local_products SET category_tr = 'Kalem Setleri', top_category_tr = 'Kalem Setleri', category_ar = 'أطقم أقلام', category_en = 'Pen Sets' WHERE category_tr IN ('KalemSetleri > Kalem Seti', 'Kalem Setleri > Kalem Seti', 'Kalem Seti', 'Hediyelik Kalem Setleri');
+      UPDATE local_products SET category_tr = 'Plastik Duvar Saatleri', top_category_tr = 'Plastik Duvar Saatleri', category_ar = 'ساعات حائط بلاستيكية', category_en = 'Plastic Wall Clocks' WHERE category_tr IN ('Saatler > Plastik Duvar Saati', 'Plastik Duvar Saati', 'Duvar Saatleri', 'Saatler > Duvar Saati');
+      UPDATE local_products SET category_tr = 'USB Bellekler', top_category_tr = 'USB Bellekler', category_ar = 'ذاكرة USB', category_en = 'USB Flash Drives' WHERE category_tr IN ('Teknoloji Ürünleri > USB Bellek', 'Usb Bellekler', 'USB Bellek');
+      UPDATE local_products SET category_tr = 'Powerbank', top_category_tr = 'Powerbank', category_ar = 'بطاريات متنقلة', category_en = 'Power Banks' WHERE category_tr IN ('Teknoloji Ürünleri > Powerbank', 'Powerbanklar', 'Power Bank');
+      UPDATE local_products SET category_tr = 'Termoslar', top_category_tr = 'Termoslar', category_ar = 'ترمسات', category_en = 'Thermoses' WHERE category_tr IN ('Termos - Matara > Diğer Termos - Matara', 'Termos - Mug', 'Termos Bardaklar (Mug)');
+    `);
+    if (typeof saveDatabase === 'function') saveDatabase();
+    console.log('[Category Migration] Bulk categories merged successfully!');
   } catch(e) {
-    try { db.exec('ROLLBACK'); } catch(_) {}
     console.error('[Category Migration Error]:', e.message);
   }
 }

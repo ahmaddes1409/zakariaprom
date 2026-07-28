@@ -88,7 +88,8 @@ export async function fetchCategories(): Promise<ApiCategory[]> {
   try {
     const res = await fetch(`${API_BASE}/api/categories`);
     if (!res.ok) return [];
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
   } catch {
     return [];
   }
@@ -112,7 +113,12 @@ export async function fetchProducts(params: {
     if (params.lang) searchParams.set("lang", params.lang);
     const res = await fetch(`${API_BASE}/api/products?${searchParams.toString()}`);
     if (!res.ok) return { products: [], pagination: { page: 1, limit: 24, total: 0, totalPages: 0 } };
-    return await res.json();
+    const data = await res.json();
+    const productsList = Array.isArray(data?.products) ? data.products : [];
+    return {
+      products: productsList,
+      pagination: data?.pagination || { page: 1, limit: 24, total: productsList.length, totalPages: 1 }
+    };
   } catch {
     return { products: [], pagination: { page: 1, limit: 24, total: 0, totalPages: 0 } };
   }
@@ -122,7 +128,8 @@ export async function fetchProduct(id: string): Promise<ApiProduct | null> {
   try {
     const res = await fetch(`${API_BASE}/api/product/${id}`);
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    return data && data.id ? data : null;
   } catch {
     return null;
   }
@@ -132,7 +139,8 @@ export async function fetchSettings(): Promise<ApiSettings> {
   try {
     const res = await fetch(`${API_BASE}/api/settings/public`);
     if (!res.ok) return {};
-    return await res.json();
+    const data = await res.json();
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
   } catch {
     return {};
   }
@@ -167,7 +175,8 @@ export async function fetchBanners(): Promise<ApiBanner[]> {
   try {
     const res = await fetch(`${API_BASE}/api/banners`);
     if (!res.ok) return [];
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
   } catch {
     return [];
   }
@@ -177,7 +186,8 @@ export async function fetchCurrencies(): Promise<ApiCurrency[]> {
   try {
     const res = await fetch(`${API_BASE}/api/currencies`);
     if (!res.ok) return [];
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
   } catch {
     return [];
   }

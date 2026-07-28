@@ -684,6 +684,9 @@ ensureDbReady();
   app.get('/api/categories', async (req, res) => {
     try {
       await ensureDbReady();
+      const { fetchAndParseProducts, getCategories } = require('./dataService');
+      const { normalizeCategoryName, categoryTranslations } = require('./translations');
+
       let products = [];
       try { products = await fetchAndParseProducts(); } catch(xmlErr) { console.error("XML fetch failed, using local only:", xmlErr.message); }
       

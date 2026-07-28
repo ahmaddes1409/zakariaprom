@@ -60,7 +60,7 @@ router.put('/profile', userAuth, (req, res) => {
 // ===== CART =====
 router.get('/cart', optionalUserAuth, (req, res) => {
   const db = getDb();
-  const sessionId = req.cookies?.session_id || req.headers['x-session-id'];
+  const sessionId = (req.cookies && req.cookies.session_id) || req.headers['x-session-id'];
   let items;
   if (req.user) {
     items = db.prepare('SELECT * FROM cart_items WHERE user_id = ? ORDER BY added_at DESC').all(req.user.id);
@@ -69,18 +69,16 @@ router.get('/cart', optionalUserAuth, (req, res) => {
   } else {
     items = [];
   }
-  res.json({ items, count: items.length });
+  res.json(items);
 });
 
 router.post('/cart', optionalUserAuth, (req, res) => {
   const db = getDb();
   const { product_id, product_name, product_image, quantity, options, session_id } = req.body;
-  if (!product_id) {
-    return res.status(400).json({ error: 'Product ID required' });
-  }
+  if (!product_id) return res.status(400).json({ error: 'product_id required' });
 
   const userId = req.user ? req.user.id : null;
-  const sessId = session_id || req.cookies?.session_id || null;
+  const sessId = session_id || (req.cookies && req.cookies.session_id) || null;
 
   // Check if already in cart
   let existing;
@@ -127,7 +125,7 @@ router.delete('/cart', optionalUserAuth, (req, res) => {
   if (req.user) {
     db.prepare('DELETE FROM cart_items WHERE user_id = ?').run(req.user.id);
   } else {
-    const sessionId = req.cookies?.session_id || req.headers['x-session-id'];
+    const sessionId = (req.cookies && req.cookies.session_id) || req.headers['x-session-id'];
     if (sessionId) {
       db.prepare('DELETE FROM cart_items WHERE session_id = ? AND user_id IS NULL').run(sessionId);
     }

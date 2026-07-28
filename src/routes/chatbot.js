@@ -16,13 +16,13 @@ router.get('/config', (req, res) => {
   const whatsapp = db.prepare("SELECT value FROM settings WHERE key = 'whatsapp'").get();
 
   res.json({
-    enabled: enabled?.value === '1',
+    enabled: enabled && enabled.value === '1',
     welcome: {
-      ar: welcomeAr?.value || 'مرحباً! كيف يمكنني مساعدتك؟',
-      en: welcomeEn?.value || 'Hello! How can I help you?',
-      tr: welcomeTr?.value || 'Merhaba! Size nasıl yardımcı olabilirim?'
+      ar: (welcomeAr && welcomeAr.value) || 'مرحباً! كيف يمكنني مساعدتك؟',
+      en: (welcomeEn && welcomeEn.value) || 'Hello! How can I help you?',
+      tr: (welcomeTr && welcomeTr.value) || 'Merhaba! Size nasıl yardımcı olabilirim?'
     },
-    whatsapp: whatsapp?.value || ''
+    whatsapp: (whatsapp && whatsapp.value) || ''
   });
 });
 

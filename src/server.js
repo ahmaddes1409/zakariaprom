@@ -784,7 +784,7 @@ ensureDbReady();
         if (typeof catAr === 'string') catAr = catAr.replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
         if (typeof catEn === 'string') catEn = catEn.replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
 
-        const subcategories = Array.isArray(cat?.subcategories) ? cat.subcategories.map(sub => {
+        const subcategories = (cat && Array.isArray(cat.subcategories)) ? cat.subcategories.map(sub => {
           const subOv = (sub && sub.tr) ? (overrideMap[sub.tr] || {}) : {};
           const subDict = (sub && sub.tr) ? (categoryTranslations[sub.tr] || {}) : {};
           let sAr = subOv.ar || subDict.ar || sub.ar || sub.tr;

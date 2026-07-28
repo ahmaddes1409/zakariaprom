@@ -24,7 +24,8 @@ function verifyToken(token) {
 
 // Admin authentication middleware
 function adminAuth(req, res, next) {
-  const token = req.cookies?.admin_token || req.headers['authorization']?.replace('Bearer ', '');
+  const authHeader = req.headers['authorization'];
+  const token = (req.cookies && req.cookies.admin_token) || (authHeader ? authHeader.replace('Bearer ', '') : null);
   if (!token) {
     return res.status(401).json({ error: 'Authentication required' });
   }
@@ -38,7 +39,8 @@ function adminAuth(req, res, next) {
 
 // User authentication middleware
 function userAuth(req, res, next) {
-  const token = req.cookies?.user_token || req.headers['authorization']?.replace('Bearer ', '');
+  const authHeader = req.headers['authorization'];
+  const token = (req.cookies && req.cookies.user_token) || (authHeader ? authHeader.replace('Bearer ', '') : null);
   if (!token) {
     return res.status(401).json({ error: 'Authentication required' });
   }
@@ -52,7 +54,8 @@ function userAuth(req, res, next) {
 
 // Optional user auth (doesn't fail, just attaches user if token exists)
 function optionalUserAuth(req, res, next) {
-  const token = req.cookies?.user_token || req.headers['authorization']?.replace('Bearer ', '');
+  const authHeader = req.headers['authorization'];
+  const token = (req.cookies && req.cookies.user_token) || (authHeader ? authHeader.replace('Bearer ', '') : null);
   if (token) {
     const decoded = verifyToken(token);
     if (decoded && decoded.type === 'user') {

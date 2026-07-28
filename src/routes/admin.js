@@ -43,9 +43,12 @@ router.get('/db-status', adminAuth, (req, res) => {
       const stats = fs.statSync(dbPath);
       fileStats = { sizeBytes: stats.size, modifiedAt: stats.mtime };
     }
-    const adminCount = db.prepare('SELECT COUNT(*) as count FROM admins').get()?.count || 0;
-    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get()?.count || 0;
-    const orderCount = db.prepare('SELECT COUNT(*) as count FROM orders').get()?.count || 0;
+    const adminRow = db.prepare('SELECT COUNT(*) as count FROM admins').get();
+    const userRow = db.prepare('SELECT COUNT(*) as count FROM users').get();
+    const orderRow = db.prepare('SELECT COUNT(*) as count FROM orders').get();
+    const adminCount = adminRow ? adminRow.count : 0;
+    const userCount = userRow ? userRow.count : 0;
+    const orderCount = orderRow ? orderRow.count : 0;
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(t => t.name);
 
     res.json({
@@ -112,8 +115,8 @@ router.get('/translations', adminAuth, async (req, res) => {
     // Merge categories with overrides
     const categories = allCategories.map(cat => ({
       tr: cat.tr,
-      ar: overrideMap.category?.[cat.tr]?.ar || cat.ar,
-      en: overrideMap.category?.[cat.tr]?.en || cat.en
+      ar: (overrideMap.category && overrideMap.category[cat.tr] && overrideMap.category[cat.tr].ar) || cat.ar,
+      en: (overrideMap.category && overrideMap.category[cat.tr] && overrideMap.category[cat.tr].en) || cat.en
     }));
 
     // Get term overrides
@@ -229,9 +232,9 @@ router.get('/translations/products', adminAuth, async (req, res) => {
     if (search) {
       const q = search.toLowerCase();
       products = products.filter(p => 
-        (p.name_tr || p.name?.tr || '').toLowerCase().includes(q) ||
-        (p.name_ar || p.name?.ar || '').toLowerCase().includes(q) ||
-        (p.name_en || p.name?.en || '').toLowerCase().includes(q) ||
+        (p.name_tr || (p.name && p.name.tr) || '').toLowerCase().includes(q) ||
+        (p.name_ar || (p.name && p.name.ar) || '').toLowerCase().includes(q) ||
+        (p.name_en || (p.name && p.name.en) || '').toLowerCase().includes(q) ||
         (p.model || '').toLowerCase().includes(q) ||
         (p.id || '').toLowerCase().includes(q)
       );
@@ -253,9 +256,9 @@ router.get('/translations/products', adminAuth, async (req, res) => {
     const result = paginated.map(p => {
       const pId = p.id || p.product_id;
       const pModel = p.model || pId;
-      const pTr = p.name_tr || p.name?.tr || '';
-      const pAr = p.name_ar || p.name?.ar || '';
-      const pEn = p.name_en || p.name?.en || '';
+      const pTr = p.name_tr || (p.name && p.name.tr) || '';
+      const pAr = p.name_ar || (p.name && p.name.ar) || '';
+      const pEn = p.name_en || (p.name && p.name.en) || '';
       const ov = overrideMap[pId] || overrideMap[pModel] || overrideMap[pTr] || {};
       return {
         id: pId,
@@ -367,9 +370,9 @@ router.get('/products', adminAuth, async (req, res) => {
     if (search) {
       const q = search.toLowerCase();
       products = products.filter(p => 
-        (p.name?.tr || '').toLowerCase().includes(q) ||
-        (p.name?.ar || '').toLowerCase().includes(q) ||
-        (p.name?.en || '').toLowerCase().includes(q) ||
+        ((p.name && p.name.tr) || '').toLowerCase().includes(q) ||
+        ((p.name && p.name.ar) || '').toLowerCase().includes(q) ||
+        ((p.name && p.name.en) || '').toLowerCase().includes(q) ||
         (p.model || '').toLowerCase().includes(q) ||
         (p.id || '').toLowerCase().includes(q)
       );
@@ -379,8 +382,8 @@ router.get('/products', adminAuth, async (req, res) => {
     if (category) {
       const catLower = category.toLowerCase().trim();
       products = products.filter(p => 
-        (p.topCategory?.tr || "").toLowerCase().includes(catLower) ||
-        (p.categories?.tr || []).some(c => c.toLowerCase().includes(catLower))
+        ((p.topCategory && p.topCategory.tr) || "").toLowerCase().includes(catLower) ||
+        ((p.categories && Array.isArray(p.categories.tr)) ? p.categories.tr : []).some(c => c.toLowerCase().includes(catLower))
       );
     }
 
@@ -435,7 +438,7 @@ router.get('/products/:id', adminAuth, async (req, res) => {
     if (!product) return res.status(404).json({ error: 'Product not found' });
     
     // Check for name overrides
-    const overrides = db.prepare("SELECT lang, translation FROM translation_overrides WHERE type = 'product' AND original_key IN (?, ?, ?)").all(product.id, product.model, product.name?.tr || '');
+    const overrides = db.prepare("SELECT lang, translation FROM translation_overrides WHERE type = 'product' AND original_key IN (?, ?, ?)").all(product.id, product.model, (product.name && product.name.tr) || '');
     if (overrides.length > 0) {
       overrides.forEach(o => { product.name[o.lang] = o.translation; });
     }
@@ -631,7 +634,7 @@ router.get('/categories/:name', adminAuth, async (req, res) => {
     const overrideObj = {};
     overrides.forEach(o => { overrideObj[o.lang] = o.translation; });
     const imageRow = db.prepare('SELECT image_url FROM category_images WHERE category_name = ?').get(catName);
-    const image = imageRow?.image_url || (customCat ? customCat.image_url : '') || '';
+    const image = (imageRow && imageRow.image_url) || (customCat ? customCat.image_url : '') || '';
     const isHidden = hiddenCats.includes(catName) || (customCat && customCat.active === 0);
     res.json({ category: { ...cat, ...overrideObj, hidden: isHidden, image: image, isCustom: !!customCat } });
   } catch (error) {
@@ -1460,7 +1463,8 @@ router.post('/sync-all', async (req, res) => {
     // 2. Sync Etkin products
     const etkinResult = await syncEtkinProducts(db, database.saveDatabase);
 
-    const total = db.prepare('SELECT COUNT(*) as count FROM local_products WHERE hidden = 0').get()?.count || 0;
+    const totalRow = db.prepare('SELECT COUNT(*) as count FROM local_products WHERE hidden = 0').get();
+    const total = totalRow ? totalRow.count : 0;
     res.json({ success: true, totalProducts: total, xmlSynced: xmlCount, etkinResult });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

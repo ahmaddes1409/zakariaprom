@@ -285,7 +285,11 @@ function ensureDbReady() {
 }
 
 // Trigger DB init immediately on module load
-ensureDbReady();
+  // Middleware
+  app.use(cors());
+  app.use(cookieParser());
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   // API Routes
   app.use('/api/admin', adminRoutes);

@@ -5,7 +5,7 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const { initializeDatabase, initDatabaseAsync } = require('./database');
 const { fetchAndParseProducts, getCategories, getProductsByCategory, searchProducts, getProductById } = require('./dataService');
-const { uiTranslations } = require('./translations');
+const { uiTranslations, categoryTranslations, translateCategory, normalizeCategoryName } = require('./translations');
 const { optionalUserAuth } = require('./auth');
 
 // === Exchange Rate Auto-Update ===

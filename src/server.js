@@ -240,9 +240,21 @@ function migrateCategories(db) {
       UPDATE local_products SET category_tr = 'USB Bellekler', top_category_tr = 'USB Bellekler', category_ar = 'ذاكرة USB', category_en = 'USB Flash Drives' WHERE category_tr IN ('Teknoloji Ürünleri > USB Bellek', 'Usb Bellekler', 'USB Bellek');
       UPDATE local_products SET category_tr = 'Powerbank', top_category_tr = 'Powerbank', category_ar = 'بطاريات متنقلة', category_en = 'Power Banks' WHERE category_tr IN ('Teknoloji Ürünleri > Powerbank', 'Powerbanklar', 'Power Bank');
       UPDATE local_products SET category_tr = 'Termoslar', top_category_tr = 'Termoslar', category_ar = 'ترمسات', category_en = 'Thermoses' WHERE category_tr IN ('Termos - Matara > Diğer Termos - Matara', 'Termos - Mug', 'Termos Bardaklar (Mug)');
+
+      DELETE FROM translation_overrides WHERE type = 'category' AND (translation LIKE '%ler' OR translation LIKE '%lar');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'ar', 'أقلام بلاستيكية');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'en', 'Plastic Pens');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Defterler', 'ar', 'دفاتر وأجندات');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Defterler', 'en', 'Notebooks & Agendas');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Anahtarlıklar', 'ar', 'ميداليات');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Anahtarlıklar', 'en', 'Keychains');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Duvar Saatleri', 'ar', 'ساعات حائط بلاستيكية');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Duvar Saatleri', 'en', 'Plastic Wall Clocks');
     `);
     if (typeof saveDatabase === 'function') saveDatabase();
-    console.log('[Category Migration] Bulk categories merged successfully!');
+    console.log('[Category Migration] Bulk categories merged & translation overrides cleaned successfully!');
   } catch(e) {
     console.error('[Category Migration Error]:', e.message);
   }

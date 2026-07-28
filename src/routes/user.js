@@ -293,6 +293,8 @@ router.get('/test-smtp', async (req, res) => {
     const configs = [
       { name: 'Hostinger SSL 465', host: 'smtp.hostinger.com', port: 465, secure: true },
       { name: 'Hostinger TLS 587', host: 'smtp.hostinger.com', port: 587, secure: false },
+      { name: 'Domain Mail SSL 465', host: 'mail.zakariaprom.com', port: 465, secure: true },
+      { name: 'Domain Mail TLS 587', host: 'mail.zakariaprom.com', port: 587, secure: false },
       { name: 'Titan SSL 465', host: 'smtp.titan.email', port: 465, secure: true },
       { name: 'Titan TLS 587', host: 'smtp.titan.email', port: 587, secure: false },
       { name: 'Localhost 25', host: 'localhost', port: 25, secure: false }

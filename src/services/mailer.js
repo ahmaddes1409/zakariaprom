@@ -1,18 +1,19 @@
-const nodemailer = require('nodemailer');
-
-// Hostinger SMTP Transporter Configuration
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.hostinger.com',
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: true, // Port 465 uses SSL/TLS
-  auth: {
-    user: process.env.SMTP_USER || 'info@zakariaprom.com',
-    pass: process.env.SMTP_PASS || 'Sy2242368.'
-  },
-  tls: {
-    rejectUnauthorized: false // Prevents failures due to custom/shared SSL cert chains
-  }
-});
+function getTransporter(host = 'smtp.hostinger.com', port = 465, secure = true) {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || host,
+    port: parseInt(process.env.SMTP_PORT || String(port)),
+    secure,
+    auth: {
+      user: process.env.SMTP_USER || 'info@zakariaprom.com',
+      pass: process.env.SMTP_PASS || 'Sy2242368.'
+    },
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000
+  });
+}
 
 /**
  * Send Contact / Quote Request Email to Admin & Confirmation to Customer
@@ -86,7 +87,7 @@ async function sendContactEmail({ name, email, phone, message, subject }) {
     </div>
   `;
 
-  // Send to Admin
+  // Send to Admin with multi-host fallback
   const mailOptionsAdmin = {
     from: `"موقع مكتبة زكريا" <${adminRecipient}>`,
     to: adminRecipient,
@@ -95,13 +96,38 @@ async function sendContactEmail({ name, email, phone, message, subject }) {
     html: adminHtml
   };
 
-  const info = await transporter.sendMail(mailOptionsAdmin);
-  console.log('[SMTP Mailer] Admin email sent successfully:', info.messageId);
+  const hostsToTry = [
+    { host: 'smtp.hostinger.com', port: 465, secure: true },
+    { host: 'smtp.hostinger.com', port: 587, secure: false },
+    { host: 'mail.zakariaprom.com', port: 465, secure: true },
+    { host: 'mail.zakariaprom.com', port: 587, secure: false },
+    { host: 'smtp.titan.email', port: 465, secure: true },
+    { host: 'smtp.titan.email', port: 587, secure: false }
+  ];
+
+  let info = null;
+  let activeTransporter = null;
+
+  for (const target of hostsToTry) {
+    try {
+      const tp = getTransporter(target.host, target.port, target.secure);
+      info = await tp.sendMail(mailOptionsAdmin);
+      activeTransporter = tp;
+      console.log(`[SMTP Mailer] Admin email sent successfully via ${target.host}:${target.port}: ${info.messageId}`);
+      break;
+    } catch (hErr) {
+      console.error(`[SMTP Mailer Attempt Failed] ${target.host}:${target.port} -> ${hErr.message}`);
+    }
+  }
+
+  if (!info) {
+    throw new Error('All SMTP host connections failed');
+  }
 
   // Send Confirmation Copy to Customer (if valid email provided)
-  if (cleanEmail && cleanEmail.includes('@')) {
+  if (cleanEmail && cleanEmail.includes('@') && activeTransporter) {
     try {
-      await transporter.sendMail({
+      await activeTransporter.sendMail({
         from: `"مكتبة زكريا" <${adminRecipient}>`,
         to: cleanEmail,
         subject: 'تم استلام طلبك بنجاح - مكتبة زكريا',

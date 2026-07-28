@@ -7,7 +7,7 @@ const transporter = nodemailer.createTransport({
   secure: true, // Port 465 uses SSL/TLS
   auth: {
     user: process.env.SMTP_USER || 'info@zakariaprom.com',
-    pass: process.env.SMTP_PASS || 'Sy2242368'
+    pass: process.env.SMTP_PASS || 'Sy2242368.'
   },
   tls: {
     rejectUnauthorized: false // Prevents failures due to custom/shared SSL cert chains

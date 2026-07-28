@@ -288,7 +288,7 @@ router.get('/test-smtp', async (req, res) => {
   try {
     const nodemailer = require('nodemailer');
     const testUser = 'info@zakariaprom.com';
-    const testPass = 'Sy2242368';
+    const testPass = 'Sy2242368.';
 
     const configs = [
       { name: 'Hostinger SSL 465', host: 'smtp.hostinger.com', port: 465, secure: true },

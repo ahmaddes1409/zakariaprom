@@ -379,6 +379,20 @@ function initializeDatabase() {
     )
   `);
 
+  // Contact & Quote Messages table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS contact_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      subject TEXT,
+      message TEXT NOT NULL,
+      status TEXT DEFAULT 'unread',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Wishlist table
   db.exec(`
     CREATE TABLE IF NOT EXISTS wishlist (

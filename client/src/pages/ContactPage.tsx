@@ -9,6 +9,7 @@ import { toast } from "sonner";
 export default function ContactPage() {
   const { language, t, settings } = useLanguage();
   const [formData, setFormData] = useState({ name: "", email: "", message: "" });
+  const [loading, setLoading] = useState(false);
 
   const phone = settings.phone || "+90 542 810 4208";
   const email = settings.email || "info@zakariaprom.com";
@@ -17,16 +18,33 @@ export default function ContactPage() {
   const address = (settings[addressKey] as string) || 
     (language === "ar" ? "إسطنبول، تركيا" : language === "tr" ? "İstanbul, Türkiye" : "Istanbul, Turkey");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success(
-      language === "ar"
-        ? "تم إرسال رسالتك بنجاح! سنتواصل معك قريباً."
-        : language === "tr"
-        ? "Mesajınız başarıyla gönderildi! En kısa sürede size dönüş yapacağız."
-        : "Your message has been sent successfully! We will contact you soon."
-    );
-    setFormData({ name: "", email: "", message: "" });
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send');
+
+      toast.success(
+        language === "ar"
+          ? "تم إرسال رسالتك وعرض السعر بنجاح إلى البريد الإلكتروني! سنتواصل معك قريباً."
+          : language === "tr"
+          ? "Mesajınız ve teklif talebiniz başarıyla gönderildi! En kısa sürede size dönüş yapacağız."
+          : "Your quote request has been sent successfully to email! We will contact you soon."
+      );
+      setFormData({ name: "", email: "", message: "" });
+    } catch (err: any) {
+      toast.error(err.message || (language === "ar" ? "حدث خطأ أثناء الإرسال" : "Failed to send message"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -147,10 +165,11 @@ export default function ContactPage() {
                   </div>
                   <button
                     type="submit"
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97]"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97] disabled:opacity-50"
                   >
                     <Send className="w-4 h-4" />
-                    {t("contact.send")}
+                    {loading ? (language === "ar" ? "جاري الإرسال..." : language === "tr" ? "Gönderiliyor..." : "Sending...") : t("contact.send")}
                   </button>
                 </div>
               </form>

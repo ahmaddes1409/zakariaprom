@@ -198,6 +198,19 @@ router.post('/orders', optionalUserAuth, (req, res) => {
     db.prepare('DELETE FROM cart_items WHERE session_id = ? AND user_id IS NULL').run(session_id);
   }
 
+  // Dispatch Email Notification to Admin (info@zakariaprom.com)
+  try {
+    const { sendContactEmail } = require('../services/mailer');
+    const itemsSummary = items.map((it, idx) => `${idx + 1}. ${it.product_name || 'منتج'} (الكمية: ${it.quantity})`).join('\n');
+    sendContactEmail({
+      name: guest_name || (req.user ? req.user.name : 'عميل الموقع'),
+      email: guest_email || (req.user ? req.user.email : ''),
+      phone: guest_phone || (req.user ? req.user.phone : ''),
+      message: `طلب رقم: ${orderNumber}\nالشركة: ${guest_company || 'غير محدد'}\nملاحظات: ${notes || 'لا يوجد'}\n\nالمنتجات:\n${itemsSummary}`,
+      subject: `🛒 طلب سعر جديد رقم ${orderNumber}`
+    }).catch(err => console.error('[Order Mailer Error]:', err.message));
+  } catch(e) {}
+
   res.json({ success: true, orderNumber });
 });
 

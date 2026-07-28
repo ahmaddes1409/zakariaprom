@@ -984,6 +984,47 @@ ensureDbReady();
     }
   });
 
+  // Contact & Quote Request Form Endpoint (Sends Email via Hostinger SMTP & Saves to DB)
+  app.post('/api/contact', async (req, res) => {
+    try {
+      await ensureDbReady();
+      const { name, email, phone, message, subject } = req.body;
+      const cleanName = (name || '').trim();
+      const cleanEmail = (email || '').trim();
+      const cleanMessage = (message || '').trim();
+
+      if (!cleanName || !cleanEmail || !cleanMessage) {
+        return res.status(400).json({ error: 'Name, email, and message are required' });
+      }
+
+      // 1. Save message into database
+      try {
+        database.db.prepare(`
+          INSERT INTO contact_messages (name, email, phone, subject, message, created_at)
+          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).run(cleanName, cleanEmail, phone || '', subject || '', cleanMessage);
+        database.saveDatabase();
+      } catch (dbErr) {
+        console.error('[Contact DB Insert Error]:', dbErr.message);
+      }
+
+      // 2. Dispatch Email via Hostinger SMTP Mailer Service
+      const { sendContactEmail } = require('./services/mailer');
+      await sendContactEmail({
+        name: cleanName,
+        email: cleanEmail,
+        phone: phone || '',
+        message: cleanMessage,
+        subject: subject || `طلب عرض سعر جديد من: ${cleanName}`
+      });
+
+      res.json({ success: true, message: 'Message sent and email delivered successfully' });
+    } catch (error) {
+      console.error('[Contact API Error]:', error.message);
+      res.status(500).json({ error: 'Failed to send message: ' + error.message });
+    }
+  });
+
   // Blog posts (public)
   app.get('/api/posts', async (req, res) => {
     try {

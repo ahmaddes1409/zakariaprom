@@ -242,16 +242,11 @@ function migrateCategories(db) {
       UPDATE local_products SET category_tr = 'Termoslar', top_category_tr = 'Termoslar', category_ar = 'ترمسات', category_en = 'Thermoses' WHERE category_tr IN ('Termos - Matara > Diğer Termos - Matara', 'Termos - Mug', 'Termos Bardaklar (Mug)');
 
       DELETE FROM translation_overrides WHERE type = 'category' AND (translation LIKE '%ler' OR translation LIKE '%lar');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'ar', 'أقلام بلاستيكية');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'en', 'Plastic Pens');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Defterler', 'ar', 'دفاتر وأجندات');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Defterler', 'en', 'Notebooks & Agendas');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Anahtarlıklar', 'ar', 'ميداليات');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Anahtarlıklar', 'en', 'Keychains');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Duvar Saatleri', 'ar', 'ساعات حائط بلاستيكية');
-      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Duvar Saatleri', 'en', 'Plastic Wall Clocks');
+
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية') ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = 'أقلام معدنية';
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens') ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = 'Metal Pens';
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'ar', 'أقلام بلاستيكية') ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = 'أقلام بلاستيكية';
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'en', 'Plastic Pens') ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = 'Plastic Pens';
     `);
     if (typeof saveDatabase === 'function') saveDatabase();
     console.log('[Category Migration] Bulk categories merged & translation overrides cleaned successfully!');

@@ -1031,6 +1031,73 @@ function ensureDbReady() {
     }
   });
 
+  // Live SMTP Diagnostic Endpoint
+  app.get('/api/test-smtp', async (req, res) => {
+    try {
+      const nodemailer = require('nodemailer');
+      const testUser = 'info@zakariaprom.com';
+      const testPass = 'Sy2242368';
+
+      const configs = [
+        { name: 'Hostinger SSL 465', host: 'smtp.hostinger.com', port: 465, secure: true },
+        { name: 'Hostinger TLS 587', host: 'smtp.hostinger.com', port: 587, secure: false },
+        { name: 'Titan SSL 465', host: 'smtp.titan.email', port: 465, secure: true },
+        { name: 'Titan TLS 587', host: 'smtp.titan.email', port: 587, secure: false },
+        { name: 'Localhost 25', host: 'localhost', port: 25, secure: false }
+      ];
+
+      const results = [];
+      let workingConfig = null;
+
+      for (const cfg of configs) {
+        const opts = {
+          host: cfg.host,
+          port: cfg.port,
+          secure: cfg.secure,
+          tls: { rejectUnauthorized: false },
+          connectionTimeout: 6000,
+          greetingTimeout: 6000,
+          socketTimeout: 6000
+        };
+
+        if (cfg.host !== 'localhost') {
+          opts.auth = { user: testUser, pass: testPass };
+        }
+
+        const tp = nodemailer.createTransport(opts);
+        try {
+          await tp.verify();
+          const resObj = { name: cfg.name, status: 'VERIFIED_SUCCESS' };
+          if (!workingConfig) {
+            workingConfig = cfg;
+            try {
+              const sendInfo = await tp.sendMail({
+                from: `"Zakaria Prom Test" <${testUser}>`,
+                to: testUser,
+                subject: `SMTP Test Live - ${cfg.name}`,
+                text: `Live diagnostic test success from ${cfg.name} at ${new Date().toISOString()}`
+              });
+              resObj.sendResult = 'SENT_SUCCESS: ' + sendInfo.messageId;
+            } catch (sErr) {
+              resObj.sendError = sErr.message;
+            }
+          }
+          results.push(resObj);
+        } catch (vErr) {
+          results.push({ name: cfg.name, status: 'FAILED', error: vErr.message });
+        }
+      }
+
+      res.json({
+        testedUser: testUser,
+        workingConfig,
+        results
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Blog posts (public)
   app.get('/api/posts', async (req, res) => {
     try {

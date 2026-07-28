@@ -295,6 +295,7 @@ function ensureDbReady() {
   app.use('/api/admin', adminRoutes);
   app.use('/api/user', userRoutes);
   app.use('/api/chatbot', chatbotRoutes);
+  app.use('/api', userRoutes);
 
   // Analytics tracking
   app.post('/api/analytics', (req, res) => {

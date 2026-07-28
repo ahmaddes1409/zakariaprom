@@ -245,4 +245,109 @@ router.delete('/wishlist/:product_id', userAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ===== CONTACT FORM & SMTP TEST =====
+router.post('/contact', (req, res) => {
+  try {
+    const { name, email, phone, message, subject } = req.body;
+    const cleanName = (name || '').trim();
+    const cleanEmail = (email || '').trim();
+    const cleanMessage = (message || '').trim();
+
+    if (!cleanName || !cleanEmail || !cleanMessage) {
+      return res.status(400).json({ error: 'Name, email, and message are required' });
+    }
+
+    try {
+      getDb().prepare(`
+        INSERT INTO contact_messages (name, email, phone, subject, message, created_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).run(cleanName, cleanEmail, phone || '', subject || '', cleanMessage);
+      database.saveDatabase();
+    } catch (dbErr) {
+      console.error('[Contact DB Insert Error]:', dbErr.message);
+    }
+
+    const { sendContactEmail } = require('../services/mailer');
+    sendContactEmail({
+      name: cleanName,
+      email: cleanEmail,
+      phone: phone || '',
+      message: cleanMessage,
+      subject: subject || `طلب عرض سعر جديد من: ${cleanName}`
+    }).catch(mailErr => {
+      console.error('[Async Contact Mailer Error]:', mailErr.message);
+    });
+
+    res.json({ success: true, message: 'Message sent and email queued successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to send message: ' + error.message });
+  }
+});
+
+router.get('/test-smtp', async (req, res) => {
+  try {
+    const nodemailer = require('nodemailer');
+    const testUser = 'info@zakariaprom.com';
+    const testPass = 'Sy2242368';
+
+    const configs = [
+      { name: 'Hostinger SSL 465', host: 'smtp.hostinger.com', port: 465, secure: true },
+      { name: 'Hostinger TLS 587', host: 'smtp.hostinger.com', port: 587, secure: false },
+      { name: 'Titan SSL 465', host: 'smtp.titan.email', port: 465, secure: true },
+      { name: 'Titan TLS 587', host: 'smtp.titan.email', port: 587, secure: false },
+      { name: 'Localhost 25', host: 'localhost', port: 25, secure: false }
+    ];
+
+    const results = [];
+    let workingConfig = null;
+
+    for (const cfg of configs) {
+      const opts = {
+        host: cfg.host,
+        port: cfg.port,
+        secure: cfg.secure,
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 6000,
+        greetingTimeout: 6000,
+        socketTimeout: 6000
+      };
+
+      if (cfg.host !== 'localhost') {
+        opts.auth = { user: testUser, pass: testPass };
+      }
+
+      const tp = nodemailer.createTransport(opts);
+      try {
+        await tp.verify();
+        const resObj = { name: cfg.name, status: 'VERIFIED_SUCCESS' };
+        if (!workingConfig) {
+          workingConfig = cfg;
+          try {
+            const sendInfo = await tp.sendMail({
+              from: `"Zakaria Prom Test" <${testUser}>`,
+              to: testUser,
+              subject: `SMTP Test Live - ${cfg.name}`,
+              text: `Live diagnostic test success from ${cfg.name} at ${new Date().toISOString()}`
+            });
+            resObj.sendResult = 'SENT_SUCCESS: ' + sendInfo.messageId;
+          } catch (sErr) {
+            resObj.sendError = sErr.message;
+          }
+        }
+        results.push(resObj);
+      } catch (vErr) {
+        results.push({ name: cfg.name, status: 'FAILED', error: vErr.message });
+      }
+    }
+
+    res.json({
+      testedUser: testUser,
+      workingConfig,
+      results
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

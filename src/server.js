@@ -837,9 +837,11 @@ ensureDbReady();
       res.status(404).json({ error: 'Language not found' });
     }
   });
-  app.get('/api/settings/public', (req, res) => {
+  app.get('/api/settings/public', async (req, res) => {
     try {
+      await ensureDbReady();
       const db = database.db;
+      if (!db) return res.json({});
       const settings = db.prepare('SELECT * FROM settings').all();
       const settingsObj = {};
       settings.forEach(s => { settingsObj[s.key] = s.value; });
@@ -868,9 +870,11 @@ ensureDbReady();
   });
 
   // Blog posts (public)
-  app.get('/api/posts', (req, res) => {
+  app.get('/api/posts', async (req, res) => {
     try {
+      await ensureDbReady();
       const db = database.db;
+      if (!db) return res.json([]);
       const posts = db.prepare('SELECT * FROM posts WHERE published = 1 ORDER BY created_at DESC').all();
       res.json(posts);
     } catch(e) {
@@ -879,9 +883,11 @@ ensureDbReady();
   });
 
   // Public banners
-  app.get('/api/banners', (req, res) => {
+  app.get('/api/banners', async (req, res) => {
     try {
+      await ensureDbReady();
       const db = database.db;
+      if (!db) return res.json([]);
       const banners = db.prepare('SELECT * FROM banners WHERE active = 1 ORDER BY sort_order ASC, id DESC').all();
       res.json(banners);
     } catch(e) {
@@ -892,6 +898,7 @@ ensureDbReady();
   // Public exchange rate endpoint
   app.get('/api/exchange-rate', async (req, res) => {
     try {
+      await ensureDbReady();
       const db = database.db;
       const rate = await getExchangeRate(db);
       res.json(rate);
@@ -900,9 +907,11 @@ ensureDbReady();
     }
   });
 
-  app.get('/api/currencies', (req, res) => {
+  app.get('/api/currencies', async (req, res) => {
     try {
+      await ensureDbReady();
       const db = database.db;
+      if (!db) return res.json([]);
       const currencies = db.prepare('SELECT * FROM currencies WHERE active = 1 ORDER BY id ASC').all();
       res.json(currencies);
     } catch(e) {

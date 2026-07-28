@@ -1012,17 +1012,19 @@ function ensureDbReady() {
         console.error('[Contact DB Insert Error]:', dbErr.message);
       }
 
-      // 2. Dispatch Email via Hostinger SMTP Mailer Service
+      // 2. Dispatch Email via Hostinger SMTP Mailer Service (Async / Non-blocking for instant UI response)
       const { sendContactEmail } = require('./services/mailer');
-      await sendContactEmail({
+      sendContactEmail({
         name: cleanName,
         email: cleanEmail,
         phone: phone || '',
         message: cleanMessage,
         subject: subject || `طلب عرض سعر جديد من: ${cleanName}`
+      }).catch(mailErr => {
+        console.error('[Async Contact Mailer Error]:', mailErr.message);
       });
 
-      res.json({ success: true, message: 'Message sent and email delivered successfully' });
+      res.json({ success: true, message: 'Message sent and email queued successfully' });
     } catch (error) {
       console.error('[Contact API Error]:', error.message);
       res.status(500).json({ error: 'Failed to send message: ' + error.message });

@@ -124,8 +124,16 @@ app.get('/sitemap.xml', async (req, res) => {
   }
 });
 
-// Serve static files (React build + admin panel)
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Serve static files (React build + admin panel) with no-cache headers to prevent stale JS bundle
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 async function syncXmlToDb(db, saveDatabase) {
   try {

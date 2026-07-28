@@ -1,5 +1,5 @@
 const fs = require('fs');
-const liveContentPath = "C:\\Users\\imac\\.gemini\\antigravity-ide\\brain\\57f91c34-7ad6-47e2-80ba-eb34e345b86e\\.system_generated\\steps\\6162\\content.md";
+const liveContentPath = "C:\\Users\\imac\\.gemini\\antigravity-ide\\brain\\57f91c34-7ad6-47e2-80ba-eb34e345b86e\\.system_generated\\steps\\6243\\content.md";
 const content = fs.readFileSync(liveContentPath, 'utf8');
 
 console.log('Live Bundle index-BZxkpalB.js contains /api/contact:', content.includes('/api/contact'));

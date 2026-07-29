@@ -189,8 +189,8 @@ function getCategories(products = []) {
         } else {
           catMap.set(cleanTr, {
             tr: cleanTr,
-            ar: ar || cleanTr,
-            en: en || cleanTr,
+            ar: ar || translateCategory(cleanTr, 'ar'),
+            en: en || translateCategory(cleanTr, 'en'),
             count: 1
           });
         }
@@ -203,12 +203,60 @@ function getCategories(products = []) {
 function getProductsByCategory(products, catName, lang = 'ar') {
   if (!catName || catName === 'all') return products;
   const target = String(catName).toLowerCase().trim();
+  
+  // Strip common Arabic/Turkish category prefixes/suffixes for robust matching
+  const cleanTarget = target.replace(/^(ميداليات|ساعات|دفاتر|أقلام|ترمس|فلاشات|ولاعات|حقائب|تقويمات|أطقم|قرطاسية)\s*[-|]?\s*/gi, '').trim();
+
   return products.filter(p => {
     if (!p) return false;
-    let tr = p.category_tr || (p.category && p.category.tr) || (p.categories && Array.isArray(p.categories.tr) ? p.categories.tr[0] : p.categories && p.categories.tr) || '';
-    let ar = p.category_ar || (p.category && p.category.ar) || (p.categories && Array.isArray(p.categories.ar) ? p.categories.ar[0] : p.categories && p.categories.ar) || '';
-    let en = p.category_en || (p.category && p.category.en) || (p.categories && Array.isArray(p.categories.en) ? p.categories.en[0] : p.categories && p.categories.en) || '';
-    return String(tr).toLowerCase().includes(target) || String(ar).toLowerCase().includes(target) || String(en).toLowerCase().includes(target);
+
+    const catTr = (p.category_tr || (p.category && p.category.tr) || (p.categories && Array.isArray(p.categories.tr) ? p.categories.tr[0] : p.categories && p.categories.tr) || '').toLowerCase();
+    const catAr = (p.category_ar || (p.category && p.category.ar) || (p.categories && Array.isArray(p.categories.ar) ? p.categories.ar[0] : p.categories && p.categories.ar) || '').toLowerCase();
+    const catEn = (p.category_en || (p.category && p.category.en) || (p.categories && Array.isArray(p.categories.en) ? p.categories.en[0] : p.categories && p.categories.en) || '').toLowerCase();
+
+    const topCatTr = (p.topCategory && p.topCategory.tr ? p.topCategory.tr : catTr.split(' > ')[0]).toLowerCase();
+    const topCatAr = (p.topCategory && p.topCategory.ar ? p.topCategory.ar : catAr.split(' > ')[0]).toLowerCase();
+
+    // Direct match check
+    if (catTr.includes(target) || catAr.includes(target) || catEn.includes(target) || topCatTr.includes(target) || topCatAr.includes(target)) {
+      return true;
+    }
+
+    if (cleanTarget && cleanTarget.length > 2) {
+      if (catTr.includes(cleanTarget) || catAr.includes(cleanTarget) || topCatTr.includes(cleanTarget) || topCatAr.includes(cleanTarget)) {
+        return true;
+      }
+    }
+
+    // Bidirectional translation check
+    const translatedAr = (translateCategory(p.category_tr || catTr, 'ar') || '').toLowerCase();
+    const translatedTr = (translateCategory(catName, 'tr') || '').toLowerCase();
+
+    if (translatedAr.includes(target) || catTr.includes(translatedTr)) {
+      return true;
+    }
+
+    // Robust Aliases
+    if ((target.includes('ميدالي') || target.includes('anahtar')) && (catTr.includes('anahtar') || catAr.includes('ميدالي'))) {
+      return true;
+    }
+    if ((target.includes('أجند') || target.includes('دفتر') || target.includes('defter') || target.includes('ajanda')) && (catTr.includes('defter') || catTr.includes('ajanda') || catAr.includes('دفتر') || catAr.includes('أجند'))) {
+      return true;
+    }
+    if ((target.includes('قلم') || target.includes('أقلام') || target.includes('kalem') || target.includes('pen')) && (catTr.includes('kalem') || catAr.includes('قلم') || catAr.includes('أقلام'))) {
+      return true;
+    }
+    if ((target.includes('ساع') || target.includes('saat') || target.includes('clock')) && (catTr.includes('saat') || catAr.includes('ساع'))) {
+      return true;
+    }
+    if ((target.includes('ترمس') || target.includes('termos') || target.includes('mug')) && (catTr.includes('termos') || catAr.includes('ترمس'))) {
+      return true;
+    }
+    if ((target.includes('بطاري') || target.includes('powerbank')) && (catTr.includes('powerbank') || catAr.includes('بطاري'))) {
+      return true;
+    }
+
+    return false;
   });
 }
 

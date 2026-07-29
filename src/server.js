@@ -505,8 +505,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         seenProductKeys.add(pId);
 
         let catTr = lp.category_tr || '';
-        let catAr = lp.category_ar || catTr;
-        let catEn = lp.category_en || catTr;
+        let catAr = (lp.category_ar && lp.category_ar !== catTr) ? lp.category_ar : translateCategory(catTr, 'ar');
+        let catEn = (lp.category_en && lp.category_en !== catTr) ? lp.category_en : translateCategory(catTr, 'en');
 
         // Check category override
         const catOverride = categoryOverrideMap[pId] || categoryOverrideMap[lp.model];

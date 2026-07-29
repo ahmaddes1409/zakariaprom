@@ -4,7 +4,7 @@ const { parseStringPromise } = require('xml2js');
 const { translateProductName, translateCategory } = require('./translations');
 
 const XML_URL = 'https://karmedya.com/xml/xml_export_product.xml';
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour cache
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hour cache
 
 let cachedProducts = null;
 let lastFetchTime = 0;
@@ -12,9 +12,21 @@ let lastFetchTime = 0;
 async function fetchXML() {
   const localBackup = path.join(__dirname, '..', 'data', 'xml_export_product.xml');
   
-  // Try remote fetch FIRST
+  // 1. Try local backup FIRST for instant zero-latency loading
+  if (fs.existsSync(localBackup)) {
+    try {
+      const stats = fs.statSync(localBackup);
+      if (stats.size > 1000) {
+        let text = fs.readFileSync(localBackup, 'utf8');
+        if (text.includes('<')) text = text.substring(text.indexOf('<'));
+        return text;
+      }
+    } catch(e) {}
+  }
+
+  // 2. Fallback to remote fetch with short 5s timeout if no local backup file
   try {
-    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(5000), headers: { 'User-Agent': 'Mozilla/5.0' } });
     if (response.ok) {
       let text = await response.text();
       if (text && text.includes('<SHOP>')) {
@@ -25,17 +37,7 @@ async function fetchXML() {
       }
     }
   } catch(e) {
-    console.warn(`[XML Feed] Remote fetch failed (${e.message}), falling back to local backup.`);
-  }
-
-  // Fallback to local backup if remote fetch failed
-  if (fs.existsSync(localBackup)) {
-    const stats = fs.statSync(localBackup);
-    if (stats.size > 1000) {
-      let text = fs.readFileSync(localBackup, 'utf8');
-      if (text.includes('<')) text = text.substring(text.indexOf('<'));
-      return text;
-    }
+    console.warn(`[XML Feed] Remote fetch failed (${e.message}).`);
   }
 
   throw new Error('Could not fetch XML from remote or local backup');
@@ -58,81 +60,69 @@ function parseXmlFast(xmlText) {
       let rawVal = '';
       const start = itemContent.indexOf(openTag);
       if (start === -1) {
-        const lower = itemContent.toLowerCase();
-        const lStart = lower.indexOf(openTag.toLowerCase());
-        if (lStart === -1) return '';
-        const lEnd = lower.indexOf(closeTag.toLowerCase(), lStart + openTag.length);
-        if (lEnd === -1) return '';
-        rawVal = itemContent.substring(lStart + openTag.length, lEnd).trim();
+        const startNoCase = itemContent.toLowerCase().indexOf(openTag.toLowerCase());
+        if (startNoCase === -1) return '';
+        const endNoCase = itemContent.toLowerCase().indexOf(closeTag.toLowerCase(), startNoCase + openTag.length);
+        if (endNoCase === -1) return '';
+        rawVal = itemContent.substring(startNoCase + openTag.length, endNoCase);
       } else {
         const end = itemContent.indexOf(closeTag, start + openTag.length);
         if (end === -1) return '';
-        rawVal = itemContent.substring(start + openTag.length, end).trim();
+        rawVal = itemContent.substring(start + openTag.length, end);
       }
-      if (rawVal.includes('Ã') || rawVal.includes('Å') || rawVal.includes('Ä')) {
-        rawVal = rawVal.replace(/Ã¶/g, 'ö').replace(/Ã§/g, 'ç').replace(/ÅŸ/g, 'ş')
-                       .replace(/ÄŸ/g, 'ğ').replace(/Ä±/g, 'ı').replace(/Ã¼/g, 'ü')
-                       .replace(/Ã–/g, 'Ö').replace(/Ã‡/g, 'Ç').replace(/Åž/g, 'Ş')
-                       .replace(/Ä°/g, 'İ').replace(/Ãœ/g, 'Ü');
-      }
-      return rawVal;
+      return rawVal.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, '$1').trim();
     };
 
-    const productId = getVal('PRODUCT_ID');
-    const name = getVal('NAME');
-    const model = getVal('MODEL');
-    const priceRaw = getVal('PRICE');
-    const quantityRaw = getVal('QUANTITY');
-    let description = getVal('DESCRIPTION');
-    if (description.includes('&lt;')) {
-      description = description.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-    }
-    description = description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const id = getVal('ITEM_ID') || getVal('PRODUCT_ID') || getVal('ID');
+    const nameTr = getVal('PRODUCT_NAME') || getVal('NAME') || getVal('TITLE');
+    if (!id || !nameTr) continue;
 
-    // Extract categories
-    const categories = [];
-    const catMatches = itemContent.match(/<CATEGORY>([\s\S]*?)<\/CATEGORY>/gi) || [];
-    for (const cTag of catMatches) {
-      let cVal = cTag.replace(/<\/?CATEGORY>/gi, '').trim();
-      if (cVal.includes('Ã') || cVal.includes('Å') || cVal.includes('Ä')) {
-        cVal = cVal.replace(/Ã¶/g, 'ö').replace(/Ã§/g, 'ç').replace(/ÅŸ/g, 'ş')
-                   .replace(/ÄŸ/g, 'ğ').replace(/Ä±/g, 'ı').replace(/Ã¼/g, 'ü')
-                   .replace(/Ã–/g, 'Ö').replace(/Ã‡/g, 'Ç').replace(/Åž/g, 'Ş')
-                   .replace(/Ä°/g, 'İ').replace(/Ãœ/g, 'Ü');
-      }
-      if (cVal && cVal !== '--Kapalı Ürünler Kategorisi' && !categories.includes(cVal)) {
-        categories.push(cVal);
-      }
-    }
-
-    // Extract images
+    const model = getVal('PRODUCT_CODE') || getVal('CODE') || getVal('MODEL') || id;
+    const catStr = getVal('CATEGORY_NAME') || getVal('CATEGORY') || getVal('CATEGORIES');
+    const descTr = getVal('DESCRIPTION') || getVal('DETAIL');
+    const price = parseFloat(getVal('PRICE') || getVal('PRICE_VAT') || '0') || 0;
+    const stock = parseInt(getVal('STOCK') || getVal('QUANTITY') || '100') || 100;
+    
+    // Images
     const images = [];
-    const imgMatches = itemContent.match(/<IMAGE_\d+>([\s\S]*?)<\/IMAGE_\d+>/gi) || [];
-    for (const iTag of imgMatches) {
-      const url = iTag.replace(/<\/?IMAGE_\d+>/gi, '').trim();
-      if (url && !images.includes(url)) {
-        images.push(url);
-      }
+    const mainImg = getVal('IMAGE') || getVal('IMAGE_URL') || getVal('PICTURE');
+    if (mainImg) images.push(mainImg);
+    
+    for (let i = 1; i <= 5; i++) {
+      const img = getVal(`IMAGE_${i}`) || getVal(`IMAGE${i}`);
+      if (img && !images.includes(img)) images.push(img);
     }
 
-    if (productId && name) {
-      const price = parseFloat(priceRaw.replace(/[^0-9.]/g, '')) || 0;
-      const quantity = parseInt(quantityRaw, 10) || 0;
+    const catTr = catStr ? catStr.split('>').pop().trim() : 'Genel';
+    const catAr = translateCategory(catTr, 'ar');
+    const catEn = translateCategory(catTr, 'en');
 
-      products.push({
-        id: productId,
-        name: { tr: name },
-        model: model,
-        categories: { tr: categories },
-        description: description,
-        price: price,
-        quantity: quantity,
-        images: images,
-        colors: [],
-        sizes: []
-      });
-    }
+    products.push({
+      id,
+      model,
+      name: {
+        tr: nameTr,
+        ar: translateProductName(nameTr, 'ar'),
+        en: translateProductName(nameTr, 'en')
+      },
+      category: {
+        tr: catTr,
+        ar: catAr,
+        en: catEn
+      },
+      price,
+      currency: 'TRY',
+      stock,
+      images,
+      description: {
+        tr: descTr,
+        ar: descTr,
+        en: descTr
+      },
+      source: 'karmedya'
+    });
   }
+
   return products;
 }
 
@@ -143,7 +133,6 @@ async function fetchAndParseProducts() {
   }
 
   try {
-    console.log('Fetching XML data from karmedya.com...');
     const xml = await fetchXML();
     const products = parseXmlFast(xml);
 
@@ -154,179 +143,57 @@ async function fetchAndParseProducts() {
       return products;
     }
   } catch (error) {
-    console.error('Error fetching/parsing XML:', error);
+    console.error('Error fetching/parsing XML:', error.message);
   }
 
   if (cachedProducts && cachedProducts.length > 0) return cachedProducts;
   return [];
 }
 
-function extractCategories(item) {
-  if (!item.CATEGORIES || !item.CATEGORIES.CATEGORY) return [];
-  const cats = item.CATEGORIES.CATEGORY;
-  if (Array.isArray(cats)) return cats;
-  return [cats];
-}
-
-function parseProduct(item) {
-  let categories = extractCategories(item)
-    .filter(c => c !== '--Kapalı Ürünler Kategorisi');
-
-  const textCats = categories.filter(c => !c.match(/^\d+$/));
-  if (textCats.length > 0) {
-    categories = textCats;
-  } else {
-    categories = ['Promosyon Ürünleri'];
-  }
-
-  const images = [];
-  if (item.IMAGES) {
-    for (let i = 1; i <= 5; i++) {
-      const imgKey = `IMAGE_${i}`;
-      if (item.IMAGES[imgKey]) {
-        images.push(item.IMAGES[imgKey].trim());
-      }
-    }
-  }
-
-  const priceStr = item.PRICE || '0';
-  const price = parseFloat(priceStr.replace('TL', '').replace(',', '.')) || 0;
-
-  const options = [];
-  if (item.PRODUCT_OPTIONS && item.PRODUCT_OPTIONS.OPTION) {
-    const opts = Array.isArray(item.PRODUCT_OPTIONS.OPTION)
-      ? item.PRODUCT_OPTIONS.OPTION
-      : [item.PRODUCT_OPTIONS.OPTION];
-
-    for (const opt of opts) {
-      if (opt.ITEMS && opt.ITEMS.ITEM) {
-        const optItems = Array.isArray(opt.ITEMS.ITEM) ? opt.ITEMS.ITEM : [opt.ITEMS.ITEM];
-        options.push({
-          name: opt.NAME || '',
-          items: optItems.map(oi => ({
-            name: oi.NAME || '',
-            price: oi.PRICE || '',
-            quantity: parseInt(oi.QUANTITY) || 0
-          }))
+function getCategories(products = []) {
+  const catMap = new Map();
+  products.forEach(p => {
+    if (p.category && p.category.tr) {
+      const tr = p.category.tr;
+      if (!catMap.has(tr)) {
+        catMap.set(tr, {
+          tr: tr,
+          ar: p.category.ar || translateCategory(tr, 'ar'),
+          en: p.category.en || translateCategory(tr, 'en')
         });
       }
     }
-  }
-
-  const nameTr = item.NAME || '';
-  const nameAr = translateProductName(nameTr, 'ar');
-  const nameEn = translateProductName(nameTr, 'en');
-
-  const categoriesTr = categories;
-  const categoriesAr = categories.map(c => translateCategory(c, 'ar'));
-  const categoriesEn = categories.map(c => translateCategory(c, 'en'));
-
-  // Clean description HTML
-  const desc = (item.DESCRIPTION || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
-
-  return {
-    id: item.PRODUCT_ID || '',
-    name: { tr: nameTr, ar: nameAr, en: nameEn },
-    model: item.MODEL || '',
-    categories: { tr: categoriesTr, ar: categoriesAr, en: categoriesEn },
-    topCategory: {
-      tr: categoriesTr.length > 0 ? categoriesTr[0].split(' > ')[0] : '',
-      ar: categoriesAr.length > 0 ? categoriesAr[0].split(' > ')[0] : '',
-      en: categoriesEn.length > 0 ? categoriesEn[0].split(' > ')[0] : ''
-    },
-    description: desc,
-    price,
-    quantity: parseInt(item.QUANTITY) || 0,
-    images,
-    options,
-    status: item.STATUS === '1'
-  };
+  });
+  return Array.from(catMap.values());
 }
 
-function getCategories(products) {
-  const { normalizeCategoryName } = require('./translations');
-  const catMap = {};
-  if (!Array.isArray(products)) return [];
-
-  for (const product of products) {
-    if (!product || !product.categories || !Array.isArray(product.categories.tr)) continue;
-    const catTrArr = product.categories.tr;
-    const catArArr = Array.isArray(product.categories.ar) ? product.categories.ar : catTrArr;
-    const catEnArr = Array.isArray(product.categories.en) ? product.categories.en : catTrArr;
-
-    for (let i = 0; i < catTrArr.length; i++) {
-      let rawTr = catTrArr[i] || '';
-      if (typeof rawTr !== 'string') continue;
-      let rawAr = (typeof catArArr[i] === 'string' ? catArArr[i] : rawTr);
-      let rawEn = (typeof catEnArr[i] === 'string' ? catEnArr[i] : rawTr);
-
-      if (rawTr.includes('|')) rawTr = rawTr.split('|')[0].trim();
-      if (rawAr.includes('|')) rawAr = rawAr.split('|')[0].trim();
-      if (rawEn.includes('|')) rawEn = rawEn.split('|')[0].trim();
-
-      rawTr = normalizeCategoryName(rawTr);
-
-      const topTr = rawTr.split(' > ')[0].trim();
-      const topAr = rawAr.split(' > ')[0].trim();
-      const topEn = rawEn.split(' > ')[0].trim();
-
-      if (!topTr) continue;
-
-      if (!catMap[topTr]) {
-        catMap[topTr] = { tr: topTr, ar: topAr, en: topEn, count: 0, subcategories: {} };
-      }
-      catMap[topTr].count++;
-
-      // Subcategories
-      const parts = rawTr.split(' > ');
-      if (parts.length > 1) {
-        const subTr = parts[1].trim();
-        const subParts = rawAr.split(' > ');
-        const subAr = subParts.length > 1 ? subParts[1].trim() : subTr;
-        const subPartsEn = rawEn.split(' > ');
-        const subEn = subPartsEn.length > 1 ? subPartsEn[1].trim() : subTr;
-
-        if (!catMap[topTr].subcategories[subTr]) {
-          catMap[topTr].subcategories[subTr] = { tr: subTr, ar: subAr, en: subEn, count: 0 };
-        }
-        catMap[topTr].subcategories[subTr].count++;
-      }
-    }
-  }
-
-  // Convert to array and sort by count
-  return Object.values(catMap)
-    .map(cat => ({
-      ...cat,
-      subcategories: Object.values(cat.subcategories).sort((a, b) => b.count - a.count)
-    }))
-    .sort((a, b) => b.count - a.count);
-}
-
-function getProductsByCategory(products, category) {
-  const { normalizeCategoryName } = require('./translations');
-  const normSearchCat = normalizeCategoryName(category);
-
+function getProductsByCategory(products, catName, lang = 'ar') {
+  if (!catName || catName === 'all') return products;
   return products.filter(p => {
-    return p.categories.tr.some(c => normalizeCategoryName(c) === normSearchCat || c.includes(category) || c.includes(normSearchCat)) ||
-           p.categories.ar.some(c => c.includes(category)) ||
-           p.categories.en.some(c => c.includes(category));
+    if (!p.category) return false;
+    return p.category.tr === catName || p.category.ar === catName || p.category.en === catName;
   });
 }
 
-function searchProducts(products, query, lang = 'tr') {
-  const q = query.toLowerCase();
+function searchProducts(products, query) {
+  if (!query) return products;
+  const q = query.toLowerCase().trim();
   return products.filter(p => {
-    return p.name.tr.toLowerCase().includes(q) ||
-           p.name.ar.toLowerCase().includes(q) ||
-           p.name.en.toLowerCase().includes(q) ||
-           p.model.toLowerCase().includes(q) ||
-           p.id.includes(q);
+    const nameMatch = (p.name.tr && p.name.tr.toLowerCase().includes(q)) ||
+                      (p.name.ar && p.name.ar.toLowerCase().includes(q)) ||
+                      (p.name.en && p.name.en.toLowerCase().includes(q));
+    const modelMatch = p.model && p.model.toLowerCase().includes(q);
+    const catMatch = p.category && (
+      (p.category.tr && p.category.tr.toLowerCase().includes(q)) ||
+      (p.category.ar && p.category.ar.toLowerCase().includes(q)) ||
+      (p.category.en && p.category.en.toLowerCase().includes(q))
+    );
+    return nameMatch || modelMatch || catMatch;
   });
 }
 
 function getProductById(products, id) {
-  return products.find(p => p.id === id) || null;
+  return products.find(p => String(p.id) === String(id));
 }
 
 module.exports = { fetchAndParseProducts, getCategories, getProductsByCategory, searchProducts, getProductById };

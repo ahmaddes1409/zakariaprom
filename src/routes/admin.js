@@ -73,23 +73,25 @@ router.get('/db-status', adminAuth, (req, res) => {
 router.get('/dashboard', adminAuth, async (req, res) => {
   try {
     const db = getDb();
-    const products = await fetchAndParseProducts();
-    const categories = getCategories(products);
-    const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get().count;
-    const newOrders = db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'new'").get().count;
-    const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
-    const totalVisits = db.prepare('SELECT COUNT(*) as count FROM analytics WHERE created_at > datetime("now", "-30 days")').get().count;
-    const recentOrders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10').all();
-    const topProducts = db.prepare('SELECT product_id, COUNT(*) as views FROM analytics WHERE product_id IS NOT NULL AND action = "view" GROUP BY product_id ORDER BY views DESC LIMIT 10').all();
+    const totalProductsRow = db.prepare('SELECT COUNT(*) as count FROM products').get();
+    const totalCategoriesRow = db.prepare('SELECT COUNT(DISTINCT category) as count FROM products').get();
+    const totalProducts = totalProductsRow ? totalProductsRow.count : 0;
+    const totalCategories = totalCategoriesRow ? totalCategoriesRow.count : 0;
+    const totalOrdersRow = db.prepare('SELECT COUNT(*) as count FROM orders').get();
+    const newOrdersRow = db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'new'").get();
+    const totalUsersRow = db.prepare('SELECT COUNT(*) as count FROM users').get();
+    const totalVisitsRow = db.prepare('SELECT COUNT(*) as count FROM analytics WHERE created_at > datetime("now", "-30 days")').get();
+    const recentOrders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10').all() || [];
+    const topProducts = db.prepare('SELECT product_id, COUNT(*) as views FROM analytics WHERE product_id IS NOT NULL AND action = "view" GROUP BY product_id ORDER BY views DESC LIMIT 10').all() || [];
 
     res.json({
       stats: {
-        totalProducts: products.length,
-        totalCategories: categories.length,
-        totalOrders,
-        newOrders,
-        totalUsers,
-        totalVisits
+        totalProducts,
+        totalCategories,
+        totalOrders: totalOrdersRow ? totalOrdersRow.count : 0,
+        newOrders: newOrdersRow ? newOrdersRow.count : 0,
+        totalUsers: totalUsersRow ? totalUsersRow.count : 0,
+        totalVisits: totalVisitsRow ? totalVisitsRow.count : 0
       },
       recentOrders,
       topProducts
@@ -102,26 +104,24 @@ router.get('/dashboard', adminAuth, async (req, res) => {
 // ===== TRANSLATIONS =====
 router.get('/translations', adminAuth, async (req, res) => {
   const db = getDb();
-  const overrides = db.prepare('SELECT * FROM translation_overrides ORDER BY type, original_key').all();
-  
-  // Build override map
-  const overrideMap = {};
-  overrides.forEach(o => {
-    if (!overrideMap[o.type]) overrideMap[o.type] = {};
-    if (!overrideMap[o.type][o.original_key]) overrideMap[o.type][o.original_key] = {};
-    overrideMap[o.type][o.original_key][o.lang] = o.translation;
-  });
-
-  // Get all categories from products
   try {
-    const products = await fetchAndParseProducts();
-    const allCategories = getCategories(products);
+    const overrides = db.prepare('SELECT * FROM translation_overrides ORDER BY type, original_key').all() || [];
     
-    // Merge categories with overrides
-    const categories = allCategories.map(cat => ({
-      tr: cat.tr,
-      ar: (overrideMap.category && overrideMap.category[cat.tr] && overrideMap.category[cat.tr].ar) || cat.ar,
-      en: (overrideMap.category && overrideMap.category[cat.tr] && overrideMap.category[cat.tr].en) || cat.en
+    // Build override map
+    const overrideMap = {};
+    overrides.forEach(o => {
+      if (!overrideMap[o.type]) overrideMap[o.type] = {};
+      if (!overrideMap[o.type][o.original_key]) overrideMap[o.type][o.original_key] = {};
+      overrideMap[o.type][o.original_key][o.lang] = o.translation;
+    });
+
+    // Get categories directly from database
+    const catRows = db.prepare('SELECT DISTINCT category, category_ar, category_en FROM products WHERE category IS NOT NULL AND category != ""').all() || [];
+    
+    const categories = catRows.map(cat => ({
+      tr: cat.category,
+      ar: (overrideMap.category && overrideMap.category[cat.category] && overrideMap.category[cat.category].ar) || cat.category_ar || cat.category,
+      en: (overrideMap.category && overrideMap.category[cat.category] && overrideMap.category[cat.category].en) || cat.category_en || cat.category
     }));
 
     // Get term overrides
@@ -138,16 +138,7 @@ router.get('/translations', adminAuth, async (req, res) => {
 
     res.json({ categories, terms });
   } catch (error) {
-    // Fallback: just return overrides grouped
-    const categories = [];
-    const terms = [];
-    overrides.forEach(o => {
-      const list = o.type === 'category' ? categories : terms;
-      let existing = list.find(i => i.tr === o.original_key);
-      if (!existing) { existing = { tr: o.original_key, ar: '', en: '' }; list.push(existing); }
-      existing[o.lang] = o.translation;
-    });
-    res.json({ categories, terms });
+    res.json({ categories: [], terms: [] });
   }
 });
 

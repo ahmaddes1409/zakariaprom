@@ -1,4 +1,4 @@
-// Hostinger LiteSpeed / Passenger Node entry point (v1.6.2 - New Asset bundle-contact-v162.js)
+// Hostinger LiteSpeed / Passenger Node entry point (v1.6.3 - UTF8 Meta & Encoding Fix)
 const app = require('./src/server.js');
 
 module.exports = app;

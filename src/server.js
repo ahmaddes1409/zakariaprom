@@ -744,6 +744,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
           const catEn = lp.category_en || catTr;
           return {
             id: lp.product_id || ('local_' + lp.id),
+            category: { tr: catTr, ar: catAr, en: catEn },
             categories: { tr: [catTr], ar: [catAr], en: [catEn] },
             topCategory: {
               tr: catTr ? catTr.split(' > ')[0].trim() : '',

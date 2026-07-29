@@ -548,6 +548,7 @@ router.get('/categories', adminAuth, async (req, res) => {
     let products = dbRows.map(lp => ({
       id: lp.product_id,
       model: lp.model,
+      category: { tr: lp.category_tr || '', ar: lp.category_ar || '', en: lp.category_en || '' },
       categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || ''], en: [lp.category_en || ''] }
     }));
     if (products.length === 0) {

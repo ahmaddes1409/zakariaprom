@@ -110,6 +110,14 @@ function parseXmlFast(xmlText) {
         ar: catAr,
         en: catEn
       },
+      categories: {
+        tr: [catTr],
+        ar: [catAr],
+        en: [catEn]
+      },
+      category_tr: catTr,
+      category_ar: catAr,
+      category_en: catEn,
       price,
       currency: 'TRY',
       stock,
@@ -153,14 +161,39 @@ async function fetchAndParseProducts() {
 function getCategories(products = []) {
   const catMap = new Map();
   products.forEach(p => {
+    if (!p) return;
+    let tr = '';
+    let ar = '';
+    let en = '';
+
     if (p.category && p.category.tr) {
-      const tr = p.category.tr;
-      if (!catMap.has(tr)) {
-        catMap.set(tr, {
-          tr: tr,
-          ar: p.category.ar || translateCategory(tr, 'ar'),
-          en: p.category.en || translateCategory(tr, 'en')
-        });
+      tr = p.category.tr;
+      ar = p.category.ar;
+      en = p.category.en;
+    } else if (p.categories && p.categories.tr) {
+      tr = Array.isArray(p.categories.tr) ? p.categories.tr[0] : p.categories.tr;
+      ar = Array.isArray(p.categories.ar) ? p.categories.ar[0] : p.categories.ar;
+      en = Array.isArray(p.categories.en) ? p.categories.en[0] : p.categories.en;
+    } else if (p.category_tr) {
+      tr = p.category_tr;
+      ar = p.category_ar;
+      en = p.category_en;
+    }
+
+    if (tr) {
+      const cleanTr = String(tr).trim();
+      if (cleanTr && cleanTr !== '--Kapalı Ürünler Kategorisi') {
+        const existing = catMap.get(cleanTr);
+        if (existing) {
+          existing.count = (existing.count || 0) + 1;
+        } else {
+          catMap.set(cleanTr, {
+            tr: cleanTr,
+            ar: ar || cleanTr,
+            en: en || cleanTr,
+            count: 1
+          });
+        }
       }
     }
   });
@@ -169,9 +202,13 @@ function getCategories(products = []) {
 
 function getProductsByCategory(products, catName, lang = 'ar') {
   if (!catName || catName === 'all') return products;
+  const target = String(catName).toLowerCase().trim();
   return products.filter(p => {
-    if (!p.category) return false;
-    return p.category.tr === catName || p.category.ar === catName || p.category.en === catName;
+    if (!p) return false;
+    let tr = p.category_tr || (p.category && p.category.tr) || (p.categories && Array.isArray(p.categories.tr) ? p.categories.tr[0] : p.categories && p.categories.tr) || '';
+    let ar = p.category_ar || (p.category && p.category.ar) || (p.categories && Array.isArray(p.categories.ar) ? p.categories.ar[0] : p.categories && p.categories.ar) || '';
+    let en = p.category_en || (p.category && p.category.en) || (p.categories && Array.isArray(p.categories.en) ? p.categories.en[0] : p.categories && p.categories.en) || '';
+    return String(tr).toLowerCase().includes(target) || String(ar).toLowerCase().includes(target) || String(en).toLowerCase().includes(target);
   });
 }
 
@@ -179,21 +216,20 @@ function searchProducts(products, query) {
   if (!query) return products;
   const q = query.toLowerCase().trim();
   return products.filter(p => {
-    const nameMatch = (p.name.tr && p.name.tr.toLowerCase().includes(q)) ||
-                      (p.name.ar && p.name.ar.toLowerCase().includes(q)) ||
-                      (p.name.en && p.name.en.toLowerCase().includes(q));
+    const nameMatch = (p.name && p.name.tr && p.name.tr.toLowerCase().includes(q)) ||
+                      (p.name && p.name.ar && p.name.ar.toLowerCase().includes(q)) ||
+                      (p.name && p.name.en && p.name.en.toLowerCase().includes(q)) ||
+                      (p.name_tr && p.name_tr.toLowerCase().includes(q)) ||
+                      (p.name_ar && p.name_ar.toLowerCase().includes(q));
     const modelMatch = p.model && p.model.toLowerCase().includes(q);
-    const catMatch = p.category && (
-      (p.category.tr && p.category.tr.toLowerCase().includes(q)) ||
-      (p.category.ar && p.category.ar.toLowerCase().includes(q)) ||
-      (p.category.en && p.category.en.toLowerCase().includes(q))
-    );
+    const catMatch = (p.category_tr && p.category_tr.toLowerCase().includes(q)) ||
+                     (p.category_ar && p.category_ar.toLowerCase().includes(q));
     return nameMatch || modelMatch || catMatch;
   });
 }
 
 function getProductById(products, id) {
-  return products.find(p => String(p.id) === String(id));
+  return products.find(p => String(p.id) === String(id) || String(p.product_id) === String(id));
 }
 
 module.exports = { fetchAndParseProducts, getCategories, getProductsByCategory, searchProducts, getProductById };

@@ -554,7 +554,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
           id: pId,
           name: { tr: nameTr, ar: nameAr, en: nameEn },
           model: lp.model || ('LP' + lp.id),
+          category: { tr: catTr, ar: catAr, en: catEn },
           categories: { tr: [catTr], ar: [catAr], en: [catEn] },
+          category_tr: catTr,
+          category_ar: catAr,
+          category_en: catEn,
           topCategory: {
             tr: topCatTr,
             ar: catAr.split(' > ')[0].trim(),

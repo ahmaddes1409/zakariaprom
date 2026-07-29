@@ -67,12 +67,18 @@ function optionalUserAuth(req, res, next) {
 
 // Admin login
 function adminLogin(username, password) {
-  const db = getDb();
-  const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get(username);
-  if (!admin) return null;
-  if (!bcrypt.compareSync(password, admin.password)) return null;
-  const token = generateToken({ id: admin.id, username: admin.username, role: admin.role, type: 'admin' });
-  return { token, admin: { id: admin.id, username: admin.username, role: admin.role } };
+  try {
+    const db = getDb();
+    if (!db) return null;
+    const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get(username);
+    if (!admin || !admin.password) return null;
+    if (!bcrypt.compareSync(password, admin.password)) return null;
+    const token = generateToken({ id: admin.id, username: admin.username, role: admin.role, type: 'admin' });
+    return { token, admin: { id: admin.id, username: admin.username, role: admin.role } };
+  } catch (e) {
+    console.error('[Admin Login Error]:', e.message);
+    return null;
+  }
 }
 
 // User registration

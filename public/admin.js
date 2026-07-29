@@ -23,16 +23,16 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
-    const data = await res.json();
-    if (data.token) {
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.token) {
       token = data.token;
       localStorage.setItem('admin_token', token);
       showAdmin();
     } else {
-      showLoginError(data.error || 'خطأ في تسجيل الدخول');
+      showLoginError(data.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
     }
   } catch (err) {
-    showLoginError('خطأ في الاتصال بالسيرفر');
+    showLoginError('اسم المستخدم أو كلمة المرور غير صحيحة');
   }
 });
 
@@ -135,12 +135,12 @@ async function renderDashboard() {
   const area = document.getElementById('contentArea');
   area.innerHTML = `
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-box"></i></div><div class="stat-info"><h3>${data.stats?.totalProducts || 0}</h3><p>منتج</p></div></div>
-      <div class="stat-card"><div class="stat-icon green"><i class="fas fa-tags"></i></div><div class="stat-info"><h3>${data.stats?.totalCategories || 0}</h3><p>فئة</p></div></div>
-      <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-shopping-bag"></i></div><div class="stat-info"><h3>${data.stats?.totalOrders || 0}</h3><p>طلب</p></div></div>
-      <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-users"></i></div><div class="stat-info"><h3>${data.stats?.totalUsers || 0}</h3><p>عميل مسجل</p></div></div>
-      <div class="stat-card"><div class="stat-icon teal"><i class="fas fa-sync"></i></div><div class="stat-info"><h3>${data.stats?.totalVisits || 0}</h3><p>زيارة (30 يوم)</p></div></div>
-      <div class="stat-card"><div class="stat-icon red"><i class="fas fa-clock"></i></div><div class="stat-info"><h3>${data.stats?.newOrders || 0}</h3><p>طلب جديد</p></div></div>
+      <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-box"></i></div><div class="stat-info"><h3>${(data.stats && data.stats.totalProducts) || 0}</h3><p>منتج</p></div></div>
+      <div class="stat-card"><div class="stat-icon green"><i class="fas fa-tags"></i></div><div class="stat-info"><h3>${(data.stats && data.stats.totalCategories) || 0}</h3><p>فئة</p></div></div>
+      <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-shopping-bag"></i></div><div class="stat-info"><h3>${(data.stats && data.stats.totalOrders) || 0}</h3><p>طلب</p></div></div>
+      <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-users"></i></div><div class="stat-info"><h3>${(data.stats && data.stats.totalUsers) || 0}</h3><p>عميل مسجل</p></div></div>
+      <div class="stat-card"><div class="stat-icon teal"><i class="fas fa-sync"></i></div><div class="stat-info"><h3>${(data.stats && data.stats.totalVisits) || 0}</h3><p>زيارة (30 يوم)</p></div></div>
+      <div class="stat-card"><div class="stat-icon red"><i class="fas fa-clock"></i></div><div class="stat-info"><h3>${(data.stats && data.stats.newOrders) || 0}</h3><p>طلب جديد</p></div></div>
     </div>
     <div class="card">
       <div class="card-header"><h3>آخر الطلبات</h3></div>
@@ -164,7 +164,7 @@ async function renderDashboard() {
 async function renderOrders() {
   const data = await api('/api/admin/orders');
   const area = document.getElementById('contentArea');
-  const orders = data?.orders || [];
+  const orders = (data && data.orders) || [];
   area.innerHTML = `
     <div class="filters-bar">
       <select id="orderStatusFilter" onchange="filterOrders()">
@@ -243,7 +243,7 @@ window.updateOrderStatus = async function(id) {
 async function renderCategories() {
   const data = await api('/api/admin/categories');
   const area = document.getElementById('contentArea');
-  const cats = data?.categories || [];
+  const cats = (data && data.categories) || [];
   
   area.innerHTML = `
     <div class="card">
@@ -388,8 +388,8 @@ window.editCategory = async function(catTr) {
 async function renderTranslations() {
   const data = await api('/api/admin/translations');
   const area = document.getElementById('contentArea');
-  const cats = data?.categories || [];
-  const terms = data?.terms || [];
+  const cats = (data && data.categories) || [];
+  const terms = (data && data.terms) || [];
   area.innerHTML = `
     <div class="card">
       <div class="card-header"><h3>ترجمات الفئات</h3><button class="btn-primary btn-sm" onclick="addTranslation('category')">+ إضافة</button></div>
@@ -434,11 +434,11 @@ async function renderTranslations() {
 let productTransPage = 1;
 async function loadProductTranslations(page) {
   productTransPage = page;
-  const search = document.getElementById('productTransSearch')?.value || '';
+  const search = (document.getElementById('productTransSearch') && document.getElementById('productTransSearch').value) || '';
   const data = await api(`/api/admin/translations/products?page=${page}&limit=20&search=${encodeURIComponent(search)}`);
-  const products = data?.products || [];
-  const total = data?.total || 0;
-  const totalPages = data?.totalPages || 1;
+  const products = (data && data.products) || [];
+  const total = (data && data.total) || 0;
+  const totalPages = (data && data.totalPages) || 1;
   const listEl = document.getElementById('productTransList');
   if (!products.length) { listEl.innerHTML = '<p style="color:#888;">لا توجد منتجات</p>'; return; }
   listEl.innerHTML = `<div class="table-responsive"><table>
@@ -521,7 +521,7 @@ window.addTranslation = function(type) {
 async function renderUsers() {
   const data = await api('/api/admin/users');
   const area = document.getElementById('contentArea');
-  const users = data?.users || [];
+  const users = (data && data.users) || [];
   area.innerHTML = `
     <div class="card">
       <div class="card-header"><h3>العملاء المسجلين (${users.length})</h3></div>
@@ -545,7 +545,7 @@ async function renderUsers() {
 async function renderCoupons() {
   const data = await api('/api/admin/coupons');
   const area = document.getElementById('contentArea');
-  const coupons = Array.isArray(data) ? data : (data?.coupons || []);
+  const coupons = Array.isArray(data) ? data : ((data && data.coupons) || []);
   area.innerHTML = `
     <div class="filters-bar">
       <button class="btn-primary" onclick="addCoupon()"><i class="fas fa-plus"></i> إضافة كوبون</button>
@@ -608,7 +608,7 @@ window.deleteCoupon = async function(id) {
 async function renderPosts() {
   const data = await api('/api/admin/posts');
   const area = document.getElementById('contentArea');
-  const posts = Array.isArray(data) ? data : (data?.posts || []);
+  const posts = Array.isArray(data) ? data : ((data && data.posts) || []);
   area.innerHTML = `
     <div class="filters-bar">
       <button class="btn-primary" onclick="addPost()"><i class="fas fa-plus"></i> إضافة مقال</button>
@@ -668,7 +668,7 @@ window.deletePost = async function(id) {
 async function renderChatbot() {
   const data = await api('/api/admin/chatbot');
   const area = document.getElementById('contentArea');
-  const responses = Array.isArray(data) ? data : (data?.responses || []);
+  const responses = Array.isArray(data) ? data : ((data && data.responses) || []);
   area.innerHTML = `
     <div class="card">
       <div class="card-header"><h3>إعدادات الشات بوت</h3></div>
@@ -720,7 +720,7 @@ window.addChatResponse = function() {
 
 window.editChatResponse = async function(id) {
   const data = await api('/api/admin/chatbot');
-  const responses = Array.isArray(data) ? data : (data?.responses || []);
+  const responses = Array.isArray(data) ? data : ((data && data.responses) || []);
   const r = responses.find(x => x.id === id);
   if (!r) return toast('لم يتم العثور على الرد');
   showModal('تعديل رد الشات بوت', `
@@ -923,8 +923,8 @@ async function renderSettings() {
       current_password: document.getElementById('spCurrent').value,
       new_password: newPass
     }});
-    if (res?.success) toast('تم تغيير كلمة المرور');
-    else toast(res?.error || 'خطأ', 'error');
+    if ((res && res.success)) toast('تم تغيير كلمة المرور');
+    else toast((res && res.error) || 'خطأ', 'error');
   };
 }
 

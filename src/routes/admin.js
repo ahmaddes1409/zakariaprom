@@ -9,17 +9,22 @@ function getDb() { return database.db; }
 const router = express.Router();
 
 // Admin Login
-router.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+router.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبان' });
+    }
+    const result = adminLogin(username, password);
+    if (!result) {
+      return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+    }
+    res.cookie('admin_token', result.token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.json(result);
+  } catch (err) {
+    console.error('[POST /api/admin/login error]:', err.message);
+    res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
   }
-  const result = adminLogin(username, password);
-  if (!result) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-  res.cookie('admin_token', result.token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.json(result);
 });
 
 // Admin Logout

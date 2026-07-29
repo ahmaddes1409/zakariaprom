@@ -418,47 +418,38 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       // Fetch all products directly from local_products database table
       let dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
       
-      // Fallback: If DB has <= 1 product, populate XML feed products synchronously
-      if (!dbRows || dbRows.length <= 1) {
-        try {
-          await syncXmlToDb(database.db, saveDatabase);
-          dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
-        } catch (syncErr) {}
-      }
+      // Merge Karmedya XML feed products alongside local_products
+      try {
+        const xmlProds = await fetchAndParseProducts();
+        if (xmlProds && xmlProds.length > 0) {
+          const existingIds = new Set((dbRows || []).map(r => String(r.product_id || r.id)));
+          const mappedXml = xmlProds.filter(p => p && p.id && !existingIds.has(String(p.id))).map(p => {
+            const catArray = (p.categories && Array.isArray(p.categories.tr)) ? p.categories.tr : [];
+            const catTr = catArray.length > 0 ? (catArray[catArray.length - 1] || 'Promosyon Ürünleri') : 'Promosyon Ürünleri';
+            const nameTr = (p.name && typeof p.name.tr === 'string') ? p.name.tr : (typeof p.name === 'string' ? p.name : '');
+            const pId = p.id ? p.id.toString() : Math.random().toString(36).substring(7);
 
-      // If still <= 1 product in DB, fallback to live in-memory XML parsing (sub-5ms)
-      if (!dbRows || dbRows.length <= 1) {
-        try {
-          const xmlProds = await fetchAndParseProducts();
-          if (xmlProds && xmlProds.length > 0) {
-            const mappedXml = xmlProds.map(p => {
-              const catArray = (p.categories && Array.isArray(p.categories.tr)) ? p.categories.tr : [];
-              const catTr = catArray.length > 0 ? (catArray[catArray.length - 1] || 'Promosyon Ürünleri') : 'Promosyon Ürünleri';
-              const nameTr = (p.name && typeof p.name.tr === 'string') ? p.name.tr : (typeof p.name === 'string' ? p.name : '');
-              const pId = p.id ? p.id.toString() : Math.random().toString(36).substring(7);
-
-              return {
-                product_id: pId,
-                name_tr: nameTr,
-                name_ar: p.name && p.name.ar ? p.name.ar : translateProductName(nameTr, 'ar'),
-                name_en: p.name && p.name.en ? p.name.en : translateProductName(nameTr, 'en'),
-                model: p.model || '',
-                description: p.description || '',
-                price: p.price || 0,
-                quantity: p.quantity || 0,
-                category_tr: catTr,
-                category_ar: translateCategory(catTr, 'ar'),
-                category_en: translateCategory(catTr, 'en'),
-                colors: '[]',
-                sizes: '[]',
-                images: JSON.stringify(p.images || [])
-              };
-            });
-            dbRows = [...dbRows, ...mappedXml];
-          }
-        } catch(fallbackErr) {
-          console.error('[API Products XML Fallback Error]:', fallbackErr.message);
+            return {
+              product_id: pId,
+              name_tr: nameTr,
+              name_ar: p.name && p.name.ar ? p.name.ar : translateProductName(nameTr, 'ar'),
+              name_en: p.name && p.name.en ? p.name.en : translateProductName(nameTr, 'en'),
+              model: p.model || '',
+              description: typeof p.description === 'object' ? (p.description.ar || p.description.tr || '') : (p.description || ''),
+              price: p.price || 0,
+              quantity: p.stock || p.quantity || 100,
+              category_tr: catTr,
+              category_ar: translateCategory(catTr, 'ar'),
+              category_en: translateCategory(catTr, 'en'),
+              colors: '[]',
+              sizes: '[]',
+              images: JSON.stringify(p.images || [])
+            };
+          });
+          dbRows = [...dbRows, ...mappedXml];
         }
+      } catch(fallbackErr) {
+        console.error('[API Products XML Merge Error]:', fallbackErr.message);
       }
       
       let hiddenProducts = [];

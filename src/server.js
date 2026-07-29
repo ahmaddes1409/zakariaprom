@@ -654,12 +654,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         products.sort((a, b) => (a.name[lang] || a.name.tr).localeCompare(b.name[lang] || b.name.tr));
       } else {
         // Interleave Karmedya XML and Etkin products evenly for a balanced mix on Page 1 and every page
-        const xmlProds = products.filter(p => !p.id.startsWith('etkin_'));
-        const etkinProds = products.filter(p => p.id.startsWith('etkin_'));
+        const etkinProds = products.filter(p => String(p.id).startsWith('etkin_') || (p.model && String(p.model).toUpperCase().startsWith('ETK')));
+        const karmedyaProds = products.filter(p => !String(p.id).startsWith('etkin_') && (!p.model || !String(p.model).toUpperCase().startsWith('ETK')));
         const mixed = [];
-        const maxLen = Math.max(xmlProds.length, etkinProds.length);
+        const maxLen = Math.max(karmedyaProds.length, etkinProds.length);
         for (let i = 0; i < maxLen; i++) {
-          if (i < xmlProds.length) mixed.push(xmlProds[i]);
+          if (i < karmedyaProds.length) mixed.push(karmedyaProds[i]);
           if (i < etkinProds.length) mixed.push(etkinProds[i]);
         }
         products = mixed;

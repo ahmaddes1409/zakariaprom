@@ -398,15 +398,47 @@ function translateProductName(name, targetLang) {
 
 function fixMojikake(str) {
   if (!str || typeof str !== 'string') return str || '';
-  if (/[\u00C2-\u00C5][\u0080-\u00BF]/.test(str) || /[\u00C3\u00C4\u00C5]/.test(str) || str.includes('Ã') || str.includes('Å') || str.includes('ï¿½')) {
+  
+  let s = str;
+
+  if (/[\u00C2-\u00C5][\u0080-\u00BF]/.test(s) || /[\u00C3\u00C4\u00C5]/.test(s)) {
     try {
-      const fixed = Buffer.from(str, 'latin1').toString('utf8');
-      if (fixed && !fixed.includes('')) {
-        return fixed;
+      const b = Buffer.from(s, 'latin1').toString('utf8');
+      if (b && !b.includes('')) {
+        s = b;
       }
     } catch (e) {}
   }
-  return str;
+
+  s = s
+    .replace(/Ãœ/g, 'Ü')
+    .replace(/Ã¼/g, 'ü')
+    .replace(/Ã–/g, 'Ö')
+    .replace(/Ã¶/g, 'ö')
+    .replace(/Ã‡/g, 'Ç')
+    .replace(/Ã§/g, 'ç')
+    .replace(/Ãǂ/g, 'Ç')
+    .replace(/Ã\u01c2/g, 'Ç')
+    .replace(/Ã\u0102/g, 'Ç')
+    .replace(/ÅŸ/g, 'ş')
+    .replace(/Å\u009f/g, 'ş')
+    .replace(/Å\u0178/g, 'Ş')
+    .replace(/Å\u009e/g, 'Ş')
+    .replace(/Ã\u0131/g, 'ı')
+    .replace(/Ä\u009f/g, 'ğ')
+    .replace(/Ä\u009e/g, 'Ğ')
+    .replace(/Ã\u0087/g, 'Ç')
+    .replace(/Ã\u009c/g, 'Ü')
+    .replace(/Ã\u0096/g, 'Ö')
+    .replace(/MasaÜstü/g, 'Masaüstü')
+    .replace(/DeskÜstü/g, 'Desküstü')
+    .replace(/GereÃĂ/g, 'Gereç')
+    .replace(/GereÃ§/g, 'Gereç')
+    .replace(/AraÃ§/g, 'Araç')
+    .replace(/^§/g, '')
+    .trim();
+
+  return s;
 }
 
 function translateCategory(category, targetLang) {

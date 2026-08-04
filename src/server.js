@@ -792,37 +792,26 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       allCustomCats.forEach(cc => { if (cc && cc.name_tr && cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
 
       const { categoryTranslations } = require('./translations');
+      const { fixMojikake } = require('./translations');
       let result = (Array.isArray(categories) ? categories : []).map(cat => {
-        const ov = (cat && cat.tr) ? (overrideMap[cat.tr] || {}) : {};
-        const dict = (cat && cat.tr) ? (categoryTranslations[cat.tr] || {}) : {};
+        const cleanTr = fixMojikake(cat.tr);
+        const cleanAr = fixMojikake(cat.ar);
+        const cleanEn = fixMojikake(cat.en);
+        const ov = cleanTr ? (overrideMap[cleanTr] || {}) : {};
+        const dict = cleanTr ? (categoryTranslations[cleanTr] || {}) : {};
 
-        let catAr = ov.ar || dict.ar || cat.ar || cat.tr;
-        let catEn = ov.en || dict.en || cat.en || cat.tr;
+        let catAr = ov.ar || dict.ar || (cleanAr && cleanAr !== cleanTr ? cleanAr : translateCategory(cleanTr, 'ar'));
+        let catEn = ov.en || dict.en || (cleanEn && cleanEn !== cleanTr ? cleanEn : translateCategory(cleanTr, 'en'));
 
-        if (typeof catAr === 'string') catAr = catAr.replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
-        if (typeof catEn === 'string') catEn = catEn.replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
-
-        const subcategories = (cat && Array.isArray(cat.subcategories)) ? cat.subcategories.map(sub => {
-          const subOv = (sub && sub.tr) ? (overrideMap[sub.tr] || {}) : {};
-          const subDict = (sub && sub.tr) ? (categoryTranslations[sub.tr] || {}) : {};
-          let sAr = subOv.ar || subDict.ar || sub.ar || sub.tr;
-          let sEn = subOv.en || subDict.en || sub.en || sub.tr;
-          if (typeof sAr === 'string') sAr = sAr.replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
-          if (typeof sEn === 'string') sEn = sEn.replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
-
-          return {
-            ...sub,
-            ar: sAr,
-            en: sEn
-          };
-        }) : [];
+        if (typeof catAr === 'string') catAr = fixMojikake(catAr).replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
+        if (typeof catEn === 'string') catEn = fixMojikake(catEn).replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
 
         return {
           ...cat,
+          tr: cleanTr,
           ar: catAr,
           en: catEn,
-          subcategories,
-          image: cat && cat.tr ? (imageMap[cat.tr] || customImageMap[cat.tr] || '') : ''
+          image: cleanTr ? (imageMap[cleanTr] || customImageMap[cleanTr] || '') : ''
         };
       });
 

@@ -544,59 +544,78 @@ router.get('/categories', adminAuth, async (req, res) => {
     const db = getDb();
     
     // Read all products from local_products database table
+    const { fixMojikake, translateCategory } = require('../translations');
     let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
-    let products = dbRows.map(lp => ({
-      id: lp.product_id,
-      model: lp.model,
-      category: { tr: lp.category_tr || '', ar: lp.category_ar || '', en: lp.category_en || '' },
-      categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || ''], en: [lp.category_en || ''] }
-    }));
+    let products = dbRows.map(lp => {
+      const cTr = fixMojikake(lp.category_tr || '');
+      const cAr = fixMojikake(lp.category_ar || '');
+      const cEn = fixMojikake(lp.category_en || '');
+      return {
+        id: lp.product_id,
+        model: lp.model,
+        category: { tr: cTr, ar: cAr, en: cEn },
+        categories: { tr: [cTr], ar: [cAr], en: [cEn] }
+      };
+    });
     if (products.length === 0) {
       products = await fetchAndParseProducts();
     }
 
     const categories = getCategories(products);
-    const hiddenCats = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => h.category_name);
+    const hiddenCats = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => fixMojikake(h.category_name));
     const overrides = db.prepare("SELECT * FROM translation_overrides WHERE type = 'category'").all();
     const overrideMap = {};
     overrides.forEach(o => {
-      if (!overrideMap[o.original_key]) overrideMap[o.original_key] = {};
-      overrideMap[o.original_key][o.lang] = o.translation;
+      const k = fixMojikake(o.original_key);
+      const v = fixMojikake(o.translation);
+      if (!overrideMap[k]) overrideMap[k] = {};
+      overrideMap[k][o.lang] = v;
     });
 
     const images = db.prepare('SELECT * FROM category_images').all();
     const imageMap = {};
-    images.forEach(i => { imageMap[i.category_name] = i.image_url; });
+    images.forEach(i => { if (i && i.category_name) imageMap[fixMojikake(i.category_name)] = i.image_url; });
 
     const seenCategoryKeys = new Set();
     const result = [];
 
     categories.forEach(cat => {
-      if (!cat || !cat.tr || seenCategoryKeys.has(cat.tr)) return;
-      seenCategoryKeys.add(cat.tr);
-      const ov = overrideMap[cat.tr] || {};
+      if (!cat || !cat.tr) return;
+      const cleanTr = fixMojikake(cat.tr);
+      const cleanAr = fixMojikake(cat.ar);
+      const cleanEn = fixMojikake(cat.en);
+      if (seenCategoryKeys.has(cleanTr)) return;
+      seenCategoryKeys.add(cleanTr);
+
+      const ov = overrideMap[cleanTr] || {};
+      const arVal = ov.ar || (cleanAr && cleanAr !== cleanTr ? cleanAr : translateCategory(cleanTr, 'ar'));
+      const enVal = ov.en || (cleanEn && cleanEn !== cleanTr ? cleanEn : translateCategory(cleanTr, 'en'));
+
       result.push({
         ...cat,
-        ar: ov.ar || cat.ar || cat.tr,
-        en: ov.en || cat.en || cat.tr,
-        hidden: hiddenCats.includes(cat.tr),
-        image: imageMap[cat.tr] || ''
+        tr: cleanTr,
+        ar: arVal,
+        en: enVal,
+        hidden: hiddenCats.includes(cleanTr),
+        image: imageMap[cleanTr] || ''
       });
     });
 
     // Add custom categories only if not already added
     const customCats = db.prepare("SELECT * FROM custom_categories").all();
     customCats.forEach(cc => {
-      if (!cc || !cc.name_tr || seenCategoryKeys.has(cc.name_tr)) return;
-      seenCategoryKeys.add(cc.name_tr);
-      const ov = overrideMap[cc.name_tr] || {};
+      if (!cc || !cc.name_tr) return;
+      const cleanTr = fixMojikake(cc.name_tr);
+      if (seenCategoryKeys.has(cleanTr)) return;
+      seenCategoryKeys.add(cleanTr);
+      const ov = overrideMap[cleanTr] || {};
       result.push({
-        tr: cc.name_tr,
-        ar: ov.ar || cc.name_ar || cc.name_tr,
-        en: ov.en || cc.name_en || cc.name_tr,
+        tr: cleanTr,
+        ar: ov.ar || fixMojikake(cc.name_ar) || translateCategory(cleanTr, 'ar'),
+        en: ov.en || fixMojikake(cc.name_en) || translateCategory(cleanTr, 'en'),
         count: 0,
-        hidden: hiddenCats.includes(cc.name_tr) || cc.active === 0,
-        image: imageMap[cc.name_tr] || cc.image_url || "",
+        hidden: hiddenCats.includes(cleanTr) || cc.active === 0,
+        image: imageMap[cleanTr] || cc.image_url || "",
         isCustom: true
       });
     });

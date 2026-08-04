@@ -396,8 +396,22 @@ function translateProductName(name, targetLang) {
   return translated;
 }
 
+function fixMojikake(str) {
+  if (!str || typeof str !== 'string') return str || '';
+  if (/[\u00C2-\u00C5][\u0080-\u00BF]/.test(str) || /[\u00C3\u00C4\u00C5]/.test(str) || str.includes('Ã') || str.includes('Å') || str.includes('ï¿½')) {
+    try {
+      const fixed = Buffer.from(str, 'latin1').toString('utf8');
+      if (fixed && !fixed.includes('')) {
+        return fixed;
+      }
+    } catch (e) {}
+  }
+  return str;
+}
+
 function translateCategory(category, targetLang) {
-  const normCat = normalizeCategoryName(category);
+  const cleanCat = fixMojikake(category);
+  const normCat = normalizeCategoryName(cleanCat);
   if (categoryTranslations[normCat] && categoryTranslations[normCat][targetLang]) {
     return categoryTranslations[normCat][targetLang];
   }
@@ -417,4 +431,4 @@ function translateCategory(category, targetLang) {
   return translatedParts.join(' > ');
 }
 
-module.exports = { categoryTranslations, termTranslations, uiTranslations, translateProductName, translateCategory, normalizeCategoryName };
+module.exports = { categoryTranslations, termTranslations, uiTranslations, translateProductName, translateCategory, normalizeCategoryName, fixMojikake };

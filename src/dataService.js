@@ -223,17 +223,16 @@ function getProductsByCategory(products, catName, lang = 'ar') {
     const isTargetMetal = target.includes('metal') || target.includes('معدن');
 
     if (isTargetPlastik && (target.includes('kalem') || target.includes('قلم') || target.includes('أقلام') || target.includes('pen'))) {
-      if (combinedStr.includes('metal') || combinedStr.includes('roller') || combinedStr.includes('lüks') || combinedStr.includes('luks') || combinedStr.includes('kurşun') || combinedStr.includes('kursun') || combinedStr.includes('bambu') || combinedStr.includes('dokunmatik') || combinedStr.includes('معدن')) {
-        return false;
-      }
-      return combinedStr.includes('plastik') || combinedStr.includes('بلاستيك') || combinedStr.includes('kalem');
+      const isMetal = combinedStr.includes('metal') || combinedStr.includes('roller') || combinedStr.includes('lüks') || combinedStr.includes('luks') || combinedStr.includes('kurşun') || combinedStr.includes('kursun') || combinedStr.includes('bambu') || combinedStr.includes('dokunmatik') || combinedStr.includes('معدن');
+      if (isMetal) return false;
+      return combinedStr.includes('plastik') || combinedStr.includes('بلاستيك') || (combinedStr.includes('kalem') && !isMetal);
     }
 
     if (isTargetMetal && (target.includes('kalem') || target.includes('قلم') || target.includes('أقلام') || target.includes('pen'))) {
-      if (combinedStr.includes('plastik') || combinedStr.includes('بلاستيك') || combinedStr.includes('kurşun') || combinedStr.includes('kursun') || combinedStr.includes('bambu') || combinedStr.includes('dokunmatik')) {
-        return false;
-      }
-      return combinedStr.includes('metal') || combinedStr.includes('roller') || combinedStr.includes('lüks') || combinedStr.includes('luks') || combinedStr.includes('معدن');
+      const isMetal = combinedStr.includes('metal') || combinedStr.includes('roller') || combinedStr.includes('lüks') || combinedStr.includes('luks') || combinedStr.includes('معدن');
+      const isPlastik = combinedStr.includes('plastik') || combinedStr.includes('بلاستيك') || combinedStr.includes('kurşun') || combinedStr.includes('bambu');
+      if (isPlastik) return false;
+      return isMetal;
     }
 
     // 2. STRICT SEPARATION FOR DATED AGENDAS VS NOTEBOOKS

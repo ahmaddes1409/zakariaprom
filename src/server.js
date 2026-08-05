@@ -495,34 +495,22 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         if (seenProductKeys.has(pId)) continue;
         seenProductKeys.add(pId);
 
-        let catTr = lp.category_tr || '';
-        let catAr = (lp.category_ar && lp.category_ar !== catTr) ? lp.category_ar : translateCategory(catTr, 'ar');
-        let catEn = (lp.category_en && lp.category_en !== catTr) ? lp.category_en : translateCategory(catTr, 'en');
+        let rawCatTr = lp.category_tr || '';
+        let nameTr = lp.name_tr || '';
+        let nameAr = lp.name_ar || nameTr;
+        let nameEn = lp.name_en || nameTr;
 
-        // Check category override
-        const catOverride = categoryOverrideMap[pId] || categoryOverrideMap[lp.model];
-        if (catOverride) {
-          catTr = catOverride.new_category_tr;
-          catAr = catOverride.new_category_ar || catTr;
-          catEn = catOverride.new_category_en || catTr;
-        }
+        const { resolveStrictCategory } = require('./dataService');
+        const resolved = resolveStrictCategory(rawCatTr, nameTr);
+        let catTr = resolved.catTr;
+        let catAr = resolved.catAr;
+        let catEn = resolved.catEn;
 
-        // Apply category translation override if present
         const topCatTr = catTr.split(' > ')[0].trim();
-        const catTrans = catTransMap[catTr] || catTransMap[topCatTr];
-        if (catTrans) {
-          if (catTrans.ar) catAr = catTrans.ar;
-          if (catTrans.en) catEn = catTrans.en;
-        }
-
         // Skip hidden categories
         const normCatTr = normalizeCategoryName(catTr);
         const normTopCatTr = normalizeCategoryName(topCatTr);
         if (hiddenCategorySet.has(topCatTr) || hiddenCategorySet.has(catTr) || hiddenCategorySet.has(normCatTr) || hiddenCategorySet.has(normTopCatTr)) continue;
-
-        let nameTr = lp.name_tr || '';
-        let nameAr = lp.name_ar || nameTr;
-        let nameEn = lp.name_en || nameTr;
 
         // Check name override
         const nameOverride = nameOverrideMap[pId] || nameOverrideMap[lp.model] || nameOverrideMap[lp.name_tr];

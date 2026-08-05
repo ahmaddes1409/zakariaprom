@@ -1,4 +1,4 @@
-// Hostinger LiteSpeed / Passenger Node entry point (v1.7.4 - Strict Category Separation)
+// Hostinger LiteSpeed / Passenger Node entry point (v1.7.5 - Strict Disambiguated Categories)
 const app = require('./src/server.js');
 
 module.exports = app;

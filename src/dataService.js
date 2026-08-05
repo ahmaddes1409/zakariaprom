@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parseStringPromise } = require('xml2js');
-const { translateProductName, translateCategory } = require('./translations');
+const { translateProductName, translateCategory, fixMojikake } = require('./translations');
 
 const XML_URL = 'https://karmedya.com/xml/xml_export_product.xml';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hour cache
@@ -12,7 +12,6 @@ let lastFetchTime = 0;
 async function fetchXML() {
   const localBackup = path.join(__dirname, '..', 'data', 'xml_export_product.xml');
   
-  // 1. Try local backup FIRST for instant zero-latency loading
   if (fs.existsSync(localBackup)) {
     try {
       const stats = fs.statSync(localBackup);
@@ -24,7 +23,6 @@ async function fetchXML() {
     } catch(e) {}
   }
 
-  // 2. Fallback to remote fetch with short 5s timeout if no local backup file
   try {
     const response = await fetch(XML_URL, { signal: AbortSignal.timeout(5000), headers: { 'User-Agent': 'Mozilla/5.0' } });
     if (response.ok) {
@@ -74,16 +72,15 @@ function parseXmlFast(xmlText) {
     };
 
     const id = getVal('ITEM_ID') || getVal('PRODUCT_ID') || getVal('ID');
-    const nameTr = getVal('PRODUCT_NAME') || getVal('NAME') || getVal('TITLE');
+    const nameTr = fixMojikake(getVal('PRODUCT_NAME') || getVal('NAME') || getVal('TITLE'));
     if (!id || !nameTr) continue;
 
     const model = getVal('PRODUCT_CODE') || getVal('CODE') || getVal('MODEL') || id;
-    const catStr = getVal('CATEGORY_NAME') || getVal('CATEGORY') || getVal('CATEGORIES');
+    const catStr = fixMojikake(getVal('CATEGORY_NAME') || getVal('CATEGORY') || getVal('CATEGORIES'));
     const descTr = getVal('DESCRIPTION') || getVal('DETAIL');
     const price = parseFloat(getVal('PRICE') || getVal('PRICE_VAT') || '0') || 0;
     const stock = parseInt(getVal('STOCK') || getVal('QUANTITY') || '100') || 100;
     
-    // Images
     const images = [];
     const mainImg = getVal('IMAGE') || getVal('IMAGE_URL') || getVal('PICTURE');
     if (mainImg) images.push(mainImg);
@@ -181,7 +178,7 @@ function getCategories(products = []) {
     }
 
     if (tr) {
-      const cleanTr = String(tr).trim();
+      const cleanTr = fixMojikake(String(tr).trim());
       if (cleanTr && cleanTr !== '--Kapalı Ürünler Kategorisi') {
         const existing = catMap.get(cleanTr);
         if (existing) {
@@ -189,8 +186,8 @@ function getCategories(products = []) {
         } else {
           catMap.set(cleanTr, {
             tr: cleanTr,
-            ar: ar || translateCategory(cleanTr, 'ar'),
-            en: en || translateCategory(cleanTr, 'en'),
+            ar: fixMojikake(ar || translateCategory(cleanTr, 'ar')),
+            en: fixMojikake(en || translateCategory(cleanTr, 'en')),
             count: 1
           });
         }
@@ -202,57 +199,69 @@ function getCategories(products = []) {
 
 function getProductsByCategory(products, catName, lang = 'ar') {
   if (!catName || catName === 'all') return products;
-  const target = String(catName).toLowerCase().trim();
+  const rawTarget = fixMojikake(String(catName)).trim();
+  const target = rawTarget.toLowerCase();
   
-  // Strip common Arabic/Turkish category prefixes/suffixes for robust matching
-  const cleanTarget = target.replace(/^(ميداليات|ساعات|دفاتر|أقلام|ترمس|فلاشات|ولاعات|حقائب|تقويمات|أطقم|قرطاسية)\s*[-|]?\s*/gi, '').trim();
-
   return products.filter(p => {
     if (!p) return false;
 
-    const catTr = (p.category_tr || (p.category && p.category.tr) || (p.categories && Array.isArray(p.categories.tr) ? p.categories.tr[0] : p.categories && p.categories.tr) || '').toLowerCase();
-    const catAr = (p.category_ar || (p.category && p.category.ar) || (p.categories && Array.isArray(p.categories.ar) ? p.categories.ar[0] : p.categories && p.categories.ar) || '').toLowerCase();
-    const catEn = (p.category_en || (p.category && p.category.en) || (p.categories && Array.isArray(p.categories.en) ? p.categories.en[0] : p.categories && p.categories.en) || '').toLowerCase();
+    const catTr = fixMojikake(p.category_tr || (p.category && p.category.tr) || (p.categories && Array.isArray(p.categories.tr) ? p.categories.tr[0] : p.categories && p.categories.tr) || '').toLowerCase();
+    const catAr = fixMojikake(p.category_ar || (p.category && p.category.ar) || (p.categories && Array.isArray(p.categories.ar) ? p.categories.ar[0] : p.categories && p.categories.ar) || '').toLowerCase();
+    const catEn = fixMojikake(p.category_en || (p.category && p.category.en) || (p.categories && Array.isArray(p.categories.en) ? p.categories.en[0] : p.categories && p.categories.en) || '').toLowerCase();
 
-    const topCatTr = (p.topCategory && p.topCategory.tr ? p.topCategory.tr : catTr.split(' > ')[0]).toLowerCase();
-    const topCatAr = (p.topCategory && p.topCategory.ar ? p.topCategory.ar : catAr.split(' > ')[0]).toLowerCase();
+    const topCatTr = (p.topCategory && p.topCategory.tr ? fixMojikake(p.topCategory.tr) : catTr.split(' > ')[0]).toLowerCase();
+    const topCatAr = (p.topCategory && p.topCategory.ar ? fixMojikake(p.topCategory.ar) : catAr.split(' > ')[0]).toLowerCase();
 
-    // Direct match check
+    // 1. SPECIFIC STRICT DISAMBIGUATION RULES FOR PENS & NOTEBOOKS
+    // -----------------------------------------------------------
+    const isTargetPlastik = target.includes('plastik') || target.includes('بلاستيك');
+    const isTargetMetal = target.includes('metal') || target.includes('معدن');
+
+    if (isTargetPlastik && (target.includes('kalem') || target.includes('قلم') || target.includes('أقلام') || target.includes('pen'))) {
+      const pIsPlastik = catTr.includes('plastik') || catAr.includes('بلاستيك') || catEn.includes('plastic');
+      const pIsMetal = catTr.includes('metal') || catAr.includes('معدن');
+      if (pIsMetal) return false;
+      return pIsPlastik || (catTr.includes('kalem') && !pIsMetal);
+    }
+
+    if (isTargetMetal && (target.includes('kalem') || target.includes('قلم') || target.includes('أقلام') || target.includes('pen'))) {
+      const pIsMetal = catTr.includes('metal') || catAr.includes('معدن') || catTr.includes('roller');
+      const pIsPlastik = catTr.includes('plastik') || catAr.includes('بلاستيك');
+      if (pIsPlastik) return false;
+      return pIsMetal || (catTr.includes('kalem') && !pIsPlastik);
+    }
+
+    // Dated Agendas vs Notebooks
+    const isTargetTarihli = target.includes('tarihli') || target.includes('2026') || target.includes('2025') || target.includes('تقويم') || target.includes('مؤرخ');
+    const isTargetAjanda = (target.includes('ajanda') || target.includes('أجند')) && !isTargetTarihli;
+    const isTargetDefter = (target.includes('defter') || target.includes('دفتر') || target.includes('notluk') || target.includes('bloknot')) && !isTargetAjanda && !isTargetTarihli;
+
+    if (isTargetTarihli) {
+      return catTr.includes('tarihli') || catTr.includes('2026') || catTr.includes('2025') || catAr.includes('مؤرخ') || catAr.includes('تقويم');
+    }
+
+    if (isTargetAjanda) {
+      const pIsTarihli = catTr.includes('tarihli') || catTr.includes('2026') || catTr.includes('2025') || catAr.includes('مؤرخ');
+      if (pIsTarihli) return false;
+      return catTr.includes('ajanda') || catAr.includes('أجند');
+    }
+
+    if (isTargetDefter) {
+      const pIsTarihli = catTr.includes('tarihli') || catTr.includes('2026') || catTr.includes('2025') || catAr.includes('مؤرخ');
+      if (pIsTarihli) return false;
+      return catTr.includes('defter') || catAr.includes('دفتر') || catTr.includes('notluk') || catTr.includes('bloknot');
+    }
+
+    // 2. Direct match check
     if (catTr.includes(target) || catAr.includes(target) || catEn.includes(target) || topCatTr.includes(target) || topCatAr.includes(target)) {
       return true;
     }
 
-    if (cleanTarget && cleanTarget.length > 2) {
-      if (catTr.includes(cleanTarget) || catAr.includes(cleanTarget) || topCatTr.includes(cleanTarget) || topCatAr.includes(cleanTarget)) {
-        return true;
-      }
-    }
-
-    // Bidirectional translation check
-    const translatedAr = (translateCategory(p.category_tr || catTr, 'ar') || '').toLowerCase();
-    const translatedTr = (translateCategory(catName, 'tr') || '').toLowerCase();
+    // 3. Bidirectional translation check
+    const translatedAr = fixMojikake(translateCategory(p.category_tr || catTr, 'ar') || '').toLowerCase();
+    const translatedTr = fixMojikake(translateCategory(rawTarget, 'tr') || '').toLowerCase();
 
     if (translatedAr.includes(target) || catTr.includes(translatedTr)) {
-      return true;
-    }
-
-    // Robust Aliases
-    if ((target.includes('ميدالي') || target.includes('anahtar')) && (catTr.includes('anahtar') || catAr.includes('ميدالي'))) {
-      return true;
-    }
-    if ((target.includes('أجند') || target.includes('دفتر') || target.includes('defter') || target.includes('ajanda')) && (catTr.includes('defter') || catTr.includes('ajanda') || catAr.includes('دفتر') || catAr.includes('أجند'))) {
-      return true;
-    }
-    if ((target.includes('قلم') || target.includes('أقلام') || target.includes('kalem') || target.includes('pen')) && (catTr.includes('kalem') || catAr.includes('قلم') || catAr.includes('أقلام'))) {
-      return true;
-    }
-    if ((target.includes('ساع') || target.includes('saat') || target.includes('clock')) && (catTr.includes('saat') || catAr.includes('ساع'))) {
-      return true;
-    }
-    if ((target.includes('ترمس') || target.includes('termos') || target.includes('mug')) && (catTr.includes('termos') || catAr.includes('ترمس'))) {
-      return true;
-    }
-    if ((target.includes('بطاري') || target.includes('powerbank')) && (catTr.includes('powerbank') || catAr.includes('بطاري'))) {
       return true;
     }
 
@@ -262,7 +271,7 @@ function getProductsByCategory(products, catName, lang = 'ar') {
 
 function searchProducts(products, query) {
   if (!query) return products;
-  const q = query.toLowerCase().trim();
+  const q = fixMojikake(query).toLowerCase().trim();
   return products.filter(p => {
     const nameMatch = (p.name && p.name.tr && p.name.tr.toLowerCase().includes(q)) ||
                       (p.name && p.name.ar && p.name.ar.toLowerCase().includes(q)) ||

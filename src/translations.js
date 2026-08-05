@@ -4,7 +4,7 @@ const categoryTranslations = {
   "Metal Kalemler": { ar: "أقلام معدنية", en: "Metal Pens" },
   "Metal Tükenmez - Roller Kalemler": { ar: "أقلام معدنية - رولر", en: "Metal Ballpoint - Roller Pens" },
   "Plastik Kalemler": { ar: "أقلام بلاستيكية", en: "Plastic Pens" },
-  "Defterler": { ar: "دفاتر وأجندات", en: "Notebooks & Agendas" },
+  "Defterler": { ar: "دفاتر ملاحظات", en: "Notebooks" },
   "Anahtarlıklar": { ar: "ميداليات", en: "Keychains" },
   "Plastik Duvar Saatleri": { ar: "ساعات حائط بلاستيكية", en: "Plastic Wall Clocks" },
   "Dokunmatik Ekran Kalemleri": { ar: "أقلام شاشة لمس", en: "Touchscreen Pens" },

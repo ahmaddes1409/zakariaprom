@@ -209,55 +209,59 @@ function getProductsByCategory(products, catName, lang = 'ar') {
     const catAr = fixMojikake(p.category_ar || (p.category && p.category.ar) || (p.categories && Array.isArray(p.categories.ar) ? p.categories.ar[0] : p.categories && p.categories.ar) || '').toLowerCase();
     const catEn = fixMojikake(p.category_en || (p.category && p.category.en) || (p.categories && Array.isArray(p.categories.en) ? p.categories.en[0] : p.categories && p.categories.en) || '').toLowerCase();
 
+    const nameTr = (p.name_tr || (p.name && p.name.tr) || '').toLowerCase();
+    const nameAr = (p.name_ar || (p.name && p.name.ar) || '').toLowerCase();
+
+    const combinedStr = `${catTr} ${catAr} ${catEn} ${nameTr} ${nameAr}`.toLowerCase();
+
     const topCatTr = (p.topCategory && p.topCategory.tr ? fixMojikake(p.topCategory.tr) : catTr.split(' > ')[0]).toLowerCase();
     const topCatAr = (p.topCategory && p.topCategory.ar ? fixMojikake(p.topCategory.ar) : catAr.split(' > ')[0]).toLowerCase();
 
-    // 1. SPECIFIC STRICT DISAMBIGUATION RULES FOR PENS & NOTEBOOKS
-    // -----------------------------------------------------------
+    // 1. STRICT SEPARATION FOR PENS
+    // ----------------------------
     const isTargetPlastik = target.includes('plastik') || target.includes('بلاستيك');
     const isTargetMetal = target.includes('metal') || target.includes('معدن');
 
     if (isTargetPlastik && (target.includes('kalem') || target.includes('قلم') || target.includes('أقلام') || target.includes('pen'))) {
-      const pIsPlastik = catTr.includes('plastik') || catAr.includes('بلاستيك') || catEn.includes('plastic');
-      const pIsMetal = catTr.includes('metal') || catAr.includes('معدن');
-      if (pIsMetal) return false;
-      return pIsPlastik || (catTr.includes('kalem') && !pIsMetal);
+      if (combinedStr.includes('metal') || combinedStr.includes('roller') || combinedStr.includes('lüks') || combinedStr.includes('luks') || combinedStr.includes('kurşun') || combinedStr.includes('kursun') || combinedStr.includes('bambu') || combinedStr.includes('dokunmatik') || combinedStr.includes('معدن')) {
+        return false;
+      }
+      return combinedStr.includes('plastik') || combinedStr.includes('بلاستيك') || combinedStr.includes('kalem');
     }
 
     if (isTargetMetal && (target.includes('kalem') || target.includes('قلم') || target.includes('أقلام') || target.includes('pen'))) {
-      const pIsMetal = catTr.includes('metal') || catAr.includes('معدن') || catTr.includes('roller');
-      const pIsPlastik = catTr.includes('plastik') || catAr.includes('بلاستيك');
-      if (pIsPlastik) return false;
-      return pIsMetal || (catTr.includes('kalem') && !pIsPlastik);
+      if (combinedStr.includes('plastik') || combinedStr.includes('بلاستيك') || combinedStr.includes('kurşun') || combinedStr.includes('kursun') || combinedStr.includes('bambu') || combinedStr.includes('dokunmatik')) {
+        return false;
+      }
+      return combinedStr.includes('metal') || combinedStr.includes('roller') || combinedStr.includes('lüks') || combinedStr.includes('luks') || combinedStr.includes('معدن');
     }
 
-    // Dated Agendas vs Notebooks
+    // 2. STRICT SEPARATION FOR DATED AGENDAS VS NOTEBOOKS
+    // ----------------------------------------------------
     const isTargetTarihli = target.includes('tarihli') || target.includes('2026') || target.includes('2025') || target.includes('تقويم') || target.includes('مؤرخ');
     const isTargetAjanda = (target.includes('ajanda') || target.includes('أجند')) && !isTargetTarihli;
     const isTargetDefter = (target.includes('defter') || target.includes('دفتر') || target.includes('notluk') || target.includes('bloknot')) && !isTargetAjanda && !isTargetTarihli;
 
     if (isTargetTarihli) {
-      return catTr.includes('tarihli') || catTr.includes('2026') || catTr.includes('2025') || catAr.includes('مؤرخ') || catAr.includes('تقويم');
+      return combinedStr.includes('tarihli') || combinedStr.includes('2026') || combinedStr.includes('2025') || combinedStr.includes('مؤرخ') || combinedStr.includes('تقويم');
     }
 
     if (isTargetAjanda) {
-      const pIsTarihli = catTr.includes('tarihli') || catTr.includes('2026') || catTr.includes('2025') || catAr.includes('مؤرخ');
-      if (pIsTarihli) return false;
-      return catTr.includes('ajanda') || catAr.includes('أجند');
+      if (combinedStr.includes('tarihli') || combinedStr.includes('2026') || combinedStr.includes('2025') || combinedStr.includes('مؤرخ')) return false;
+      return combinedStr.includes('ajanda') || combinedStr.includes('أجند');
     }
 
     if (isTargetDefter) {
-      const pIsTarihli = catTr.includes('tarihli') || catTr.includes('2026') || catTr.includes('2025') || catAr.includes('مؤرخ');
-      if (pIsTarihli) return false;
-      return catTr.includes('defter') || catAr.includes('دفتر') || catTr.includes('notluk') || catTr.includes('bloknot');
+      if (combinedStr.includes('tarihli') || combinedStr.includes('2026') || combinedStr.includes('2025') || combinedStr.includes('مؤرخ')) return false;
+      return combinedStr.includes('defter') || combinedStr.includes('دفتر') || combinedStr.includes('notluk') || combinedStr.includes('bloknot');
     }
 
-    // 2. Direct match check
+    // 3. Direct match check
     if (catTr.includes(target) || catAr.includes(target) || catEn.includes(target) || topCatTr.includes(target) || topCatAr.includes(target)) {
       return true;
     }
 
-    // 3. Bidirectional translation check
+    // 4. Bidirectional translation check
     const translatedAr = fixMojikake(translateCategory(p.category_tr || catTr, 'ar') || '').toLowerCase();
     const translatedTr = fixMojikake(translateCategory(rawTarget, 'tr') || '').toLowerCase();
 

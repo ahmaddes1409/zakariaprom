@@ -821,6 +821,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         }
       });
 
+      // Filter out hidden categories strictly from public website response
+      result = result.filter(c => {
+        if (!c || !c.tr) return false;
+        const norm = normalizeCategoryName(c.tr);
+        return !hiddenCategorySet.has(c.tr) && !hiddenCategorySet.has(norm);
+      });
+
       return res.json(result);
     } catch (error) {
       console.error('Error fetching categories:', error);

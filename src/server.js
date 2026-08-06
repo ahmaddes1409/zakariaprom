@@ -414,6 +414,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     try {
       const { category, search, lang = 'ar', page = 1, limit = 24, sort } = req.query;
       const { translateProductName, translateCategory } = require('./translations');
+      const { getProductsByCategory, searchProducts, resolveStrictCategory } = require('./dataService');
 
       // Fetch all products directly from local_products database table
       let dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();

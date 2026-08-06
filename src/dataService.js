@@ -261,6 +261,14 @@ function getProductsByCategory(products, catName, lang = 'ar') {
   if (!catName || catName === 'all') return products;
   const rawTarget = fixMojikake(String(catName)).trim();
   const target = rawTarget.toLowerCase();
+  
+  // Normalize Turkish category suffixes like 'setleri' -> 'setler', 'leri' -> 'ler', 'ları' -> 'lar'
+  const normTarget = target
+    .replace(/setleri$/gi, 'setler')
+    .replace(/leri$/gi, 'ler')
+    .replace(/ları$/gi, 'lar')
+    .replace(/set$/gi, 'setler')
+    .trim();
 
   return products.filter(p => {
     if (!p) return false;
@@ -274,18 +282,19 @@ function getProductsByCategory(products, catName, lang = 'ar') {
     const catEn = resolved.catEn.toLowerCase();
 
     // Direct match check against resolved strict category
-    if (catTr === target || catAr === target || catEn === target) {
+    if (catTr === target || catAr === target || catEn === target || catTr === normTarget) {
       return true;
     }
 
-    if (catTr.includes(target) || catAr.includes(target) || catEn.includes(target)) {
+    if (catTr.includes(target) || catAr.includes(target) || catEn.includes(target) || catTr.includes(normTarget)) {
       return true;
     }
 
     const translatedAr = fixMojikake(translateCategory(resolved.catTr, 'ar') || '').toLowerCase();
     const translatedTr = fixMojikake(translateCategory(rawTarget, 'tr') || '').toLowerCase();
+    const normTranslatedTr = translatedTr.replace(/setleri$/gi, 'setler').replace(/leri$/gi, 'ler').replace(/ları$/gi, 'lar').trim();
 
-    if (translatedAr === target || catTr === translatedTr || catTr.includes(translatedTr)) {
+    if (translatedAr === target || catTr === translatedTr || catTr.includes(translatedTr) || catTr.includes(normTranslatedTr)) {
       return true;
     }
 

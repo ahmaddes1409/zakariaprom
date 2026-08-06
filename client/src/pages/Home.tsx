@@ -61,7 +61,7 @@ export default function Home() {
   useEffect(() => {
     Promise.all([
       fetchCategories(),
-      fetchProducts({ limit: 8, lang: language }),
+      fetchProducts({ limit: 16, lang: language }),
       fetchBanners(),
     ]).then(([cats, prods, bans]) => {
       setCategories(cats);

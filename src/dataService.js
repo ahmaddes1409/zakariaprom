@@ -231,12 +231,11 @@ async function fetchAndParseProducts(force = false) {
       console.log(`[Fast XML Parser] Parsed ${products.length} products successfully`);
       return products;
     }
+    return [];
   } catch (error) {
-    console.error('Error fetching/parsing XML:', error.message);
+    console.error('Error fetching/parsing XML:', error.message, error.stack);
+    throw error;
   }
-
-  if (cachedProducts && cachedProducts.length > 0) return cachedProducts;
-  return [];
 }
 
 function getCategories(products = []) {
@@ -348,4 +347,4 @@ function getProductById(products, id) {
   return products.find(p => String(p.id) === String(id) || String(p.product_id) === String(id));
 }
 
-module.exports = { fetchAndParseProducts, getCategories, getProductsByCategory, searchProducts, getProductById, resolveStrictCategory };
+module.exports = { fetchAndParseProducts, fetchXML, parseXmlFast, getCategories, getProductsByCategory, searchProducts, getProductById, resolveStrictCategory };

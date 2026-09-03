@@ -356,12 +356,32 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     }
   });
 
+  app.get('/api/test-xml-parser', async (req, res) => {
+    try {
+      const { fetchXML, parseXmlFast } = require('./dataService');
+      const xml = await fetchXML();
+      const products = parseXmlFast(xml);
+      res.json({
+        success: true,
+        xmlLength: xml ? xml.length : 0,
+        parsedCount: products ? products.length : 0,
+        sample: products && products.length > 0 ? products[0] : null
+      });
+    } catch(err) {
+      res.status(500).json({ success: false, error: err.message, stack: err.stack });
+    }
+  });
+
   app.get('/api/db-status', async (req, res) => {
     try {
       const { fetchAndParseProducts } = require('./dataService');
       let xmlParsed = [];
       let xmlError = null;
-      try { xmlParsed = await fetchAndParseProducts(true); } catch(e) { xmlError = e.message; }
+      try {
+        xmlParsed = await fetchAndParseProducts(true);
+      } catch(e) {
+        xmlError = e.message + (e.stack ? ' | ' + e.stack : '');
+      }
 
       let etkinRawCount = 0;
       let etkinRawErr = null;

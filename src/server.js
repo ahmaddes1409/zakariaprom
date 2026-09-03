@@ -172,13 +172,23 @@ async function syncXmlToDb(db, saveDatabase) {
       const nameAr = p.name ? (p.name.ar || translateProductName(nameTr, 'ar')) : '';
       const nameEn = p.name ? (p.name.en || translateProductName(nameTr, 'en')) : '';
 
+      let descStr = '';
+      if (typeof p.description === 'object' && p.description !== null) {
+        descStr = p.description.ar || p.description.tr || p.description.en || '';
+      } else if (typeof p.description === 'string') {
+        descStr = p.description;
+      }
+      if (descStr) {
+        descStr = descStr.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      }
+
       preparedRows.push([
         pId,
         nameTr,
         nameAr,
         nameEn,
         p.model || '',
-        p.description || '',
+        descStr,
         p.price || 0,
         p.quantity || 0,
         catTr,
@@ -211,10 +221,10 @@ async function syncXmlToDb(db, saveDatabase) {
       }
     }
 
-    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_ar, name_en, name_tr) VALUES (?, ?, ?)');
+    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
     for (const [key, c] of categoryMap) {
       if (c && c.tr) {
-        try { catStmt.run(c.ar || c.tr, c.en || c.tr, c.tr); } catch(e) {}
+        try { catStmt.run(c.tr, c.ar || c.tr, c.en || c.tr); } catch(e) {}
       }
     }
 

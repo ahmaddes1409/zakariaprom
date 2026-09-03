@@ -7,14 +7,35 @@ const bcrypt = require('bcryptjs');
 let DB_PATH = null;
 
 function findBestDatabasePath() {
-  const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'zakariaprom.db');
-  const resolvedPath = path.resolve(dbPath);
-  const targetDir = path.dirname(resolvedPath);
-  if (!fs.existsSync(targetDir)) {
-    try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
+  if (process.env.DB_PATH) {
+    const resolved = path.resolve(process.env.DB_PATH);
+    const targetDir = path.dirname(resolved);
+    if (!fs.existsSync(targetDir)) {
+      try { fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 }); } catch (e) {}
+    }
+    console.log(`[DB Path] Using env DB_PATH: "${resolved}"`);
+    return resolved;
   }
-  console.log(`[DB Path] Using fixed database file path: "${resolvedPath}"`);
-  return resolvedPath;
+
+  // Permanent Hostinger database path candidates (persists across hbuilds/versions deployments)
+  const hostingerBase = '/home/u424368414/domains/zakariaprom.com';
+  if (fs.existsSync(hostingerBase)) {
+    const permanentPath = path.join(hostingerBase, 'nodejs', 'data', 'zakariaprom.db');
+    const targetDir = path.dirname(permanentPath);
+    if (!fs.existsSync(targetDir)) {
+      try { fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 }); } catch (e) {}
+    }
+    console.log(`[DB Path] Using permanent Hostinger database path: "${permanentPath}"`);
+    return permanentPath;
+  }
+
+  const localDefault = path.resolve(path.join(__dirname, '..', 'data', 'zakariaprom.db'));
+  const targetDir = path.dirname(localDefault);
+  if (!fs.existsSync(targetDir)) {
+    try { fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 }); } catch (e) {}
+  }
+  console.log(`[DB Path] Using default database path: "${localDefault}"`);
+  return localDefault;
 }
 
 function resolveWasmFile(file) {
@@ -104,6 +125,7 @@ let saveInterval = null;
 class DatabaseWrapper {
   constructor(sqliteDb) {
     this.sqliteDb = sqliteDb;
+    this.inTransaction = false;
   }
 
   prepare(sql) {
@@ -163,7 +185,7 @@ class DatabaseWrapper {
               lastId = res[0].values[0][0];
             }
           } catch(err) {}
-          if (!sql.toUpperCase().includes('BEGIN')) {
+          if (!self.inTransaction && !sql.toUpperCase().includes('BEGIN')) {
             saveDatabase();
           }
           return {
@@ -180,8 +202,15 @@ class DatabaseWrapper {
 
   exec(sql) {
     try {
+      const upper = (sql || '').toUpperCase();
+      if (upper.includes('BEGIN')) {
+        this.inTransaction = true;
+      }
       this.sqliteDb.exec(sql);
-      if (!sql.toUpperCase().includes('BEGIN')) {
+      if (upper.includes('COMMIT') || upper.includes('ROLLBACK')) {
+        this.inTransaction = false;
+        saveDatabase();
+      } else if (!this.inTransaction) {
         saveDatabase();
       }
     } catch (e) {
@@ -200,14 +229,17 @@ class DatabaseWrapper {
   transaction(fn) {
     const self = this;
     return function(...args) {
+      self.inTransaction = true;
       self.sqliteDb.exec('BEGIN TRANSACTION');
       try {
         const result = fn(...args);
         self.sqliteDb.exec('COMMIT');
+        self.inTransaction = false;
         saveDatabase();
         return result;
       } catch (e) {
         self.sqliteDb.exec('ROLLBACK');
+        self.inTransaction = false;
         throw e;
       }
     };
@@ -241,7 +273,7 @@ async function initDatabaseAsync() {
   const targetDir = path.dirname(DB_PATH);
   if (!fs.existsSync(targetDir)) {
     try {
-      fs.mkdirSync(targetDir, { recursive: true });
+      fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 });
     } catch (err) {
       console.error('[DB Init] Could not create target data directory:', err.message);
     }
@@ -250,23 +282,45 @@ async function initDatabaseAsync() {
   console.log(`[DB Init] Active database file path: ${DB_PATH}`);
 
   let sqliteDb;
+  let loadedFromDisk = false;
+
   if (fs.existsSync(DB_PATH)) {
     try {
       const fileBuffer = fs.readFileSync(DB_PATH);
-      if (fileBuffer.length > 0) {
+      if (fileBuffer.length > 1000) {
         sqliteDb = new SQL.Database(fileBuffer);
-        console.log(`[DB Init] Loaded existing database file (${fileBuffer.length} bytes)`);
-      } else {
-        console.log('[DB Init] DB file is 0 bytes. Initializing new SQLite instance');
-        sqliteDb = new SQL.Database();
+        console.log(`[DB Init] Loaded existing database file from ${DB_PATH} (${fileBuffer.length} bytes)`);
+        loadedFromDisk = true;
       }
     } catch (e) {
       console.error(`[DB Init Error] Failed to load DB file at ${DB_PATH}:`, e.message);
-      console.log('[DB Init] Fallback: initializing empty SQLite database in memory');
-      sqliteDb = new SQL.Database();
     }
-  } else {
-    console.log('[DB Init] No existing DB file found. Creating a new SQLite database.');
+  }
+
+  if (!loadedFromDisk) {
+    const bootstrapCandidates = [
+      path.join(__dirname, '..', 'data', 'zakariaprom.db'),
+      process.cwd() ? path.join(process.cwd(), 'data', 'zakariaprom.db') : null
+    ].filter(Boolean);
+
+    for (const cand of bootstrapCandidates) {
+      if (cand !== DB_PATH && fs.existsSync(cand)) {
+        try {
+          const stats = fs.statSync(cand);
+          if (stats.size > 1000) {
+            const buf = fs.readFileSync(cand);
+            sqliteDb = new SQL.Database(buf);
+            console.log(`[DB Init] Bootstrapped database from ${cand} (${buf.length} bytes)`);
+            loadedFromDisk = true;
+            break;
+          }
+        } catch(e) {}
+      }
+    }
+  }
+
+  if (!loadedFromDisk || !sqliteDb) {
+    console.log('[DB Init] No valid existing database found. Creating a new SQLite database instance.');
     sqliteDb = new SQL.Database();
   }
 

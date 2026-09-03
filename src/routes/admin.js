@@ -68,6 +68,227 @@ router.get('/db-status', adminAuth, (req, res) => {
   }
 });
 
+// Inspect all existing databases and backups across Hostinger server paths
+router.get('/inspect-server-databases', adminAuth, async (req, res) => {
+  try {
+    const initSqlJs = require('sql.js');
+    let SQL = null;
+    try { SQL = await initSqlJs(); } catch(e) {}
+
+    const results = [];
+    const visited = new Set();
+
+    function searchDir(dir, depth = 0) {
+      if (depth > 6 || !fs.existsSync(dir)) return;
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const ent of entries) {
+          const fullPath = path.join(dir, ent.name);
+          if (ent.isDirectory()) {
+            if (ent.name === 'node_modules' || ent.name === '.git' || ent.name === '.cache' || ent.name === '.npm') continue;
+            searchDir(fullPath, depth + 1);
+          } else if (ent.isFile() && (ent.name.endsWith('.db') || ent.name.endsWith('.sqlite') || ent.name.includes('zakariaprom.db'))) {
+            if (visited.has(fullPath)) continue;
+            visited.add(fullPath);
+            try {
+              const stat = fs.statSync(fullPath);
+              if (stat.size > 1000) {
+                const info = {
+                  path: fullPath,
+                  sizeBytes: stat.size,
+                  modifiedAt: stat.mtime
+                };
+                if (SQL) {
+                  try {
+                    const buf = fs.readFileSync(fullPath);
+                    const tempDb = new SQL.Database(buf);
+                    const countSafe = (sql) => {
+                      try {
+                        const r = tempDb.exec(sql);
+                        if (r.length > 0 && r[0].values.length > 0) return r[0].values[0][0];
+                      } catch(e) {}
+                      return 0;
+                    };
+                    info.localProductsTotal = countSafe("SELECT COUNT(*) FROM local_products");
+                    info.localProductsEtkin = countSafe("SELECT COUNT(*) FROM local_products WHERE product_id LIKE 'etkin_%'");
+                    info.localProductsXml = countSafe("SELECT COUNT(*) FROM local_products WHERE product_id NOT LIKE 'etkin_%'");
+                    info.translationOverridesCount = countSafe("SELECT COUNT(*) FROM translation_overrides");
+                    info.customCategoriesCount = countSafe("SELECT COUNT(*) FROM custom_categories");
+                    info.bannersCount = countSafe("SELECT COUNT(*) FROM banners");
+                    info.ordersCount = countSafe("SELECT COUNT(*) FROM orders");
+                    info.usersCount = countSafe("SELECT COUNT(*) FROM users");
+                    
+                    try {
+                      const tRes = tempDb.exec("SELECT type, original_key, lang, translation FROM translation_overrides LIMIT 10");
+                      if (tRes.length > 0 && tRes[0].values) {
+                        info.sampleOverrides = tRes[0].values;
+                      }
+                    } catch(e) {}
+
+                    tempDb.close();
+                  } catch(dbErr) {
+                    info.error = dbErr.message;
+                  }
+                }
+                results.push(info);
+              }
+            } catch(e) {}
+          }
+        }
+      } catch(e) {}
+    }
+
+    const rootCandidates = [
+      '/home/u424368414/domains/zakariaprom.com/nodejs',
+      '/home/u424368414/domains/zakariaprom.com/hbuilds',
+      '/home/u424368414/domains/zakariaprom.com/data',
+      '/home/u424368414/domains/zakariaprom.com',
+      '/home/u424368414/backups',
+      '/home/u424368414',
+      path.resolve(path.join(__dirname, '..', '..'))
+    ];
+
+    for (const r of rootCandidates) {
+      if (fs.existsSync(r)) {
+        searchDir(r, 0);
+      }
+    }
+
+    const currentDbPath = database.getDbPath ? database.getDbPath() : 'unknown';
+
+    res.json({
+      success: true,
+      currentActiveDbPath: currentDbPath,
+      databasesFoundCount: results.length,
+      databases: results.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt))
+    });
+  } catch(err) {
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
+});
+
+// Restore/replace active database file from a chosen server database path
+router.post('/restore-database', adminAuth, async (req, res) => {
+  try {
+    const { sourcePath } = req.body || {};
+    if (!sourcePath || !fs.existsSync(sourcePath)) {
+      return res.status(400).json({ error: 'Valid sourcePath required and file must exist on server' });
+    }
+
+    const activeDbPath = database.getDbPath ? database.getDbPath() : null;
+    if (!activeDbPath) {
+      return res.status(500).json({ error: 'Active DB path not resolved' });
+    }
+
+    // Ensure destination directory exists
+    const targetDir = path.dirname(activeDbPath);
+    if (!fs.existsSync(targetDir)) {
+      try { fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 }); } catch(e) {}
+    }
+
+    // Backup active DB if it exists
+    if (fs.existsSync(activeDbPath)) {
+      const backupPath = activeDbPath + '.bak_' + Date.now();
+      try { fs.copyFileSync(activeDbPath, backupPath); } catch(e) {}
+    }
+
+    // Copy source to active DB
+    fs.copyFileSync(sourcePath, activeDbPath);
+    try { fs.chmodSync(activeDbPath, 0o666); } catch(e) {}
+
+    // Reload active database instance
+    const reloaded = database.reloadDatabaseFromDisk ? database.reloadDatabaseFromDisk() : false;
+
+    res.json({
+      success: true,
+      message: 'Database restored successfully',
+      activeDbPath,
+      sourcePath,
+      reloaded
+    });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Merge user amendments (translation overrides, categories, banners, settings) from any database into active DB
+router.post('/merge-amendments', adminAuth, async (req, res) => {
+  try {
+    const { sourcePath } = req.body || {};
+    if (!sourcePath || !fs.existsSync(sourcePath)) {
+      return res.status(400).json({ error: 'Valid sourcePath required and file must exist on server' });
+    }
+
+    const initSqlJs = require('sql.js');
+    const SQL = await initSqlJs();
+    const sourceBuf = fs.readFileSync(sourcePath);
+    const sourceDb = new SQL.Database(sourceBuf);
+    const targetDb = database.db;
+
+    const stats = { translationsMerged: 0, categoriesMerged: 0, bannersMerged: 0 };
+
+    // 1. Merge translation_overrides
+    try {
+      const trans = sourceDb.exec("SELECT type, original_key, lang, translation FROM translation_overrides");
+      if (trans.length > 0 && trans[0].values) {
+        const stmt = targetDb.prepare(`
+          INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+        `);
+        for (const row of trans[0].values) {
+          try {
+            stmt.run(row[0], row[1], row[2], row[3], row[3]);
+            stats.translationsMerged++;
+          } catch(e) {}
+        }
+      }
+    } catch(e) {}
+
+    // 2. Merge custom_categories
+    try {
+      const cats = sourceDb.exec("SELECT name_ar, name_en, name_tr, image_url, sort_order, active FROM custom_categories");
+      if (cats.length > 0 && cats[0].values) {
+        const stmt = targetDb.prepare(`
+          INSERT INTO custom_categories (name_ar, name_en, name_tr, image_url, sort_order, active)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(name_tr) DO UPDATE SET name_ar = ?, name_en = ?, image_url = ?, sort_order = ?, active = ?
+        `);
+        for (const r of cats[0].values) {
+          try {
+            stmt.run(r[0], r[1], r[2], r[3], r[4], r[5], r[0], r[1], r[3], r[4], r[5]);
+            stats.categoriesMerged++;
+          } catch(e) {}
+        }
+      }
+    } catch(e) {}
+
+    // 3. Merge banners
+    try {
+      const banners = sourceDb.exec("SELECT title_ar, title_en, title_tr, subtitle_ar, subtitle_en, subtitle_tr, image_url, link_url, button_text_ar, button_text_en, button_text_tr, sort_order, active FROM banners");
+      if (banners.length > 0 && banners[0].values) {
+        const stmt = targetDb.prepare(`
+          INSERT INTO banners (title_ar, title_en, title_tr, subtitle_ar, subtitle_en, subtitle_tr, image_url, link_url, button_text_ar, button_text_en, button_text_tr, sort_order, active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const r of banners[0].values) {
+          try {
+            stmt.run(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12]);
+            stats.bannersMerged++;
+          } catch(e) {}
+        }
+      }
+    } catch(e) {}
+
+    database.saveDatabase();
+    sourceDb.close();
+
+    res.json({ success: true, message: 'Amendments merged successfully', stats });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // ===== DASHBOARD =====
 router.get('/dashboard', adminAuth, async (req, res) => {

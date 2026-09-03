@@ -71,20 +71,16 @@ function resolveStrictCategory(catStr, nameStr) {
 
 async function fetchXML() {
   const localBackup = path.join(__dirname, '..', 'data', 'xml_export_product.xml');
-  
-  if (fs.existsSync(localBackup)) {
-    try {
-      const stats = fs.statSync(localBackup);
-      if (stats.size > 1000) {
-        let text = fs.readFileSync(localBackup, 'utf8');
-        if (text.includes('<')) text = text.substring(text.indexOf('<'));
-        return text;
-      }
-    } catch(e) {}
-  }
 
+  // 1. Prioritize live remote XML download to get fresh products and prices
   try {
-    const response = await fetch(XML_URL, { signal: AbortSignal.timeout(5000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const response = await fetch(XML_URL, {
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/xml, text/xml, */*'
+      }
+    });
     if (response.ok) {
       let text = await response.text();
       if (text && text.includes('<SHOP>')) {
@@ -95,7 +91,20 @@ async function fetchXML() {
       }
     }
   } catch(e) {
-    console.warn(`[XML Feed] Remote fetch failed (${e.message}).`);
+    console.warn(`[XML Feed] Remote fetch failed (${e.message}). Falling back to local backup...`);
+  }
+
+  // 2. Fall back to local backup file only if remote fetch fails
+  if (fs.existsSync(localBackup)) {
+    try {
+      const stats = fs.statSync(localBackup);
+      if (stats.size > 1000) {
+        let text = fs.readFileSync(localBackup, 'utf8');
+        if (text.includes('<')) text = text.substring(text.indexOf('<'));
+        console.log(`[XML Feed] Loaded XML from local backup file (${stats.size} bytes)`);
+        return text;
+      }
+    } catch(e) {}
   }
 
   throw new Error('Could not fetch XML from remote or local backup');
@@ -136,8 +145,10 @@ function parseXmlFast(xmlText) {
     if (!id || !nameTr) continue;
 
     const model = getVal('PRODUCT_CODE') || getVal('CODE') || getVal('MODEL') || id;
-    const catStr = fixMojikake(getVal('CATEGORY_NAME') || getVal('CATEGORY') || getVal('CATEGORIES'));
-    const descTr = getVal('DESCRIPTION') || getVal('DETAIL');
+    let descTr = getVal('DESCRIPTION') || getVal('DETAIL') || '';
+    if (descTr) {
+      descTr = descTr.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
     const price = parseFloat(getVal('PRICE') || getVal('PRICE_VAT') || '0') || 0;
     const stock = parseInt(getVal('STOCK') || getVal('QUANTITY') || '100') || 100;
     

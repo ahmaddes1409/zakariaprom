@@ -44,5 +44,10 @@ pnpm-workspace.yaml
 u424368414.*/
 
 # Database files (stored on server only, not in repo)
-# data/zakariaprom.db is created/maintained on the server
+data/*.db
+data/*.db*
+data/*.sqlite*
+data/zakariaprom.db
+*.db
+*.db-journal
 

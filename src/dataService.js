@@ -152,13 +152,28 @@ function parseXmlFast(xmlText) {
     const price = parseFloat(getVal('PRICE') || getVal('PRICE_VAT') || '0') || 0;
     const stock = parseInt(getVal('STOCK') || getVal('QUANTITY') || '100') || 100;
     
+    // Extract CATEGORY items from CATEGORIES block or single CATEGORY tag
+    let catStr = '';
+    const catMatches = itemContent.match(/<category[^>]*>([\s\S]*?)<\/category>/gi);
+    if (catMatches && catMatches.length > 0) {
+      const cleanCats = catMatches
+        .map(m => m.replace(/<\/?category[^>]*>/gi, '').replace(/&gt;/g, '>').trim())
+        .filter(c => c && !c.match(/^\d+$/) && c !== '--Kapalı Ürünler Kategorisi');
+      if (cleanCats.length > 0) {
+        catStr = cleanCats.reduce((a, b) => b.length > a.length ? b : a, cleanCats[0]);
+      }
+    }
+    if (!catStr) {
+      catStr = fixMojikake(getVal('CATEGORY_NAME') || getVal('CATEGORY') || getVal('CATEGORIES') || 'Genel');
+    }
+
     const images = [];
     const mainImg = getVal('IMAGE') || getVal('IMAGE_URL') || getVal('PICTURE');
-    if (mainImg) images.push(mainImg);
+    if (mainImg) images.push(mainImg.trim());
     
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 10; i++) {
       const img = getVal(`IMAGE_${i}`) || getVal(`IMAGE${i}`);
-      if (img && !images.includes(img)) images.push(img);
+      if (img && !images.includes(img.trim())) images.push(img.trim());
     }
 
     const { catTr, catAr, catEn } = resolveStrictCategory(catStr, nameTr);
@@ -189,9 +204,9 @@ function parseXmlFast(xmlText) {
       stock,
       images,
       description: {
-        tr: descTr,
-        ar: descTr,
-        en: descTr
+        tr: descTr || nameTr,
+        ar: descTr || translateProductName(nameTr, 'ar'),
+        en: descTr || translateProductName(nameTr, 'en')
       },
       source: 'karmedya'
     });
@@ -200,9 +215,9 @@ function parseXmlFast(xmlText) {
   return products;
 }
 
-async function fetchAndParseProducts() {
+async function fetchAndParseProducts(force = false) {
   const now = Date.now();
-  if (cachedProducts && cachedProducts.length > 0 && (now - lastFetchTime) < CACHE_DURATION) {
+  if (!force && cachedProducts && cachedProducts.length > 0 && (now - lastFetchTime) < CACHE_DURATION) {
     return cachedProducts;
   }
 

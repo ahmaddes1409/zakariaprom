@@ -140,7 +140,7 @@ async function syncXmlToDb(db, saveDatabase) {
     const { fetchAndParseProducts } = require('./dataService');
     const { translateCategory, translateProductName } = require('./translations');
     console.log('[Auto XML Sync] Starting background sync of Karmedya XML feed to database...');
-    const products = await fetchAndParseProducts();
+    const products = await fetchAndParseProducts(true);
     console.log(`[Auto XML Sync] Parsed ${products ? products.length : 0} products from XML`);
     if (!products || products.length === 0) return;
 
@@ -361,7 +361,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       const { fetchAndParseProducts } = require('./dataService');
       let xmlParsed = [];
       let xmlError = null;
-      try { xmlParsed = await fetchAndParseProducts(); } catch(e) { xmlError = e.message; }
+      try { xmlParsed = await fetchAndParseProducts(true); } catch(e) { xmlError = e.message; }
 
       let etkinRawCount = 0;
       let etkinRawErr = null;

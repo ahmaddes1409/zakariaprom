@@ -289,6 +289,213 @@ router.post('/merge-amendments', adminAuth, async (req, res) => {
   }
 });
 
+// Synchronize Karmedya XML Feed directly into permanent database
+router.post('/sync-karmedya-xml', adminAuth, async (req, res) => {
+  try {
+    const { parseStringPromise } = require('xml2js');
+    const { translateProductName, fixMojikake } = require('../translations');
+    const XML_URL = 'https://karmedya.com/xml/xml_export_product.xml';
+
+    console.log('[Admin XML Sync] Fetching live XML feed from:', XML_URL);
+    const xmlRes = await fetch(XML_URL, {
+      signal: AbortSignal.timeout(20000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    if (!xmlRes.ok) {
+      throw new Error(`Failed to fetch XML feed, status: ${xmlRes.status}`);
+    }
+    const xmlText = await xmlRes.text();
+    const result = await parseStringPromise(xmlText, { explicitArray: false, trim: true });
+    if (!result || !result.SHOP || !result.SHOP.SHOPITEM) {
+      throw new Error('Invalid XML feed structure');
+    }
+    const rawItems = Array.isArray(result.SHOP.SHOPITEM) ? result.SHOP.SHOPITEM : [result.SHOP.SHOPITEM];
+
+    const TOP_CATEGORY_MAP = {
+      'Kalemler': { ar: 'أقلام دعاية وإعلان', en: 'Promotional Pens' },
+      'Teknoloji Ürünleri': { ar: 'منتجات تكنولوجية وبادج', en: 'Technology Products' },
+      'Teknoloji': { ar: 'منتجات تكنولوجية وبادج', en: 'Technology Products' },
+      'Termos - Matara': { ar: 'حافظات حرارية وترمس', en: 'Thermos & Flasks' },
+      'Termos': { ar: 'حافظات حرارية وترمس', en: 'Thermos & Flasks' },
+      'Anahtarlık - Rozet': { ar: 'ميداليات مفاتيح وشعارات', en: 'Keychains & Badges' },
+      'Anahtarlık': { ar: 'ميداليات مفاتيح وشعارات', en: 'Keychains & Badges' },
+      'Saatler': { ar: 'ساعات حائط ومكتب', en: 'Clocks & Watches' },
+      'Kalem Setleri': { ar: 'أطقم أقلام فاخرة', en: 'Pen Sets' },
+      'Kırtasiye Ürünleri': { ar: 'أدوات قرطاسية ومكتبية', en: 'Stationery Products' },
+      'Kırtasiye': { ar: 'أدوات قرطاسية ومكتبية', en: 'Stationery Products' },
+      'Ajanda -Defter': { ar: 'أجندات ودفاتر 2026', en: 'Agendas & Notebooks' },
+      'Ajanda': { ar: 'أجندات ودفاتر 2026', en: 'Agendas & Notebooks' },
+      'Kutulu Setler': { ar: 'أطقم هدايا دعائية', en: 'Gift Sets' },
+      'Çakmaklar': { ar: 'قداحات وولاعات', en: 'Lighters' },
+      'Çakmak': { ar: 'قداحات وولاعات', en: 'Lighters' },
+      'Masaüstü Ürünler': { ar: 'مستلزمات وطقم مكتب', en: 'Desk Accessories' },
+      'Çanta': { ar: 'حقائب دعائية', en: 'Bags' },
+      'Matbaa Ürünleri': { ar: 'مطبوعات ورقية وتقاويم', en: 'Printing & Calendars' },
+      'Seramik - Cam Ürünler': { ar: 'أكواب سيراميك وزجاج', en: 'Mugs & Glassware' },
+      'Kutu - Aksesuar': { ar: 'علب وهدايا', en: 'Boxes & Accessories' },
+      'Çeşitli Araç Gereç': { ar: 'أدوات ومستلزمات متنوعة', en: 'Miscellaneous Tools' },
+      'Plaket - Ödül Ürünleri': { ar: 'دروع تذكارية وجوائز', en: 'Plaques & Awards' },
+      'Plaket': { ar: 'دروع تذكارية وجوائز', en: 'Plaques & Awards' },
+      'Byrak': { ar: 'أعلام ورايات', en: 'Flags & Banners' },
+      'اعلام': { ar: 'أعلام ورايات', en: 'Flags & Banners' },
+      'Şapka - Tişört': { ar: 'قبعات وتيشيرتات', en: 'Caps & T-Shirts' },
+      'VIP Setler': { ar: 'مجموعات VIP فاخرة', en: 'VIP Gift Sets' }
+    };
+
+    function extractCats(item) {
+      if (!item.CATEGORIES || !item.CATEGORIES.CATEGORY) return [];
+      const c = item.CATEGORIES.CATEGORY;
+      return Array.isArray(c) ? c : [c];
+    }
+
+    function cleanCatStr(rawStr) {
+      if (!rawStr) return '';
+      let clean = rawStr;
+      if (clean.includes('|')) clean = clean.split('|')[0].trim();
+      const parts = clean.split('>').map(p => p.trim()).filter(Boolean);
+      const unique = [];
+      for (const p of parts) {
+        if (unique.length === 0 || unique[unique.length - 1] !== p) unique.push(p);
+      }
+      return unique.join(' > ');
+    }
+
+    function getCatTrans(catTr) {
+      if (!catTr) return { tr: '', ar: '', en: '' };
+      const parts = catTr.split(' > ');
+      const topTr = parts[0].trim();
+      const topMap = TOP_CATEGORY_MAP[topTr] || { ar: topTr, en: topTr };
+      if (parts.length > 1) {
+        const subTr = parts.slice(1).join(' > ');
+        return { tr: catTr, ar: `${topMap.ar} > ${subTr}`, en: `${topMap.en} > ${subTr}` };
+      }
+      return { tr: topTr, ar: topMap.ar, en: topMap.en };
+    }
+
+    const db = database.db;
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO local_products 
+      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+
+    db.exec('BEGIN TRANSACTION');
+
+    let inserted = 0;
+    const categoryMap = new Map();
+
+    for (const item of rawItems) {
+      const allCats = extractCats(item).filter(c => c && c !== '--Kapalı Ürünler Kategorisi');
+      if (allCats.length === 0) continue;
+      const textCats = allCats.filter(c => !String(c).match(/^\d+$/));
+      const chosenCat = textCats.length > 0 ? textCats.reduce((a, b) => b.length > a.length ? b : a, textCats[0]) : 'Promosyon Ürünleri';
+
+      const cleanCatTr = cleanCatStr(chosenCat);
+      const catTrans = getCatTrans(cleanCatTr);
+
+      const topCatTr = cleanCatTr.split(' > ')[0].trim();
+      if (topCatTr && !categoryMap.has(topCatTr)) {
+        categoryMap.set(topCatTr, getCatTrans(topCatTr));
+      }
+
+      const images = [];
+      if (item.IMAGES) {
+        for (let i = 1; i <= 10; i++) {
+          const k = `IMAGE_${i}`;
+          if (item.IMAGES[k] && typeof item.IMAGES[k] === 'string' && item.IMAGES[k].trim()) {
+            images.push(item.IMAGES[k].trim());
+          }
+        }
+      }
+
+      const nameTr = fixMojikake(item.NAME || '');
+      const nameAr = translateProductName(nameTr, 'ar');
+      const nameEn = translateProductName(nameTr, 'en');
+
+      let desc = item.DESCRIPTION || '';
+      if (typeof desc === 'string') {
+        desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      } else {
+        desc = nameTr;
+      }
+
+      const priceStr = (item.PRICE || '0').toString().replace('TL', '').replace(',', '.').trim();
+      const price = parseFloat(priceStr) || 0;
+      const quantity = parseInt(item.QUANTITY) || 0;
+      const productId = (item.PRODUCT_ID || `xml_${inserted}`).toString();
+
+      stmt.run([
+        productId,
+        nameTr,
+        nameAr,
+        nameEn,
+        item.MODEL || '',
+        desc,
+        price,
+        quantity,
+        catTrans.tr,
+        catTrans.ar,
+        catTrans.en,
+        JSON.stringify([]),
+        JSON.stringify([]),
+        JSON.stringify(images)
+      ]);
+      inserted++;
+    }
+
+    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
+    for (const [key, c] of categoryMap) {
+      if (c && c.tr) {
+        try { catStmt.run(c.tr, c.ar || c.tr, c.en || c.tr); } catch(e) {}
+      }
+    }
+
+    db.exec('COMMIT');
+    database.saveDatabase();
+
+    const totalRow = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+    const xmlRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+    const etkinRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+
+    res.json({
+      success: true,
+      message: `Successfully synced ${inserted} Karmedya XML products into database`,
+      inserted,
+      total: totalRow ? totalRow.count : 0,
+      xml: xmlRow ? xmlRow.count : 0,
+      etkin: etkinRow ? etkinRow.count : 0
+    });
+  } catch(err) {
+    try { database.db.exec('ROLLBACK'); } catch(e) {}
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
+});
+
+// Sync All feeds (Karmedya XML + Etkin API) into permanent database
+router.post('/sync-all-feeds', adminAuth, async (req, res) => {
+  try {
+    const { syncEtkinProducts } = require('../services/etkinService');
+    const etkinResult = await syncEtkinProducts(database.db, database.saveDatabase);
+
+    const db = database.db;
+    const totalRow = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+    const xmlRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
+    const etkinRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+
+    res.json({
+      success: true,
+      etkin: etkinResult,
+      dbCounts: {
+        total: totalRow ? totalRow.count : 0,
+        xml: xmlRow ? xmlRow.count : 0,
+        etkin: etkinRow ? etkinRow.count : 0
+      }
+    });
+  } catch(err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 // ===== DASHBOARD =====
 router.get('/dashboard', adminAuth, async (req, res) => {

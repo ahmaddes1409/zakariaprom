@@ -441,6 +441,20 @@ function fixMojikake(str) {
   return s;
 }
 
+function normalizeImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  url = url.trim();
+  const matchFile = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (matchFile) {
+    return `https://lh3.googleusercontent.com/d/${matchFile[1]}`;
+  }
+  const matchId = url.match(/drive\.google\.com\/[a-zA-Z0-9_/?&=]+(?:id=|\/d\/)([a-zA-Z0-9_-]+)/);
+  if (matchId) {
+    return `https://lh3.googleusercontent.com/d/${matchId[1]}`;
+  }
+  return url;
+}
+
 function translateCategory(category, targetLang) {
   const cleanCat = fixMojikake(category);
   const normCat = normalizeCategoryName(cleanCat);
@@ -463,4 +477,4 @@ function translateCategory(category, targetLang) {
   return translatedParts.join(' > ');
 }
 
-module.exports = { categoryTranslations, termTranslations, uiTranslations, translateProductName, translateCategory, normalizeCategoryName, fixMojikake };
+module.exports = { categoryTranslations, termTranslations, uiTranslations, translateProductName, translateCategory, normalizeCategoryName, fixMojikake, normalizeImageUrl };

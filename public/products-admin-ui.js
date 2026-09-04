@@ -1,6 +1,19 @@
 // ========== Enhanced Products Management UI ==========
 // This replaces the renderProducts function and adds new product management features
 
+function fixImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (driveMatch) {
+    return 'https://lh3.googleusercontent.com/d/' + driveMatch[1];
+  }
+  const driveIdMatch = url.match(/drive\.google\.com\/[a-zA-Z0-9_/?&=]+(?:id=|\/d\/)([a-zA-Z0-9_-]+)/);
+  if (driveIdMatch) {
+    return 'https://lh3.googleusercontent.com/d/' + driveIdMatch[1];
+  }
+  return url;
+}
+
 let productsPage = 1;
 let localProductsPage = 1;
 let currentProductsTab = 'all'; // 'all', 'xml', 'etkin', 'local'
@@ -13,6 +26,9 @@ async function renderProducts() {
     <div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
       <h2 style="margin:0;">إدارة المنتجات</h2>
       <div style="flex:1;"></div>
+      <button class="btn-secondary" id="syncXmlBtn" onclick="triggerXmlSync()" style="margin-left:8px;">
+        <i class="fas fa-sync"></i> مزامنة Karmedya XML
+      </button>
       <button class="btn-primary" onclick="showAddProductModal()">
         <i class="fas fa-plus"></i> إضافة منتج جديد
       </button>
@@ -29,20 +45,38 @@ async function renderProducts() {
   await renderXmlProducts();
 }
 
+window.triggerXmlSync = async function() {
+  const btn = document.getElementById('syncXmlBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري المزامنة...';
+  }
+  try {
+    const res = await api('/api/admin/sync-karmedya-xml', { method: 'POST' });
+    if (res && res.success) {
+      alert(`تمت المزامنة بنجاح! تم تحديث ${res.inserted} منتج (الإجمالي: ${res.total})`);
+      renderProducts();
+    } else {
+      alert('فشلت المزامنة: ' + (res?.error || 'خطأ غير معروف'));
+    }
+  } catch(e) {
+    alert('خطأ أثناء المزامنة: ' + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-sync"></i> مزامنة Karmedya XML';
+    }
+  }
+};
+
 async function getProductCounts() {
   try {
-    const data = await api('/api/admin/products?limit=10000');
-    const prods = data?.products || [];
-    let xml = 0, etkin = 0, local = 0;
-    prods.forEach(p => {
-      if (p.isEtkin || p.source === 'etkin') etkin++;
-      else if (p.isLocal || p.source === 'local') local++;
-      else xml++;
-    });
-    return { total: prods.length, xml, etkin, local };
-  } catch(e) {
-    return { total: 0, xml: 0, etkin: 0, local: 0 };
-  }
+    const data = await api('/api/admin/product-counts');
+    if (data && data.total !== undefined) {
+      return { total: data.total, xml: data.xml || 0, etkin: data.etkin || 0, local: data.local || 0 };
+    }
+  } catch(e) {}
+  return { total: 0, xml: 0, etkin: 0, local: 0 };
 }
 
 async function renderXmlProducts() {

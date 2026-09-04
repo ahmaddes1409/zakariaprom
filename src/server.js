@@ -5,7 +5,7 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const { initializeDatabase, initDatabaseAsync } = require('./database');
 const { fetchAndParseProducts, getCategories, getProductsByCategory, searchProducts, getProductById } = require('./dataService');
-const { uiTranslations, categoryTranslations, translateCategory, normalizeCategoryName } = require('./translations');
+const { uiTranslations, categoryTranslations, translateCategory, normalizeCategoryName, normalizeImageUrl, fixMojikake } = require('./translations');
 const { optionalUserAuth } = require('./auth');
 
 // === Exchange Rate Auto-Update ===
@@ -261,15 +261,48 @@ function migrateCategories(db) {
 
       UPDATE custom_categories SET name_tr = 'Metal Kalemler', name_ar = 'أقلام معدنية', name_en = 'Metal Pens' WHERE name_tr IN ('Metal Kalem', 'Metal Kalemleri', 'Kalemler > Metal Kalem');
       UPDATE custom_categories SET name_tr = 'Plastik Kalemler', name_ar = 'أقلام بلاستيكية', name_en = 'Plastic Pens' WHERE name_tr IN ('Plastik Kalem', 'Plastik Kalemleri', 'Kalemler > Plastik Kalem');
+      UPDATE custom_categories SET name_tr = 'Bayraklar', name_ar = 'أعلام ورايات', name_en = 'Flags' WHERE name_tr IN ('Byrak', 'اعلام', 'Bayrak');
+
+      -- Clean up corrupted Mojikake categories and entries
+      DELETE FROM custom_categories WHERE name_tr LIKE '%Ã%' OR name_tr LIKE '%Ä%' OR name_tr LIKE '%Å%' OR name_tr LIKE '%?%' OR name_tr LIKE '%§%';
+      DELETE FROM custom_categories WHERE name_tr LIKE '%Kapalı Ürünler%';
       DELETE FROM custom_categories WHERE id NOT IN (SELECT min(id) FROM custom_categories GROUP BY name_tr);
 
       DELETE FROM translation_overrides WHERE type = 'category' AND (translation LIKE '%ler' OR translation LIKE '%lar' OR original_key IN ('Metal Kalemler', 'Plastik Kalemler', 'Metal Kalem', 'Plastik Kalem'));
+      DELETE FROM translation_overrides WHERE original_key LIKE '%Ã%' OR original_key LIKE '%Ä%' OR original_key LIKE '%Å%' OR original_key LIKE '%?%' OR original_key LIKE '%§%';
+      DELETE FROM translation_overrides WHERE translation LIKE '%Ã%' OR translation LIKE '%Ä%' OR translation LIKE '%Å%' OR translation LIKE '%?%' OR translation LIKE '%§%';
 
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية');
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens');
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'ar', 'أقلام بلاستيكية');
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'en', 'Plastic Pens');
     `);
+
+    // Migrate Google Drive sharing links to direct image URLs in DB
+    try {
+      const driveRows = db.prepare("SELECT id, image_url FROM custom_categories WHERE image_url LIKE '%drive.google.com%'").all();
+      for (const r of driveRows) {
+        const norm = normalizeImageUrl(r.image_url);
+        if (norm && norm !== r.image_url) {
+          db.prepare("UPDATE custom_categories SET image_url = ? WHERE id = ?").run(norm, r.id);
+        }
+      }
+      const catImgRows = db.prepare("SELECT category_name, image_url FROM category_images WHERE image_url LIKE '%drive.google.com%'").all();
+      for (const r of catImgRows) {
+        const norm = normalizeImageUrl(r.image_url);
+        if (norm && norm !== r.image_url) {
+          db.prepare("UPDATE category_images SET image_url = ? WHERE category_name = ?").run(norm, r.category_name);
+        }
+      }
+      const bannerRows = db.prepare("SELECT id, image_url FROM banners WHERE image_url LIKE '%drive.google.com%'").all();
+      for (const r of bannerRows) {
+        const norm = normalizeImageUrl(r.image_url);
+        if (norm && norm !== r.image_url) {
+          db.prepare("UPDATE banners SET image_url = ? WHERE id = ?").run(norm, r.id);
+        }
+      }
+    } catch(imgErr) {}
+
     if (typeof saveDatabase === 'function') saveDatabase();
     console.log('[Category Migration] Bulk categories merged & custom categories cleaned successfully!');
   } catch(e) {
@@ -830,16 +863,19 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
           tr: cleanTr,
           ar: catAr,
           en: catEn,
-          image: cleanTr ? (imageMap[cleanTr] || customImageMap[cleanTr] || '') : ''
+          image: cleanTr ? normalizeImageUrl(imageMap[cleanTr] || customImageMap[cleanTr] || '') : ''
         };
       });
 
-      // Add custom categories (that are active and not hidden)
+      // Add custom categories (that are active, not hidden, and not mojikake)
       const customCats = safeQuery('SELECT * FROM custom_categories WHERE active = 1');
       customCats.forEach(cc => {
-        const normCc = cc ? normalizeCategoryName(cc.name_tr) : '';
-        if (cc && cc.name_tr && !hiddenCategorySet.has(cc.name_tr) && !hiddenCategorySet.has(normCc) && !result.find(r => r && (r.tr === cc.name_tr || normalizeCategoryName(r.tr) === normCc))) {
-          const catImage = imageMap[cc.name_tr] || cc.image_url || '';
+        if (!cc || !cc.name_tr) return;
+        // Skip corrupted mojikake rows
+        if (cc.name_tr.includes('Ã') || cc.name_tr.includes('Ä') || cc.name_tr.includes('Å') || cc.name_tr.includes('?') || cc.name_tr.includes('§')) return;
+        const normCc = normalizeCategoryName(cc.name_tr);
+        if (!hiddenCategorySet.has(cc.name_tr) && !hiddenCategorySet.has(normCc) && !result.find(r => r && (r.tr === cc.name_tr || normalizeCategoryName(r.tr) === normCc))) {
+          const catImage = normalizeImageUrl(imageMap[cc.name_tr] || cc.image_url || '');
           const catOverrides = overrideMap[cc.name_tr] || {};
           result.push({
             tr: cc.name_tr || cc.name_ar,
@@ -1147,7 +1183,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       const db = database.db;
       if (!db) return res.json([]);
       const banners = db.prepare('SELECT * FROM banners WHERE active = 1 ORDER BY sort_order ASC, id DESC').all();
-      res.json(banners);
+      const normalized = (banners || []).map(b => ({
+        ...b,
+        image_url: normalizeImageUrl(b.image_url)
+      }));
+      res.json(normalized);
     } catch(e) {
       res.json([]);
     }

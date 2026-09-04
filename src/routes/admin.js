@@ -6,6 +6,20 @@ const { adminAuth, adminLogin } = require('../auth');
 const { fetchAndParseProducts, getCategories } = require('../dataService');
 function getDb() { return database.db; }
 
+function normalizeImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  url = url.trim();
+  const matchFile = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (matchFile) {
+    return `https://lh3.googleusercontent.com/d/${matchFile[1]}`;
+  }
+  const matchId = url.match(/drive\.google\.com\/[a-zA-Z0-9_/?&=]+(?:id=|\/d\/)([a-zA-Z0-9_-]+)/);
+  if (matchId) {
+    return `https://lh3.googleusercontent.com/d/${matchId[1]}`;
+  }
+  return url;
+}
+
 const router = express.Router();
 
 // Admin Login
@@ -501,8 +515,8 @@ router.post('/sync-all-feeds', adminAuth, async (req, res) => {
 router.get('/dashboard', adminAuth, async (req, res) => {
   try {
     const db = getDb();
-    const totalProductsRow = db.prepare('SELECT COUNT(*) as count FROM products').get();
-    const totalCategoriesRow = db.prepare('SELECT COUNT(DISTINCT category) as count FROM products').get();
+    const totalProductsRow = db.prepare('SELECT COUNT(*) as count FROM local_products WHERE hidden = 0').get();
+    const totalCategoriesRow = db.prepare("SELECT COUNT(DISTINCT category_tr) as count FROM local_products WHERE category_tr IS NOT NULL AND category_tr != '' AND hidden = 0").get();
     const totalProducts = totalProductsRow ? totalProductsRow.count : 0;
     const totalCategories = totalCategoriesRow ? totalCategoriesRow.count : 0;
     const totalOrdersRow = db.prepare('SELECT COUNT(*) as count FROM orders').get();
@@ -543,10 +557,17 @@ router.get('/translations', adminAuth, async (req, res) => {
       overrideMap[o.type][o.original_key][o.lang] = o.translation;
     });
 
-    // Get categories directly from database
-    const catRows = db.prepare('SELECT DISTINCT category, category_ar, category_en FROM products WHERE category IS NOT NULL AND category != ""').all() || [];
+    // Get categories directly from database (local_products and custom_categories)
+    const catRows = db.prepare("SELECT DISTINCT category_tr as category, category_ar, category_en FROM local_products WHERE category_tr IS NOT NULL AND category_tr != '' AND hidden = 0").all() || [];
+    const customCatRows = db.prepare("SELECT name_tr as category, name_ar as category_ar, name_en as category_en FROM custom_categories WHERE active = 1 AND name_tr IS NOT NULL AND name_tr != ''").all() || [];
+    const seenCats = new Set();
+    const combinedCats = [...catRows, ...customCatRows].filter(c => {
+      if (!c || !c.category || seenCats.has(c.category)) return false;
+      seenCats.add(c.category);
+      return true;
+    });
     
-    const categories = catRows.map(cat => ({
+    const categories = combinedCats.map(cat => ({
       tr: cat.category,
       ar: (overrideMap.category && overrideMap.category[cat.category] && overrideMap.category[cat.category].ar) || cat.category_ar || cat.category,
       en: (overrideMap.category && overrideMap.category[cat.category] && overrideMap.category[cat.category].en) || cat.category_en || cat.category
@@ -735,6 +756,26 @@ router.post('/products/show', adminAuth, (req, res) => {
   const { product_id } = req.body;
   db.prepare('DELETE FROM hidden_products WHERE product_id = ?').run(product_id);
   res.json({ success: true });
+});
+
+// ===== QUICK PRODUCT COUNTS =====
+router.get('/product-counts', adminAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const totalRow = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
+    const xmlRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND (is_local IS NULL OR is_local = 0) AND hidden = 0").get();
+    const etkinRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+    const localRow = db.prepare("SELECT count(*) as count FROM local_products WHERE (is_local = 1 OR product_id LIKE 'local_%') AND hidden = 0").get();
+
+    res.json({
+      total: totalRow ? totalRow.count : 0,
+      xml: xmlRow ? xmlRow.count : 0,
+      etkin: etkinRow ? etkinRow.count : 0,
+      local: localRow ? localRow.count : 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, total: 0, xml: 0, etkin: 0, local: 0 });
+  }
 });
 
 // ===== PRODUCTS LIST (Admin) =====
@@ -1025,7 +1066,7 @@ router.get('/categories', adminAuth, async (req, res) => {
         ar: arVal,
         en: enVal,
         hidden: hiddenCats.includes(cleanTr),
-        image: imageMap[cleanTr] || ''
+        image: normalizeImageUrl(imageMap[cleanTr] || '')
       });
     });
 
@@ -1043,7 +1084,7 @@ router.get('/categories', adminAuth, async (req, res) => {
         en: ov.en || fixMojikake(cc.name_en) || translateCategory(cleanTr, 'en'),
         count: 0,
         hidden: hiddenCats.includes(cleanTr) || cc.active === 0,
-        image: imageMap[cleanTr] || cc.image_url || "",
+        image: normalizeImageUrl(imageMap[cleanTr] || cc.image_url || ""),
         isCustom: true
       });
     });
@@ -1057,6 +1098,7 @@ router.get('/categories', adminAuth, async (req, res) => {
 router.get('/categories/:name', adminAuth, async (req, res) => {
   try {
     const db = getDb();
+    const { normalizeImageUrl } = require('../translations');
     const catName = decodeURIComponent(req.params.name);
     let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
     let products = dbRows.map(lp => ({
@@ -1561,25 +1603,31 @@ router.get('/analytics', adminAuth, (req, res) => {
 router.get('/banners', adminAuth, (req, res) => {
   const db = getDb();
   const banners = db.prepare('SELECT * FROM banners ORDER BY sort_order ASC, id DESC').all();
-  res.json(banners);
+  const normalized = (banners || []).map(b => ({
+    ...b,
+    image_url: normalizeImageUrl(b.image_url)
+  }));
+  res.json(normalized);
 });
 
 router.post('/banners', adminAuth, (req, res) => {
   const db = getDb();
   const { title_ar, title_en, title_tr, subtitle_ar, subtitle_en, subtitle_tr, image_url, link, sort_order } = req.body;
   if (!image_url) return res.status(400).json({ error: 'Image URL required' });
+  const cleanImg = normalizeImageUrl(image_url);
   const result = db.prepare(
     'INSERT INTO banners (title_ar, title_en, title_tr, subtitle_ar, subtitle_en, subtitle_tr, image_url, link, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(title_ar || '', title_en || '', title_tr || '', subtitle_ar || '', subtitle_en || '', subtitle_tr || '', image_url, link || '', sort_order || 0);
+  ).run(title_ar || '', title_en || '', title_tr || '', subtitle_ar || '', subtitle_en || '', subtitle_tr || '', cleanImg, link || '', sort_order || 0);
   res.json({ success: true, id: result.lastInsertRowid });
 });
 
 router.put('/banners/:id', adminAuth, (req, res) => {
   const db = getDb();
   const { title_ar, title_en, title_tr, subtitle_ar, subtitle_en, subtitle_tr, image_url, link, sort_order, active } = req.body;
+  const cleanImg = normalizeImageUrl(image_url);
   db.prepare(
     'UPDATE banners SET title_ar=?, title_en=?, title_tr=?, subtitle_ar=?, subtitle_en=?, subtitle_tr=?, image_url=?, link=?, sort_order=?, active=? WHERE id=?'
-  ).run(title_ar || '', title_en || '', title_tr || '', subtitle_ar || '', subtitle_en || '', subtitle_tr || '', image_url || '', link || '', sort_order || 0, active !== undefined ? (active ? 1 : 0) : 1, req.params.id);
+  ).run(title_ar || '', title_en || '', title_tr || '', subtitle_ar || '', subtitle_en || '', subtitle_tr || '', cleanImg, link || '', sort_order || 0, active !== undefined ? (active ? 1 : 0) : 1, req.params.id);
   res.json({ success: true });
 });
 

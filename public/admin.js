@@ -1,10 +1,15 @@
 // Admin Panel JavaScript - Zakaria Prom
 // Fix Google Drive image URLs to direct links
 function fixImageUrl(url) {
-  if (!url) return '';
+  if (!url || typeof url !== 'string') return '';
+  url = url.trim();
   const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
   if (driveMatch) {
     return 'https://lh3.googleusercontent.com/d/' + driveMatch[1];
+  }
+  const driveIdMatch = url.match(/drive\.google\.com\/[a-zA-Z0-9_/?&=]+(?:id=|\/d\/)([a-zA-Z0-9_-]+)/);
+  if (driveIdMatch) {
+    return 'https://lh3.googleusercontent.com/d/' + driveIdMatch[1];
   }
   return url;
 }
@@ -113,6 +118,7 @@ async function loadSection(section) {
     case 'banners': await renderBanners(); break;
     case 'staff': await renderStaff(); break;
     case 'currencies': await renderCurrencies(); break;
+    case 'sync': await renderSyncSection(); break;
     case 'customProducts': await renderCustomProducts(); break;
   }
 }
@@ -122,7 +128,7 @@ function getSectionTitle(s) {
     dashboard: 'لوحة المعلومات', orders: 'الطلبات', products: 'المنتجات',
     categories: 'الفئات', translations: 'الترجمات', users: 'العملاء',
     coupons: 'كوبونات الخصم', posts: 'المدونة', chatbot: 'الشات بوت',
-    analytics: 'الإحصائيات', settings: 'الإعدادات',
+    analytics: 'الإحصائيات', sync: 'مزامنة وقاعدة البيانات', settings: 'الإعدادات',
     banners: 'البانرات', staff: 'الموظفين', currencies: 'العملات', customProducts: 'المنتجات المخصصة'
   };
   return titles[s] || s;
@@ -1266,4 +1272,161 @@ function showModal(title, content) {
 window.closeModal = function() {
   const overlay = document.querySelector('.modal-overlay');
   if (overlay) overlay.classList.add('hidden');
+};
+
+// ========== SYNC & DATABASE SECTION ==========
+async function renderSyncSection() {
+  const area = document.getElementById('contentArea');
+  area.innerHTML = `
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header"><h3><i class="fas fa-sync text-primary"></i> مزامنة خلاصات المنتجات</h3></div>
+      <div class="card-body">
+        <p style="color:var(--text-muted);margin-bottom:15px;">قم بتحديث خلاصات المنتجات فوراً من مصادرها الرسمية وتحديث الأسعار والكميات في قاعدة البيانات الدائمة.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <button class="btn-primary" id="btnSyncXmlLive" onclick="triggerAdminXmlSync()">
+            <i class="fas fa-file-excel"></i> مزامنة خلاصة Karmedya XML الحية
+          </button>
+          <button class="btn-secondary" id="btnSyncAllLive" onclick="triggerAdminAllSync()">
+            <i class="fas fa-sync-alt"></i> مزامنة جميع المصادر (XML + Etkin API)
+          </button>
+        </div>
+        <div id="syncResult" style="margin-top:15px;"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3><i class="fas fa-database text-warning"></i> فحص واستعادة النسخ الاحتياطية للسيرفر</h3>
+        <button class="btn-secondary btn-sm" onclick="inspectDatabases()"><i class="fas fa-search"></i> فحص السيرفر الآن</button>
+      </div>
+      <div class="card-body">
+        <div id="dbInspectStatus">
+          <p style="color:var(--text-muted);">انقر على زر الفحص للبحث في مجلدات السيرفر عن أي نسخ سابقة لقاعدة البيانات أو تعديلات سابقة.</p>
+        </div>
+        <div id="dbInspectList" style="margin-top:15px;"></div>
+      </div>
+    </div>
+  `;
+}
+
+window.triggerAdminXmlSync = async function() {
+  const btn = document.getElementById('btnSyncXmlLive');
+  const resultDiv = document.getElementById('syncResult');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري مزامنة XML...'; }
+  if (resultDiv) resultDiv.innerHTML = '<div style="padding:10px;background:#e0f2fe;color:#0369a1;border-radius:6px;">جاري جلب ملف XML وتحليله وتحديث المنتجات...</div>';
+  try {
+    const res = await api('/api/admin/sync-karmedya-xml', { method: 'POST' });
+    if (res && res.success) {
+      resultDiv.innerHTML = `<div style="padding:10px;background:#ecfdf5;color:#047857;border-radius:6px;">
+        <strong>نجحت المزامنة!</strong> تم تحديث ${res.inserted} منتج (إجمالي منتجات Karmedya: ${res.xml}، الإجمالي الكلي: ${res.total}).
+      </div>`;
+    } else {
+      resultDiv.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#b91c1c;border-radius:6px;">
+        فشلت المزامنة: ${res?.error || 'خطأ غير معروف'}
+      </div>`;
+    }
+  } catch(e) {
+    if (resultDiv) resultDiv.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#b91c1c;border-radius:6px;">خطأ: ${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-excel"></i> مزامنة خلاصة Karmedya XML الحية'; }
+  }
+};
+
+window.triggerAdminAllSync = async function() {
+  const btn = document.getElementById('btnSyncAllLive');
+  const resultDiv = document.getElementById('syncResult');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري مزامنة جميع المصادر...'; }
+  if (resultDiv) resultDiv.innerHTML = '<div style="padding:10px;background:#e0f2fe;color:#0369a1;border-radius:6px;">جاري مزامنة خلاصة Karmedya وخلاصة Etkin...</div>';
+  try {
+    const res = await api('/api/admin/sync-all-feeds', { method: 'POST' });
+    if (res && res.success) {
+      resultDiv.innerHTML = `<div style="padding:10px;background:#ecfdf5;color:#047857;border-radius:6px;">
+        <strong>تمت المزامنة بنجاح!</strong> إجمالي المنتجات: ${res.dbCounts?.total || 0} (Karmedya: ${res.dbCounts?.xml || 0}, Etkin: ${res.dbCounts?.etkin || 0}).
+      </div>`;
+    } else {
+      resultDiv.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#b91c1c;border-radius:6px;">
+        فشلت المزامنة: ${res?.error || 'خطأ'}
+      </div>`;
+    }
+  } catch(e) {
+    if (resultDiv) resultDiv.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#b91c1c;border-radius:6px;">خطأ: ${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> مزامنة جميع المصادر (XML + Etkin API)'; }
+  }
+};
+
+window.inspectDatabases = async function() {
+  const statusDiv = document.getElementById('dbInspectStatus');
+  const listDiv = document.getElementById('dbInspectList');
+  if (statusDiv) statusDiv.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> جاري البحث في مسارات السيرفر...</p>';
+  try {
+    const res = await api('/api/admin/inspect-server-databases');
+    if (res && res.success) {
+      statusDiv.innerHTML = `<p><strong>قاعدة البيانات النشطة الحالية:</strong> <code>${res.currentActiveDbPath}</code><br>تم العثور على <strong>${res.databasesFoundCount}</strong> ملف قاعدة بيانات.</p>`;
+      const dbs = res.databases || [];
+      if (dbs.length === 0) {
+        listDiv.innerHTML = '<p>لا توجد نسخ احتياطية إضافية.</p>';
+        return;
+      }
+      listDiv.innerHTML = `
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>المسار</th>
+                <th>الحجم</th>
+                <th>تاريخ التعديل</th>
+                <th>المنتجات</th>
+                <th>الترجمات</th>
+                <th>الفئات</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dbs.map(d => `
+                <tr ${d.path === res.currentActiveDbPath ? 'style="background:#f0fdf4;"' : ''}>
+                  <td style="font-size:12px;direction:ltr;text-align:left;">
+                    ${d.path} ${d.path === res.currentActiveDbPath ? '<span class="badge" style="background:#22c55e;color:#fff;padding:2px 6px;border-radius:4px;">نشطة</span>' : ''}
+                  </td>
+                  <td>${(d.sizeBytes / 1024 / 1024).toFixed(2)} MB</td>
+                  <td>${new Date(d.modifiedAt).toLocaleString('ar-EG')}</td>
+                  <td>${d.localProductsTotal || 0}</td>
+                  <td>${d.translationOverridesCount || 0}</td>
+                  <td>${d.customCategoriesCount || 0}</td>
+                  <td>
+                    ${d.path !== res.currentActiveDbPath ? `
+                      <button class="btn-primary btn-sm" onclick="mergeAmendmentsFrom('${encodeURIComponent(d.path)}')">دمج التعديلات</button>
+                    ` : '<span style="color:#22c55e;font-weight:bold;">الحالية</span>'}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      statusDiv.innerHTML = `<p style="color:var(--danger);">فشل الفحص: ${res?.error || 'خطأ'}</p>`;
+    }
+  } catch(e) {
+    if (statusDiv) statusDiv.innerHTML = `<p style="color:var(--danger);">خطأ: ${e.message}</p>`;
+  }
+};
+
+window.mergeAmendmentsFrom = async function(encPath) {
+  const sourcePath = decodeURIComponent(encPath);
+  if (!confirm(`هل أنت متأكد من دمج التعديلات (الترجمات، الفئات، البنرات) من:\n${sourcePath}\nإلى قاعدة البيانات النشطة؟`)) return;
+  try {
+    const res = await api('/api/admin/merge-amendments', {
+      method: 'POST',
+      body: { sourcePath }
+    });
+    if (res && res.success) {
+      alert(`تم دمج التعديلات بنجاح!\nالترجمات المدمجة: ${res.stats?.translationsMerged || 0}\nالفئات المدمجة: ${res.stats?.categoriesMerged || 0}\nالبنرات المدمجة: ${res.stats?.bannersMerged || 0}`);
+      inspectDatabases();
+    } else {
+      alert('فشل الدمج: ' + (res?.error || 'خطأ'));
+    }
+  } catch(e) {
+    alert('خطأ أثناء الدمج: ' + e.message);
+  }
 };

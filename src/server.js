@@ -74,6 +74,29 @@ async function getCachedEtkinRaw(db) {
 }
 
 
+function getCategoryFallbackImage(catTr) {
+  if (!catTr) return 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=300&fit=crop';
+  const lower = catTr.toLowerCase();
+  if (lower.includes('kalem') || lower.includes('pen')) return 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=400&h=300&fit=crop';
+  if (lower.includes('termos') || lower.includes('mug') || lower.includes('bardak') || lower.includes('cam')) return 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&h=300&fit=crop';
+  if (lower.includes('teknoloji') || lower.includes('powerbank') || lower.includes('usb') || lower.includes('hoparlör') || lower.includes('speaker') || lower.includes('şarj') || lower.includes('sarj') || lower.includes('kablo')) return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop';
+  if (lower.includes('çanta') || lower.includes('canta') || lower.includes('bag')) return 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop';
+  if (lower.includes('saat') || lower.includes('clock')) return 'https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=400&h=300&fit=crop';
+  if (lower.includes('anahtarlık') || lower.includes('anahtarlik') || lower.includes('rozet')) return 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?w=400&h=300&fit=crop';
+  if (lower.includes('ajanda') || lower.includes('defter') || lower.includes('not') || lower.includes('sümen') || lower.includes('sumen')) return 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=400&h=300&fit=crop';
+  if (lower.includes('hediye') || lower.includes('set')) return 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=300&fit=crop';
+  if (lower.includes('matbaa') || lower.includes('kırtasiye') || lower.includes('kirtasiye') || lower.includes('print')) return 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&h=300&fit=crop';
+  if (lower.includes('çakmak') || lower.includes('cakmak') || lower.includes('lighter')) return 'https://images.unsplash.com/photo-1585011664466-b7bbe92f34ef?w=400&h=300&fit=crop';
+  if (lower.includes('şemsiye') || lower.includes('semsiye')) return 'https://images.unsplash.com/photo-1517686469429-8bdb88b9f907?w=400&h=300&fit=crop';
+  if (lower.includes('hesap') || lower.includes('makine') || lower.includes('calc')) return 'https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=400&h=300&fit=crop';
+  if (lower.includes('şapka') || lower.includes('sapka') || lower.includes('cap') || lower.includes('hat')) return 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&h=300&fit=crop';
+  if (lower.includes('açacak') || lower.includes('acacak') || lower.includes('şişe') || lower.includes('sise')) return 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&h=300&fit=crop';
+  if (lower.includes('tişört') || lower.includes('tisort') || lower.includes('tekstil') || lower.includes('t-shirt')) return 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400&h=300&fit=crop';
+  if (lower.includes('bayrak') || lower.includes('byrak') || lower.includes('flag')) return 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&h=300&fit=crop';
+  if (lower.includes('plaket') || lower.includes('kupa') || lower.includes('madalya')) return 'https://images.unsplash.com/photo-1569437061241-a848be43cc82?w=400&h=300&fit=crop';
+  return 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=300&fit=crop';
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -277,8 +300,10 @@ function migrateCategories(db) {
       UPDATE custom_categories SET name_ar = 'آلات حاسبة', name_en = 'Calculators' WHERE name_tr LIKE '%Hesap Makine%';
       UPDATE custom_categories SET name_ar = 'ولاعات', name_en = 'Lighters' WHERE name_tr LIKE '%akmak%' OR name_tr LIKE '%Cakmak%';
 
-      -- Clean up bad car image for Cakmaklar
-      DELETE FROM category_images WHERE category_name LIKE '%akmak%' AND image_url LIKE '%1qbCRjJ6sDc9oI2WX1u5TAhuXVL%';
+      -- Clean up bad car image across all tables
+      DELETE FROM category_images WHERE image_url LIKE '%1qbCRjJ6sDc9oI2WX1u5TAhuXVL%';
+      DELETE FROM custom_categories WHERE image_url LIKE '%1qbCRjJ6sDc9oI2WX1u5TAhuXVL%';
+      UPDATE custom_categories SET image_url = '' WHERE image_url LIKE '%1qbCRjJ6sDc9oI2WX1u5TAhuXVL%';
 
       -- Clean up corrupted Mojikake categories and entries
       DELETE FROM custom_categories WHERE name_tr LIKE '%Ã%' OR name_tr LIKE '%Ä%' OR name_tr LIKE '%Å%' OR name_tr LIKE '%?%' OR name_tr LIKE '%§%';
@@ -289,18 +314,18 @@ function migrateCategories(db) {
       DELETE FROM translation_overrides WHERE original_key LIKE '%Ã%' OR original_key LIKE '%Ä%' OR original_key LIKE '%Å%' OR original_key LIKE '%?%' OR original_key LIKE '%§%';
       DELETE FROM translation_overrides WHERE translation LIKE '%Ã%' OR translation LIKE '%Ä%' OR translation LIKE '%Å%' OR translation LIKE '%?%' OR translation LIKE '%§%';
 
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'ar', 'أقلام بلاستيكية');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'en', 'Plastic Pens');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Teknoloji Ürünleri', 'ar', 'منتجات تكنولوجية متنوعة');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Kırtasiye Ürünleri', 'ar', 'قرطاسية وأدوات مكتبية متنوعة');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Termos - Matara', 'ar', 'ترمسات وقوارير متنوعة');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Bardak Altı', 'ar', 'قواعد أكواب');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Hesap Makinesi', 'ar', 'آلات حاسبة');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Çakmak', 'ar', 'ولاعات');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Çakmaklar', 'ar', 'ولاعات');
-      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Masa Sümenleri', 'ar', 'لبادات مكتب فاخرة');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'ar', 'أقلام بلاستيكية');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'en', 'Plastic Pens');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Teknoloji Ürünleri', 'ar', 'منتجات تكنولوجية متنوعة');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Kırtasiye Ürünleri', 'ar', 'قرطاسية وأدوات مكتبية متنوعة');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Termos - Matara', 'ar', 'ترمسات وقوارير متنوعة');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Bardak Altı', 'ar', 'قواعد أكواب');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Hesap Makinesi', 'ar', 'آلات حاسبة');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Çakmak', 'ar', 'ولاعات');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Çakmaklar', 'ar', 'ولاعات');
+      INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Masa Sümenleri', 'ar', 'لبادات مكتب فاخرة');
     `);
 
     // Migrate Google Drive sharing links to direct image URLs in DB
@@ -869,10 +894,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         }
       });
 
-      // Build custom categories image map as fallback
+      // Build custom categories image map as fallback (skipping bad car image)
       const allCustomCats = safeQuery('SELECT name_tr, image_url, name_ar, name_en FROM custom_categories');
       const customImageMap = {};
-      allCustomCats.forEach(cc => { if (cc && cc.name_tr && cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
+      allCustomCats.forEach(cc => { 
+        if (cc && cc.name_tr && cc.image_url) {
+          if (cc.image_url.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) return;
+          customImageMap[cc.name_tr] = cc.image_url; 
+        }
+      });
 
       // Pre-extract first product image for every category so real product photos show instead of smiling man fallback
       const prodImgRows = safeQuery("SELECT category_tr, images FROM local_products WHERE hidden = 0 AND images IS NOT NULL AND images != '' AND images != '[]' ORDER BY id ASC");
@@ -881,13 +911,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         if (!r || !r.category_tr || prodImageMap[r.category_tr]) return;
         try {
           const parsed = typeof r.images === 'string' ? JSON.parse(r.images) : r.images;
-          if (Array.isArray(parsed) && parsed[0]) {
+          if (Array.isArray(parsed) && parsed[0] && !parsed[0].includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) {
             prodImageMap[r.category_tr] = parsed[0];
-          } else if (typeof r.images === 'string' && r.images.startsWith('http')) {
+          } else if (typeof r.images === 'string' && r.images.startsWith('http') && !r.images.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) {
             prodImageMap[r.category_tr] = r.images.split(',')[0].trim();
           }
         } catch(e) {
-          if (typeof r.images === 'string' && r.images.startsWith('http')) {
+          if (typeof r.images === 'string' && r.images.startsWith('http') && !r.images.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) {
             prodImageMap[r.category_tr] = r.images.split(',')[0].trim();
           }
         }
@@ -908,8 +938,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         if (typeof catAr === 'string') catAr = fixMojikake(catAr).replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
         if (typeof catEn === 'string') catEn = fixMojikake(catEn).replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
 
-        // Image priority: 1) explicit category_images (not bad car) -> 2) custom_categories image -> 3) first product image in category
-        const rawImg = imageMap[cleanTr] || customImageMap[cleanTr] || prodImageMap[cleanTr] || prodImageMap[cat.tr] || '';
+        // Image priority: 1) explicit category_images (not bad car) -> 2) custom_categories image -> 3) product image -> 4) category fallback keyword image
+        const xmlProdImg = (products.find(p => {
+          if (!p) return false;
+          const pCat = p.topCategory?.tr || (p.categories?.tr && p.categories.tr[0]);
+          return (pCat === cleanTr || pCat === cat.tr) && Array.isArray(p.images) && p.images[0] && !p.images[0].includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL');
+        })?.images?.[0]) || '';
+
+        const rawImg = imageMap[cleanTr] || customImageMap[cleanTr] || prodImageMap[cleanTr] || prodImageMap[cat.tr] || xmlProdImg || getCategoryFallbackImage(cleanTr);
 
         return {
           ...cat,
@@ -928,7 +964,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         if (cc.name_tr.includes('Ã') || cc.name_tr.includes('Ä') || cc.name_tr.includes('Å') || cc.name_tr.includes('?') || cc.name_tr.includes('§')) return;
         const normCc = normalizeCategoryName(cc.name_tr);
         if (!hiddenCategorySet.has(cc.name_tr) && !hiddenCategorySet.has(normCc) && !result.find(r => r && (r.tr === cc.name_tr || normalizeCategoryName(r.tr) === normCc))) {
-          const catImage = normalizeImageUrl(imageMap[cc.name_tr] || cc.image_url || '');
+          const rawCustomImg = imageMap[cc.name_tr] || (cc.image_url && !cc.image_url.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL') ? cc.image_url : '') || getCategoryFallbackImage(cc.name_tr);
+          const catImage = normalizeImageUrl(rawCustomImg);
           const catOverrides = overrideMap[cc.name_tr] || {};
           result.push({
             tr: cc.name_tr || cc.name_ar,

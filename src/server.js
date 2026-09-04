@@ -259,9 +259,26 @@ function migrateCategories(db) {
       UPDATE local_products SET category_tr = 'Powerbank', top_category_tr = 'Powerbank', category_ar = 'بطاريات متنقلة', category_en = 'Power Banks' WHERE category_tr IN ('Teknoloji Ürünleri > Powerbank', 'Powerbanklar', 'Power Bank');
       UPDATE local_products SET category_tr = 'Termoslar', top_category_tr = 'Termoslar', category_ar = 'ترمسات', category_en = 'Thermoses' WHERE category_tr IN ('Termos - Matara > Diğer Termos - Matara', 'Termos - Mug', 'Termos Bardaklar (Mug)');
 
+      -- Fix category translations in local_products
+      UPDATE local_products SET category_ar = 'منتجات تكنولوجية متنوعة', category_en = 'Various Technology Products' WHERE category_tr LIKE '%Di%er Teknoloji%';
+      UPDATE local_products SET category_ar = 'قرطاسية وأدوات مكتبية متنوعة', category_en = 'Various Stationery Products' WHERE category_tr LIKE '%Di%er K%rtasiye%';
+      UPDATE local_products SET category_ar = 'ترمسات وقوارير متنوعة', category_en = 'Various Thermoses & Bottles' WHERE category_tr LIKE '%Di%er Termos%';
+      UPDATE local_products SET category_ar = 'قواعد أكواب', category_en = 'Coasters' WHERE category_tr LIKE '%Bardak Alt%';
+      UPDATE local_products SET category_ar = 'آلات حاسبة', category_en = 'Calculators' WHERE category_tr LIKE '%Hesap Makine%';
+      UPDATE local_products SET category_ar = 'ولاعات', category_en = 'Lighters' WHERE (category_tr LIKE '%akmak%' OR category_tr LIKE '%Cakmak%') AND category_tr NOT LIKE '%Metal%';
+      UPDATE local_products SET category_ar = 'ولاعات معدنية', category_en = 'Metal Lighters' WHERE category_tr LIKE '%Metal%akmak%' OR category_tr LIKE '%Metal Cakmak%';
+      UPDATE local_products SET category_ar = 'لبادات مكتب فاخرة', category_en = 'Desk Blotters' WHERE category_tr LIKE '%S%men%';
+      UPDATE local_products SET category_ar = 'أعلام ورايات', category_en = 'Flags' WHERE category_tr LIKE '%Bayrak%' OR category_tr LIKE '%Byrak%';
+
       UPDATE custom_categories SET name_tr = 'Metal Kalemler', name_ar = 'أقلام معدنية', name_en = 'Metal Pens' WHERE name_tr IN ('Metal Kalem', 'Metal Kalemleri', 'Kalemler > Metal Kalem');
       UPDATE custom_categories SET name_tr = 'Plastik Kalemler', name_ar = 'أقلام بلاستيكية', name_en = 'Plastic Pens' WHERE name_tr IN ('Plastik Kalem', 'Plastik Kalemleri', 'Kalemler > Plastik Kalem');
       UPDATE custom_categories SET name_tr = 'Bayraklar', name_ar = 'أعلام ورايات', name_en = 'Flags' WHERE name_tr IN ('Byrak', 'اعلام', 'Bayrak');
+      UPDATE custom_categories SET name_ar = 'قواعد أكواب', name_en = 'Coasters' WHERE name_tr LIKE '%Bardak Alt%';
+      UPDATE custom_categories SET name_ar = 'آلات حاسبة', name_en = 'Calculators' WHERE name_tr LIKE '%Hesap Makine%';
+      UPDATE custom_categories SET name_ar = 'ولاعات', name_en = 'Lighters' WHERE name_tr LIKE '%akmak%' OR name_tr LIKE '%Cakmak%';
+
+      -- Clean up bad car image for Cakmaklar
+      DELETE FROM category_images WHERE category_name LIKE '%akmak%' AND image_url LIKE '%1qbCRjJ6sDc9oI2WX1u5TAhuXVL%';
 
       -- Clean up corrupted Mojikake categories and entries
       DELETE FROM custom_categories WHERE name_tr LIKE '%Ã%' OR name_tr LIKE '%Ä%' OR name_tr LIKE '%Å%' OR name_tr LIKE '%?%' OR name_tr LIKE '%§%';
@@ -276,6 +293,14 @@ function migrateCategories(db) {
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens');
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'ar', 'أقلام بلاستيكية');
       INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Plastik Kalemler', 'en', 'Plastic Pens');
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Teknoloji Ürünleri', 'ar', 'منتجات تكنولوجية متنوعة');
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Kırtasiye Ürünleri', 'ar', 'قرطاسية وأدوات مكتبية متنوعة');
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Diğer Termos - Matara', 'ar', 'ترمسات وقوارير متنوعة');
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Bardak Altı', 'ar', 'قواعد أكواب');
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Hesap Makinesi', 'ar', 'آلات حاسبة');
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Çakmak', 'ar', 'ولاعات');
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Çakmaklar', 'ar', 'ولاعات');
+      INSERT INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Masa Sümenleri', 'ar', 'لبادات مكتب فاخرة');
     `);
 
     // Migrate Google Drive sharing links to direct image URLs in DB
@@ -836,12 +861,37 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       // Get category images
       const images = safeQuery('SELECT * FROM category_images');
       const imageMap = {};
-      images.forEach(i => { if (i && i.category_name) imageMap[i.category_name] = i.image_url; });
+      images.forEach(i => { 
+        if (i && i.category_name) {
+          // Skip bad car image for Cakmaklar
+          if (i.image_url && i.image_url.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) return;
+          imageMap[i.category_name] = i.image_url; 
+        }
+      });
 
       // Build custom categories image map as fallback
       const allCustomCats = safeQuery('SELECT name_tr, image_url, name_ar, name_en FROM custom_categories');
       const customImageMap = {};
       allCustomCats.forEach(cc => { if (cc && cc.name_tr && cc.image_url) customImageMap[cc.name_tr] = cc.image_url; });
+
+      // Pre-extract first product image for every category so real product photos show instead of smiling man fallback
+      const prodImgRows = safeQuery("SELECT category_tr, images FROM local_products WHERE hidden = 0 AND images IS NOT NULL AND images != '' AND images != '[]' ORDER BY id ASC");
+      const prodImageMap = {};
+      prodImgRows.forEach(r => {
+        if (!r || !r.category_tr || prodImageMap[r.category_tr]) return;
+        try {
+          const parsed = typeof r.images === 'string' ? JSON.parse(r.images) : r.images;
+          if (Array.isArray(parsed) && parsed[0]) {
+            prodImageMap[r.category_tr] = parsed[0];
+          } else if (typeof r.images === 'string' && r.images.startsWith('http')) {
+            prodImageMap[r.category_tr] = r.images.split(',')[0].trim();
+          }
+        } catch(e) {
+          if (typeof r.images === 'string' && r.images.startsWith('http')) {
+            prodImageMap[r.category_tr] = r.images.split(',')[0].trim();
+          }
+        }
+      });
 
       const { categoryTranslations } = require('./translations');
       const { fixMojikake } = require('./translations');
@@ -858,12 +908,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         if (typeof catAr === 'string') catAr = fixMojikake(catAr).replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
         if (typeof catEn === 'string') catEn = fixMojikake(catEn).replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
 
+        // Image priority: 1) explicit category_images (not bad car) -> 2) custom_categories image -> 3) first product image in category
+        const rawImg = imageMap[cleanTr] || customImageMap[cleanTr] || prodImageMap[cleanTr] || prodImageMap[cat.tr] || '';
+
         return {
           ...cat,
           tr: cleanTr,
           ar: catAr,
           en: catEn,
-          image: cleanTr ? normalizeImageUrl(imageMap[cleanTr] || customImageMap[cleanTr] || '') : ''
+          image: cleanTr ? normalizeImageUrl(rawImg) : ''
         };
       });
 
@@ -999,26 +1052,37 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     }
   });
 
-  app.get('/api/translations/:lang', (req, res) => {
-    const lang = req.params.lang;
-    if (uiTranslations[lang]) {
-      // Merge with settings overrides
-      const settings = db.prepare('SELECT * FROM settings').all();
-      const settingsObj = {};
-      settings.forEach(s => { settingsObj[s.key] = s.value; });
+  app.get('/api/translations/:lang', async (req, res) => {
+    try {
+      await ensureDbReady();
+      const lang = req.params.lang;
+      if (uiTranslations[lang]) {
+        const merged = { ...uiTranslations[lang] };
+        const db = database.db;
+        if (db) {
+          try {
+            const settings = db.prepare('SELECT * FROM settings').all();
+            const settingsObj = {};
+            settings.forEach(s => { settingsObj[s.key] = s.value; });
 
-      const merged = { ...uiTranslations[lang] };
-      if (settingsObj[`site_name_${lang}`]) merged.siteName = settingsObj[`site_name_${lang}`];
-      if (settingsObj[`site_slogan_${lang}`]) merged.siteSlogan = settingsObj[`site_slogan_${lang}`];
-      if (settingsObj[`about_${lang}`]) merged.aboutText = settingsObj[`about_${lang}`];
-      if (settingsObj[`address_${lang}`]) merged.addressText = settingsObj[`address_${lang}`];
-      if (settingsObj.phone) merged.phoneNumber = settingsObj.phone;
-      if (settingsObj.whatsapp) merged.whatsappNumber = settingsObj.whatsapp;
-      if (settingsObj.email) merged.emailAddress = settingsObj.email;
-
-      res.json(merged);
-    } else {
-      res.status(404).json({ error: 'Language not found' });
+            if (settingsObj[`site_name_${lang}`]) merged.siteName = settingsObj[`site_name_${lang}`];
+            if (settingsObj[`site_slogan_${lang}`]) merged.siteSlogan = settingsObj[`site_slogan_${lang}`];
+            if (settingsObj[`about_${lang}`]) merged.aboutText = settingsObj[`about_${lang}`];
+            if (settingsObj[`address_${lang}`]) merged.addressText = settingsObj[`address_${lang}`];
+            if (settingsObj.phone) merged.phoneNumber = settingsObj.phone;
+            if (settingsObj.whatsapp) merged.whatsappNumber = settingsObj.whatsapp;
+            if (settingsObj.email) merged.emailAddress = settingsObj.email;
+          } catch (dbErr) {
+            console.error('[Translations DB Settings Read Error]:', dbErr.message);
+          }
+        }
+        res.json(merged);
+      } else {
+        res.status(404).json({ error: 'Language not found' });
+      }
+    } catch (err) {
+      console.error('[GET /api/translations/:lang error]:', err.message);
+      res.json(uiTranslations[req.params.lang] || {});
     }
   });
   app.get('/api/settings/public', async (req, res) => {
@@ -1217,6 +1281,30 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     }
   });
 
+
+  // Dedicated route handlers for brand logo, favicon and debug stubs to guarantee 0 404 console errors
+  app.get(['/assets/logo_zakaria.jpg', '/logo_zakaria.jpg', '/assets/logo_zakaria.png', '/logo_zakaria.png'], (req, res) => {
+    const p1 = path.join(__dirname, '..', 'public', 'assets', 'logo_zakaria.jpg');
+    if (fs.existsSync(p1)) return res.sendFile(p1);
+    const p2 = path.join(__dirname, '..', 'public', 'logo_zakaria.jpg');
+    if (fs.existsSync(p2)) return res.sendFile(p2);
+    res.status(404).end();
+  });
+
+  app.get('/favicon.ico', (req, res) => {
+    const icoPath = path.join(__dirname, '..', 'public', 'favicon.ico');
+    if (fs.existsSync(icoPath)) return res.sendFile(icoPath);
+    const svgPath = path.join(__dirname, '..', 'public', 'favicon.svg');
+    if (fs.existsSync(svgPath)) {
+      res.type('image/svg+xml');
+      return res.sendFile(svgPath);
+    }
+    res.status(204).end();
+  });
+
+  app.get(['/__manus__/debug-collector.js', '/debug-collector.js'], (req, res) => {
+    res.type('application/javascript').send('/* debug-collector stub */');
+  });
 
   // Admin panel - serve admin.html
   app.get('/admin', (req, res) => {

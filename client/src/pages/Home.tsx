@@ -43,8 +43,11 @@ function getCategoryDefaultImage(catTr: string): string {
   if (lower.includes("matbaa") || lower.includes("print")) return "https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&h=300&fit=crop";
   if (lower.includes("çakmak") || lower.includes("lighter")) return "https://images.unsplash.com/photo-1585011664466-b7bbe92f34ef?w=400&h=300&fit=crop";
   if (lower.includes("şemsiye")) return "https://images.unsplash.com/photo-1517686469429-8bdb88b9f907?w=400&h=300&fit=crop";
-  if (lower.includes("kırtasiye")) return "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=400&h=300&fit=crop";
-  return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop";
+  if (lower.includes("hesap") || lower.includes("makine") || lower.includes("calc")) return "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=400&h=300&fit=crop";
+  if (lower.includes("şapka") || lower.includes("cap") || lower.includes("hat") || lower.includes("sapka")) return "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&h=300&fit=crop";
+  if (lower.includes("tişört") || lower.includes("tisort") || lower.includes("tekstil") || lower.includes("t-shirt")) return "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400&h=300&fit=crop";
+  if (lower.includes("bayrak") || lower.includes("byrak") || lower.includes("flag")) return "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&h=300&fit=crop";
+  return "https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=300&fit=crop";
 }
 
 export default function Home() {

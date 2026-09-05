@@ -870,7 +870,20 @@ router.get('/products/:id', adminAuth, async (req, res) => {
   try {
     const db = getDb();
     const pId = req.params.id;
-    const row = db.prepare('SELECT * FROM local_products WHERE product_id = ? OR model = ? OR id = ?').get(pId, pId, pId);
+    const rawNumericId = String(pId).replace(/^(local_|etkin_|xml_)/, '');
+    const numId = !isNaN(Number(rawNumericId)) ? Number(rawNumericId) : -1;
+
+    // Search local_products first
+    const row = db.prepare(`
+      SELECT * FROM local_products 
+      WHERE product_id = ? 
+         OR model = ? 
+         OR id = ? 
+         OR ('local_' || id) = ? 
+         OR ('etkin_' || id) = ?
+         OR (id = ? AND ? > 0)
+    `).get(pId, pId, pId, pId, pId, numId, numId);
+
     let product = null;
 
     if (row) {
@@ -881,16 +894,32 @@ router.get('/products/:id', adminAuth, async (req, res) => {
       let sizes = [];
       try { sizes = JSON.parse(row.sizes || '[]'); } catch(e) { if (row.sizes) sizes = [row.sizes]; }
 
+      const actualId = row.product_id || ('local_' + row.id);
+      const isLocal = row.is_local === 1 || actualId.startsWith('local_') || !row.product_id;
+
       product = {
-        id: row.product_id || ('local_' + row.id),
-        product_id: row.product_id,
-        name: { tr: row.name_tr || '', ar: row.name_ar || '', en: row.name_en || '' },
+        id: actualId,
+        product_id: actualId,
+        localId: row.id,
+        isLocal,
+        source: actualId.startsWith('etkin_') ? 'etkin' : (isLocal ? 'local' : 'xml'),
+        name: { tr: row.name_tr || '', ar: row.name_ar || row.name_tr || '', en: row.name_en || row.name_tr || '' },
+        name_tr: row.name_tr || '',
+        name_ar: row.name_ar || '',
+        name_en: row.name_en || '',
         model: row.model || '',
         description: row.description || '',
         price: row.price || 0,
         quantity: row.quantity || 0,
         category_tr: row.category_tr || '',
+        category_ar: row.category_ar || '',
+        category_en: row.category_en || '',
         categories: { tr: [row.category_tr || ''], ar: [row.category_ar || ''], en: [row.category_en || ''] },
+        topCategory: {
+          tr: (row.category_tr || '').split(' > ')[0].trim(),
+          ar: (row.category_ar || '').split(' > ')[0].trim(),
+          en: (row.category_en || '').split(' > ')[0].trim()
+        },
         images,
         colors,
         sizes
@@ -903,8 +932,9 @@ router.get('/products/:id', adminAuth, async (req, res) => {
     if (!product) return res.status(404).json({ error: 'Product not found' });
     
     // Check for name overrides
-    const overrides = db.prepare("SELECT lang, translation FROM translation_overrides WHERE type = 'product' AND original_key IN (?, ?, ?)").all(product.id, product.model, (product.name && product.name.tr) || '');
+    const overrides = db.prepare("SELECT lang, translation FROM translation_overrides WHERE type = 'product' AND original_key IN (?, ?, ?)").all(product.id, product.model || '', (product.name && product.name.tr) || '');
     if (overrides.length > 0) {
+      if (!product.name) product.name = {};
       overrides.forEach(o => { product.name[o.lang] = o.translation; });
     }
     
@@ -919,23 +949,48 @@ router.put('/products/:id', adminAuth, async (req, res) => {
   try {
     const db = getDb();
     const pId = req.params.id;
-    const { name_tr, name_ar, name_en, price, description } = req.body;
+    const rawNumericId = String(pId).replace(/^(local_|etkin_|xml_)/, '');
+    const numId = !isNaN(Number(rawNumericId)) ? Number(rawNumericId) : -1;
+    const { name_tr, name_ar, name_en, price, description, model: newModel, quantity, category_tr, category_ar, category_en } = req.body;
 
-    const row = db.prepare('SELECT * FROM local_products WHERE product_id = ? OR model = ? OR id = ?').get(pId, pId, pId);
-    const targetId = row ? row.product_id : pId;
+    const row = db.prepare(`
+      SELECT * FROM local_products 
+      WHERE product_id = ? 
+         OR model = ? 
+         OR id = ? 
+         OR ('local_' || id) = ? 
+         OR ('etkin_' || id) = ?
+         OR (id = ? AND ? > 0)
+    `).get(pId, pId, pId, pId, pId, numId, numId);
+
+    if (row) {
+      db.prepare(`
+        UPDATE local_products
+        SET name_tr = COALESCE(NULLIF(?, ''), name_tr),
+            name_ar = COALESCE(NULLIF(?, ''), name_ar),
+            name_en = COALESCE(NULLIF(?, ''), name_en),
+            price = CASE WHEN ? >= 0 THEN ? ELSE price END,
+            description = COALESCE(NULLIF(?, ''), description),
+            model = COALESCE(NULLIF(?, ''), model),
+            quantity = CASE WHEN ? IS NOT NULL THEN ? ELSE quantity END,
+            category_tr = COALESCE(NULLIF(?, ''), category_tr),
+            category_ar = COALESCE(NULLIF(?, ''), category_ar),
+            category_en = COALESCE(NULLIF(?, ''), category_en),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        name_tr || '', name_ar || '', name_en || '',
+        price !== undefined ? parseFloat(price) : -1, price !== undefined ? parseFloat(price) : 0,
+        description || '',
+        newModel || '',
+        quantity !== undefined ? parseInt(quantity) : null, quantity !== undefined ? parseInt(quantity) : 0,
+        category_tr || '', category_ar || '', category_en || '',
+        row.id
+      );
+    }
+
+    const targetId = row ? (row.product_id || ('local_' + row.id)) : pId;
     const model = row ? row.model : pId;
-
-    // Direct DB update in local_products table
-    db.prepare(`
-      UPDATE local_products
-      SET name_tr = COALESCE(NULLIF(?, ''), name_tr),
-          name_ar = COALESCE(NULLIF(?, ''), name_ar),
-          name_en = COALESCE(NULLIF(?, ''), name_en),
-          price = CASE WHEN ? > 0 THEN ? ELSE price END,
-          description = COALESCE(NULLIF(?, ''), description),
-          updated_at = CURRENT_TIMESTAMP
-      WHERE product_id = ? OR model = ?
-    `).run(name_tr || '', name_ar || '', name_en || '', parseFloat(price) || 0, parseFloat(price) || 0, description || '', targetId, model);
 
     // Save Arabic override
     if (name_ar) {
@@ -944,7 +999,7 @@ router.put('/products/:id', adminAuth, async (req, res) => {
         VALUES ('product', ?, 'ar', ?, CURRENT_TIMESTAMP)
         ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
       `).run(targetId, name_ar, name_ar);
-      if (model) {
+      if (model && model !== targetId) {
         db.prepare(`
           INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
           VALUES ('product', ?, 'ar', ?, CURRENT_TIMESTAMP)
@@ -959,7 +1014,7 @@ router.put('/products/:id', adminAuth, async (req, res) => {
         VALUES ('product', ?, 'en', ?, CURRENT_TIMESTAMP)
         ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
       `).run(targetId, name_en, name_en);
-      if (model) {
+      if (model && model !== targetId) {
         db.prepare(`
           INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
           VALUES ('product', ?, 'en', ?, CURRENT_TIMESTAMP)
@@ -974,8 +1029,26 @@ router.put('/products/:id', adminAuth, async (req, res) => {
         VALUES ('product', ?, 'tr', ?, CURRENT_TIMESTAMP)
         ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
       `).run(targetId, name_tr, name_tr);
+      if (model && model !== targetId) {
+        db.prepare(`
+          INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at)
+          VALUES ('product', ?, 'tr', ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(type, original_key, lang) DO UPDATE SET translation = ?, updated_at = CURRENT_TIMESTAMP
+        `).run(model, name_tr, name_tr);
+      }
     }
-    
+
+    if (price !== undefined && parseFloat(price) > 0) {
+      try {
+        db.prepare(`
+          INSERT INTO product_overrides (product_id, price, updated_at)
+          VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(product_id) DO UPDATE SET price = ?, updated_at = CURRENT_TIMESTAMP
+        `).run(targetId, parseFloat(price), parseFloat(price));
+      } catch(e) {}
+    }
+
+    database.saveDatabase();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1896,7 +1969,15 @@ router.get('/local-products', adminAuth, (req, res) => {
 // GET single local product
 router.get('/local-products/:id', adminAuth, (req, res) => {
   const db = getDb();
-  const p = db.prepare('SELECT * FROM local_products WHERE id = ?').get(req.params.id);
+  const rawId = String(req.params.id).replace(/^(local_|etkin_|xml_)/, '');
+  const numId = !isNaN(Number(rawId)) ? Number(rawId) : -1;
+  const p = db.prepare(`
+    SELECT * FROM local_products 
+    WHERE id = ? 
+       OR product_id = ? 
+       OR ('local_' || id) = ?
+       OR (id = ? AND ? > 0)
+  `).get(req.params.id, req.params.id, req.params.id, numId, numId);
   if (!p) return res.status(404).json({ error: 'Product not found' });
   res.json({ product: { ...p, colors: JSON.parse(p.colors || '[]'), sizes: JSON.parse(p.sizes || '[]'), images: JSON.parse(p.images || '[]') } });
 });
@@ -1935,6 +2016,8 @@ router.post('/local-products', adminAuth, localProductUpload.array('images', 10)
 router.put('/local-products/:id', adminAuth, localProductUpload.array('images', 10), (req, res) => {
   try {
     const db = getDb();
+    const rawId = String(req.params.id).replace(/^(local_|etkin_|xml_)/, '');
+    const numId = !isNaN(Number(rawId)) ? Number(rawId) : -1;
     const { name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, existing_images } = req.body;
     const newImages = (req.files || []).map(f => '/uploads/products/' + f.filename);
     const keepImages = existing_images ? (typeof existing_images === 'string' ? JSON.parse(existing_images) : existing_images) : [];
@@ -1948,6 +2031,16 @@ router.put('/local-products/:id', adminAuth, localProductUpload.array('images', 
       });
     }
 
+    const existing = db.prepare(`
+      SELECT id FROM local_products 
+      WHERE id = ? 
+         OR product_id = ? 
+         OR ('local_' || id) = ?
+         OR (id = ? AND ? > 0)
+    `).get(req.params.id, req.params.id, req.params.id, numId, numId);
+
+    const targetRowId = existing ? existing.id : numId;
+
     db.prepare(
       'UPDATE local_products SET name_tr=?, name_ar=?, name_en=?, model=?, description=?, price=?, quantity=?, category_tr=?, category_ar=?, category_en=?, colors=?, sizes=?, images=?, updated_at=CURRENT_TIMESTAMP WHERE id=?'
     ).run(
@@ -1957,7 +2050,7 @@ router.put('/local-products/:id', adminAuth, localProductUpload.array('images', 
       colors || '[]',
       sizes || '[]',
       JSON.stringify(allImages),
-      req.params.id
+      targetRowId
     );
     database.saveDatabase();
     res.json({ success: true });
@@ -1967,7 +2060,15 @@ router.put('/local-products/:id', adminAuth, localProductUpload.array('images', 
 // DELETE local product
 router.delete('/local-products/:id', adminAuth, (req, res) => {
   const db = getDb();
-  db.prepare('DELETE FROM local_products WHERE id = ?').run(req.params.id);
+  const rawId = String(req.params.id).replace(/^(local_|etkin_|xml_)/, '');
+  const numId = !isNaN(Number(rawId)) ? Number(rawId) : -1;
+  db.prepare(`
+    DELETE FROM local_products 
+    WHERE id = ? 
+       OR product_id = ? 
+       OR ('local_' || id) = ?
+       OR (id = ? AND ? > 0)
+  `).run(req.params.id, req.params.id, req.params.id, numId, numId);
   database.saveDatabase();
   res.json({ success: true });
 });
@@ -1977,33 +2078,62 @@ router.put('/local-products/:id/visibility', adminAuth, (req, res) => {
   const db = getDb();
   const { hidden } = req.body;
   const id = req.params.id;
-  const lp = db.prepare('SELECT * FROM local_products WHERE id = ? OR product_id = ?').get(Number(id) || 0, id);
-  const pId = lp ? (lp.product_id || ('local_' + lp.id)) : String(id);
-  const rawId = pId.replace(/^(etkin_|xml_|local_)/, '');
+  const rawId = String(id).replace(/^(local_|etkin_|xml_)/, '');
+  const numId = !isNaN(Number(rawId)) ? Number(rawId) : -1;
 
-  db.prepare('UPDATE local_products SET hidden = ? WHERE id = ? OR product_id = ?').run(hidden ? 1 : 0, Number(id) || 0, id);
+  const lp = db.prepare(`
+    SELECT * FROM local_products 
+    WHERE id = ? 
+       OR product_id = ? 
+       OR ('local_' || id) = ?
+       OR (id = ? AND ? > 0)
+  `).get(id, id, id, numId, numId);
+
+  const pId = lp ? (lp.product_id || ('local_' + lp.id)) : String(id);
+  const cleanRawId = pId.replace(/^(etkin_|xml_|local_)/, '');
+
+  db.prepare(`
+    UPDATE local_products 
+    SET hidden = ? 
+    WHERE id = ? OR product_id = ? OR ('local_' || id) = ? OR (id = ? AND ? > 0)
+  `).run(hidden ? 1 : 0, id, id, id, numId, numId);
+
   if (hidden) {
     db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(pId);
-    db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(rawId);
+    db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(cleanRawId);
     db.prepare('INSERT OR IGNORE INTO hidden_products (product_id) VALUES (?)').run(String(id));
   } else {
-    db.prepare('DELETE FROM hidden_products WHERE product_id = ? OR product_id = ? OR product_id = ?').run(pId, rawId, String(id));
+    db.prepare('DELETE FROM hidden_products WHERE product_id = ? OR product_id = ? OR product_id = ?').run(pId, cleanRawId, String(id));
   }
   database.saveDatabase();
   res.json({ success: true });
 });
 
 // ========== PRODUCT CATEGORY OVERRIDE ==========
-// Change the category of an XML product
+// Change the category of a product (XML, Etkin, or local)
 router.post('/products/:id/category', adminAuth, (req, res) => {
   try {
     const db = getDb();
     const { new_category_tr, new_category_ar, new_category_en } = req.body;
     if (!new_category_tr) return res.status(400).json({ error: 'new_category_tr required' });
 
+    const rawId = String(req.params.id).replace(/^(local_|etkin_|xml_)/, '');
+    const numId = !isNaN(Number(rawId)) ? Number(rawId) : -1;
+
+    // Update in local_products directly if present
+    db.prepare(`
+      UPDATE local_products 
+      SET category_tr = ?, 
+          category_ar = COALESCE(NULLIF(?, ''), category_ar), 
+          category_en = COALESCE(NULLIF(?, ''), category_en),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? OR product_id = ? OR ('local_' || id) = ? OR (id = ? AND ? > 0)
+    `).run(new_category_tr, new_category_ar || '', new_category_en || '', req.params.id, req.params.id, req.params.id, numId, numId);
+
     db.prepare(
       'INSERT OR REPLACE INTO product_category_overrides (product_id, new_category_tr, new_category_ar, new_category_en) VALUES (?, ?, ?, ?)'
     ).run(req.params.id, new_category_tr, new_category_ar || '', new_category_en || '');
+
     database.saveDatabase();
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }

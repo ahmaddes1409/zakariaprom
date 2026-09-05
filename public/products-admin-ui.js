@@ -140,7 +140,7 @@ function renderXmlProductRow(p) {
       <td>${p.quantity || 0}</td>
       <td>${p.hidden ? '<span class="status status-cancelled">مخفي</span>' : '<span class="status status-completed">ظاهر</span>'}</td>
       <td style="white-space:nowrap;">
-        <button class="btn-secondary btn-sm" onclick="editProduct('${p.id}')">تعديل</button>
+        <button class="btn-secondary btn-sm" onclick="editProduct('${p.id}', ${p.isLocal || p.source === 'local' || String(p.id).startsWith('local_')})">تعديل</button>
         <button class="btn-sm" style="background:var(--warning);color:#fff;" onclick="changeCategoryModal('${p.id}','${p.model}','${category}')">نقل</button>
         <button class="btn-sm ${p.hidden ? 'btn-success' : 'btn-danger'}" onclick="toggleProduct('${p.model || p.id}', ${!p.hidden})">${p.hidden ? 'إظهار' : 'إخفاء'}</button>
       </td>
@@ -289,9 +289,17 @@ window.showAddProductModal = async function() {
 
 // ========== EDIT LOCAL PRODUCT ==========
 window.editLocalProduct = async function(id) {
-  const data = await api(`/api/admin/local-products/${id}`);
-  if (!data) return;
+  const cleanId = String(id).replace(/^local_/, '');
+  let data = await api(`/api/admin/local-products/${cleanId}`);
+  if (!data || !data.product) {
+    data = await api(`/api/admin/products/${id}`);
+  }
+  if (!data || !data.product) {
+    toast('تعذر تحميل بيانات المنتج', 'error');
+    return;
+  }
   const p = data.product;
+  const targetId = p.localId || p.id || cleanId;
   const categories = await api('/api/admin/categories');
   const catList = categories?.categories || [];
 
@@ -374,7 +382,7 @@ window.editLocalProduct = async function(id) {
     }
 
     try {
-      const resp = await fetch(`/api/admin/local-products/${id}`, {
+      const resp = await fetch(`/api/admin/local-products/${targetId}`, {
         method: 'PUT',
         headers: { 'Authorization': 'Bearer ' + token },
         body: formData
@@ -480,11 +488,20 @@ window.searchLocalProducts = async function() {
   renderProducts();
 };
 
-// ========== EDIT XML PRODUCT (enhanced) ==========
-window.editProduct = async function(id) {
+// ========== EDIT PRODUCT (enhanced) ==========
+window.editProduct = async function(id, isLocal) {
+  if (isLocal || String(id).startsWith('local_')) {
+    return editLocalProduct(id);
+  }
   const data = await api(`/api/admin/products/${id}`);
-  if (!data) return;
+  if (!data || !data.product) {
+    toast('تعذر تحميل بيانات المنتج', 'error');
+    return;
+  }
   const p = data.product;
+  if (p.isLocal || p.source === 'local') {
+    return editLocalProduct(p.localId || p.id || id);
+  }
   const categories = await api('/api/admin/categories');
   const catList = categories?.categories || [];
   const currentCat = p.topCategory?.tr || p.categories?.tr?.[0]?.split(' > ')[0] || '';
@@ -511,7 +528,7 @@ window.editProduct = async function(id) {
   document.getElementById('editProductForm').onsubmit = async (e) => {
     e.preventDefault();
     // Save name/price overrides
-    await api(`/api/admin/products/${id}`, { method: 'PUT', body: {
+    const saveRes = await api(`/api/admin/products/${id}`, { method: 'PUT', body: {
       name_tr: document.getElementById('epNameTr').value,
       name_ar: document.getElementById('epNameAr').value,
       name_en: document.getElementById('epNameEn').value,
@@ -531,9 +548,13 @@ window.editProduct = async function(id) {
       });
     }
 
-    toast('تم حفظ التعديلات');
-    closeModal();
-    renderProducts();
+    if (saveRes && saveRes.error) {
+      toast('خطأ: ' + saveRes.error, 'error');
+    } else {
+      toast('تم حفظ التعديلات بنجاح');
+      closeModal();
+      renderProducts();
+    }
   };
 };
 

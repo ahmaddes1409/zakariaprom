@@ -40,7 +40,7 @@ function getCategoryDefaultImage(catTr: string): string {
   if (lower.includes("anahtarlık") || lower.includes("rozet")) return "https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?w=400&h=300&fit=crop";
   if (lower.includes("ajanda") || lower.includes("defter") || lower.includes("not")) return "https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=400&h=300&fit=crop";
   if (lower.includes("hediye") || lower.includes("set")) return "https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=300&fit=crop";
-  if (lower.includes("matbaa") || lower.includes("print")) return "https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&h=300&fit=crop";
+  if (lower.includes("matbaa") || lower.includes("print") || lower.includes("ofset") || lower.includes("ofsit") || lower.includes("baskı") || lower.includes("baski")) return "https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&h=300&fit=crop";
   if (lower.includes("çakmak") || lower.includes("lighter")) return "https://images.unsplash.com/photo-1585011664466-b7bbe92f34ef?w=400&h=300&fit=crop";
   if (lower.includes("şemsiye")) return "https://images.unsplash.com/photo-1517686469429-8bdb88b9f907?w=400&h=300&fit=crop";
   if (lower.includes("hesap") || lower.includes("makine") || lower.includes("calc")) return "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=400&h=300&fit=crop";

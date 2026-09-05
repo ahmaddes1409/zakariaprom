@@ -1,5 +1,9 @@
 // Category translations: Turkish -> Arabic, English
 const categoryTranslations = {
+  "Ofset Baskı": { ar: "مطبوعات ورقية", en: "Offset Printing" },
+  "Ofset Baski": { ar: "مطبوعات ورقية", en: "Offset Printing" },
+  "Ofsit Baskı": { ar: "مطبوعات ورقية", en: "Offset Printing" },
+  "ofsit baski": { ar: "مطبوعات ورقية", en: "Offset Printing" },
   "Promosyon Kalemler": { ar: "أقلام ترويجية", en: "Promotional Pens" },
   "Metal Kalemler": { ar: "أقلام معدنية", en: "Metal Pens" },
   "Metal Tükenmez - Roller Kalemler": { ar: "أقلام معدنية - رولر", en: "Metal Ballpoint - Roller Pens" },
@@ -446,6 +450,11 @@ function normalizeCategoryName(catTr) {
   // Agendas / Notebooks
   if (str === 'Ajanda - Defter' || str === 'Not Defterleri' || str === 'Notluk - Defterler') {
     return 'Defterler';
+  }
+
+  // Ofset Baskı (Custom Offset Printing category)
+  if (str === 'ofsit baski' || str === 'Ofsit Baskı' || str === 'Ofset Baski' || str === 'Ofset Baskı' || str.toLowerCase().includes('ofsit baski')) {
+    return 'Ofset Baskı';
   }
 
   return str;

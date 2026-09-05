@@ -1073,18 +1073,32 @@ router.get('/categories', adminAuth, async (req, res) => {
     // Add custom categories only if not already added
     const customCats = db.prepare("SELECT * FROM custom_categories").all();
     customCats.forEach(cc => {
-      if (!cc || !cc.name_tr) return;
-      const cleanTr = fixMojikake(cc.name_tr);
+      if (!cc) return;
+      let cleanTr = fixMojikake(cc.name_tr || '');
+      let cleanAr = fixMojikake(cc.name_ar || '');
+      let cleanEn = fixMojikake(cc.name_en || '');
+      let cleanImg = cc.image_url || '';
+
+      // Auto-detect if user entered a URL into name_tr by mistake
+      if (cleanTr.startsWith('http://') || cleanTr.startsWith('https://')) {
+        cleanImg = cleanTr;
+        cleanTr = cleanEn && !cleanEn.startsWith('http') ? cleanEn : 'Ofset Baskı';
+        try {
+          db.prepare('UPDATE custom_categories SET name_tr = ?, image_url = ? WHERE id = ?').run(cleanTr, cleanImg, cc.id);
+        } catch(e) {}
+      }
+
       if (seenCategoryKeys.has(cleanTr)) return;
       seenCategoryKeys.add(cleanTr);
       const ov = overrideMap[cleanTr] || {};
       result.push({
+        id: cc.id,
         tr: cleanTr,
-        ar: ov.ar || fixMojikake(cc.name_ar) || translateCategory(cleanTr, 'ar'),
-        en: ov.en || fixMojikake(cc.name_en) || translateCategory(cleanTr, 'en'),
+        ar: ov.ar || cleanAr || translateCategory(cleanTr, 'ar'),
+        en: ov.en || cleanEn || translateCategory(cleanTr, 'en'),
         count: 0,
         hidden: hiddenCats.includes(cleanTr) || cc.active === 0,
-        image: normalizeImageUrl(imageMap[cleanTr] || cc.image_url || ""),
+        image: normalizeImageUrl(imageMap[cleanTr] || cleanImg || ""),
         isCustom: true
       });
     });
@@ -1130,11 +1144,23 @@ router.get('/categories/:name', adminAuth, async (req, res) => {
 
 router.put('/categories', adminAuth, (req, res) => {
   const db = getDb();
-  const { category_tr, ar, en, hidden, image } = req.body;
+  const { category_tr, new_tr, ar, en, hidden, image } = req.body;
   if (!category_tr) return res.status(400).json({ error: 'category_tr required' });
 
   const { normalizeCategoryName } = require('../translations');
   const normCat = normalizeCategoryName(category_tr);
+
+  // If Turkish name is being renamed (e.g. fixing mistaken URL in name_tr)
+  if (new_tr && new_tr.trim() && new_tr.trim() !== category_tr) {
+    const cleanNewTr = new_tr.trim();
+    try {
+      db.prepare('UPDATE custom_categories SET name_tr = ? WHERE name_tr = ? OR name_tr = ?').run(cleanNewTr, category_tr, normCat);
+      db.prepare('UPDATE category_images SET category_name = ? WHERE category_name = ? OR category_name = ?').run(cleanNewTr, category_tr, normCat);
+      db.prepare("UPDATE translation_overrides SET original_key = ? WHERE type = 'category' AND (original_key = ? OR original_key = ?)").run(cleanNewTr, category_tr, normCat);
+      db.prepare('UPDATE hidden_categories SET category_name = ? WHERE category_name = ? OR category_name = ?').run(cleanNewTr, category_tr, normCat);
+      db.prepare('UPDATE local_products SET category_tr = ? WHERE category_tr = ? OR category_tr = ?').run(cleanNewTr, category_tr, normCat);
+    } catch(renErr) {}
+  }
 
   // Update custom_categories table if present
   const customCat = db.prepare("SELECT * FROM custom_categories WHERE name_tr = ? OR name_tr = ?").get(category_tr, normCat);
@@ -1244,6 +1270,28 @@ router.post('/categories/show', adminAuth, (req, res) => {
 
   database.saveDatabase();
   res.json({ success: true });
+});
+
+router.delete('/categories/:name', adminAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const name = decodeURIComponent(req.params.name);
+    const { normalizeCategoryName } = require('../translations');
+    const normCat = normalizeCategoryName(name);
+
+    // Delete from custom_categories
+    db.prepare('DELETE FROM custom_categories WHERE name_tr = ? OR name_tr = ? OR name_en = ? OR name_ar = ?').run(name, normCat, name, name);
+
+    // Clean from category_images, hidden_categories, translation_overrides
+    db.prepare('DELETE FROM category_images WHERE category_name = ? OR category_name = ?').run(name, normCat);
+    db.prepare('DELETE FROM hidden_categories WHERE category_name = ? OR category_name = ?').run(name, normCat);
+    db.prepare("DELETE FROM translation_overrides WHERE type = 'category' AND (original_key = ? OR original_key = ?)").run(name, normCat);
+
+    database.saveDatabase();
+    res.json({ success: true, message: `Category "${name}" deleted` });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ===== CUSTOM CATEGORIES ENDPOINTS =====

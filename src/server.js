@@ -85,7 +85,7 @@ function getCategoryFallbackImage(catTr) {
   if (lower.includes('anahtarlık') || lower.includes('anahtarlik') || lower.includes('rozet')) return 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?w=400&h=300&fit=crop';
   if (lower.includes('ajanda') || lower.includes('defter') || lower.includes('not') || lower.includes('sümen') || lower.includes('sumen')) return 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=400&h=300&fit=crop';
   if (lower.includes('hediye') || lower.includes('set')) return 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=300&fit=crop';
-  if (lower.includes('matbaa') || lower.includes('kırtasiye') || lower.includes('kirtasiye') || lower.includes('print')) return 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&h=300&fit=crop';
+  if (lower.includes('matbaa') || lower.includes('kırtasiye') || lower.includes('kirtasiye') || lower.includes('print') || lower.includes('ofset') || lower.includes('ofsit') || lower.includes('baskı') || lower.includes('baski') || lower.includes('ورقية') || lower.includes('مطبوعات')) return 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&h=300&fit=crop';
   if (lower.includes('çakmak') || lower.includes('cakmak') || lower.includes('lighter')) return 'https://images.unsplash.com/photo-1585011664466-b7bbe92f34ef?w=400&h=300&fit=crop';
   if (lower.includes('şemsiye') || lower.includes('semsiye')) return 'https://images.unsplash.com/photo-1517686469429-8bdb88b9f907?w=400&h=300&fit=crop';
   if (lower.includes('hesap') || lower.includes('makine') || lower.includes('calc')) return 'https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=400&h=300&fit=crop';
@@ -503,6 +503,38 @@ function migrateCategories(db) {
         }
       }
     } catch(imgErr) {}
+
+    try {
+      // Fix misplaced Google Drive URLs in custom_categories name_tr for Ofset Baskı
+      const misRows = db.prepare("SELECT * FROM custom_categories WHERE name_tr LIKE '%http%' OR name_tr LIKE '%drive.google.com%' OR LOWER(name_en) LIKE '%ofsit%' OR LOWER(name_en) LIKE '%ofset%' OR LOWER(name_tr) LIKE '%ofsit%' OR LOWER(name_tr) LIKE '%ofset%'").all();
+      for (const m of misRows) {
+        let realTr = 'Ofset Baskı';
+        let realAr = (m.name_ar && !m.name_ar.startsWith('http')) ? m.name_ar : 'مطبوعات ورقية';
+        let realEn = (m.name_en && !m.name_en.startsWith('http')) ? m.name_en : 'Ofset Baskı';
+        let realImg = m.image_url;
+        if (!realImg || realImg.trim() === '' || realImg.startsWith('Ofs') || realImg.startsWith('ofs')) {
+          realImg = (m.name_tr && m.name_tr.startsWith('http')) ? m.name_tr : 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?w=400&h=300&fit=crop';
+        }
+        if (realImg && realImg.includes('drive.google.com')) {
+          realImg = normalizeImageUrl(realImg);
+        }
+        db.prepare("UPDATE custom_categories SET name_tr = ?, name_ar = ?, name_en = ?, image_url = ?, active = 1 WHERE id = ?").run(realTr, realAr, realEn, realImg, m.id);
+      }
+
+      // Also ensure any existing Ofset Baskı row has active = 1
+      db.prepare("UPDATE custom_categories SET active = 1 WHERE name_tr = 'Ofset Baskı' OR name_tr = 'Ofset Baski' OR name_ar = 'مطبوعات ورقية'").run();
+
+      // Ensure hidden_categories DOES NOT hide Ofset Baskı or misplaced URLs
+      db.prepare("DELETE FROM hidden_categories WHERE category_name LIKE '%drive.google.com%' OR category_name LIKE '%http%' OR LOWER(category_name) LIKE '%ofsit%' OR LOWER(category_name) LIKE '%ofset%' OR category_name = 'Ofset Baskı' OR category_name = 'Ofset Baski'").run();
+
+      // Ensure translation_overrides has Ofset Baskı
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baskı', 'ar', 'مطبوعات ورقية')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baskı', 'en', 'Ofset Baskı')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baski', 'ar', 'مطبوعات ورقية')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baski', 'en', 'Ofset Baskı')").run();
+    } catch(errFix) {
+      console.error('[Ofset Baskı Fix Error]:', errFix.message);
+    }
 
     if (typeof saveDatabase === 'function') saveDatabase();
     console.log('[Category Migration] Bulk categories merged & custom categories cleaned successfully!');
@@ -1109,20 +1141,32 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       });
 
       // Add custom categories (that are active, not hidden, and not mojikake)
-      const customCats = safeQuery('SELECT * FROM custom_categories WHERE active = 1');
+      const customCats = safeQuery('SELECT * FROM custom_categories WHERE active = 1 OR active IS NULL');
       customCats.forEach(cc => {
-        if (!cc || !cc.name_tr) return;
+        if (!cc) return;
+        let cNameTr = cc.name_tr || '';
+        let cNameAr = cc.name_ar || '';
+        let cNameEn = cc.name_en || '';
+        let cImg = cc.image_url || '';
+
+        // If URL was pasted into name_tr by mistake, fix it
+        if (cNameTr.startsWith('http://') || cNameTr.startsWith('https://')) {
+          if (!cImg) cImg = cNameTr;
+          cNameTr = cNameEn && !cNameEn.startsWith('http') ? cNameEn : 'Ofset Baskı';
+        }
+        if (!cNameTr) cNameTr = cNameEn || cNameAr || 'Ofset Baskı';
+
         // Skip corrupted mojikake rows
-        if (cc.name_tr.includes('Ã') || cc.name_tr.includes('Ä') || cc.name_tr.includes('Å') || cc.name_tr.includes('?') || cc.name_tr.includes('§')) return;
-        const normCc = normalizeCategoryName(cc.name_tr);
-        if (!hiddenCategorySet.has(cc.name_tr) && !hiddenCategorySet.has(normCc) && !result.find(r => r && (r.tr === cc.name_tr || normalizeCategoryName(r.tr) === normCc))) {
-          const rawCustomImg = imageMap[cc.name_tr] || (cc.image_url && !cc.image_url.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL') ? cc.image_url : '') || getCategoryFallbackImage(cc.name_tr);
+        if (cNameTr.includes('Ã') || cNameTr.includes('Ä') || cNameTr.includes('Å') || cNameTr.includes('§')) return;
+        const normCc = normalizeCategoryName(cNameTr);
+        if (!hiddenCategorySet.has(cNameTr) && !hiddenCategorySet.has(normCc) && !result.find(r => r && (r.tr === cNameTr || normalizeCategoryName(r.tr) === normCc))) {
+          const rawCustomImg = imageMap[cNameTr] || (cImg && !cImg.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL') ? cImg : '') || getCategoryFallbackImage(cNameTr);
           const catImage = normalizeImageUrl(rawCustomImg);
-          const catOverrides = overrideMap[cc.name_tr] || {};
+          const catOverrides = overrideMap[cNameTr] || {};
           result.push({
-            tr: cc.name_tr || cc.name_ar,
-            ar: catOverrides.ar || cc.name_ar,
-            en: catOverrides.en || cc.name_en || cc.name_tr || cc.name_ar,
+            tr: cNameTr,
+            ar: catOverrides.ar || cNameAr || translateCategory(cNameTr, 'ar'),
+            en: catOverrides.en || cNameEn || translateCategory(cNameTr, 'en'),
             count: 0,
             subcategories: [],
             image: catImage

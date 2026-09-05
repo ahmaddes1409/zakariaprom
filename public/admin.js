@@ -271,6 +271,7 @@ async function renderCategories() {
                 <td style="display:flex;gap:6px;flex-wrap:wrap;">
                   <button class="btn-secondary btn-sm" onclick="editCategory('${encodeURIComponent(c.tr)}')">تعديل</button>
                   <button class="btn-sm ${c.hidden ? 'btn-primary' : 'btn-danger'}" onclick="toggleCategoryVisibility('${encodeURIComponent(c.tr)}', ${!c.hidden})">${c.hidden ? 'إظهار' : 'إخفاء'}</button>
+                  ${c.isCustom ? `<button class="btn-sm btn-danger" style="background:#e53e3e;color:#fff;" onclick="deleteCategory('${encodeURIComponent(c.tr)}')">حذف</button>` : ''}
                 </td>
               </tr>`).join('')}
             </tbody>
@@ -280,6 +281,18 @@ async function renderCategories() {
     </div>
   `;
 }
+
+window.deleteCategory = async function(catTr) {
+  const cat = decodeURIComponent(catTr);
+  if (!confirm(`هل أنت متأكد من حذف الفئة "${cat}" نهائياً من الموقع وقاعدة البيانات؟`)) return;
+  const res = await api('/api/admin/categories/' + encodeURIComponent(cat), { method: 'DELETE' });
+  if (res && res.error) {
+    toast(res.error, 'error');
+  } else {
+    toast('تم حذف الفئة بنجاح');
+    renderCategories();
+  }
+};
 
 window.toggleCategoryVisibility = async function(catTr, hide) {
   const cat = decodeURIComponent(catTr);
@@ -364,9 +377,14 @@ window.editCategory = async function(catTr) {
   const data = await api(`/api/admin/categories/${encodeURIComponent(cat)}`);
   if (!data) return;
   const c = data.category;
+  const isCustom = !!c.isCustom;
   showModal('تعديل الفئة', `
     <form id="editCatForm">
-      <div class="form-group"><label>الاسم (تركي)</label><input id="ecTr" value="${c.tr || cat}" readonly style="background:#f0f4f8;"></div>
+      <div class="form-group">
+        <label>الاسم (تركي)</label>
+        <input id="ecTr" value="${c.tr || cat}" ${isCustom ? '' : 'readonly style="background:#f0f4f8;"'}>
+        ${isCustom ? '<small style="color:#718096;display:block;margin-top:4px;">فئة مخصصة: يمكنك تعديل الاسم بالتركي</small>' : ''}
+      </div>
       <div class="form-group"><label>الاسم (عربي)</label><input id="ecAr" value="${c.ar || ''}"></div>
       <div class="form-group"><label>الاسم (إنجليزي)</label><input id="ecEn" value="${c.en || ''}"></div>
       <div class="form-group"><label>رابط صورة الفئة</label><input id="ecImage" value="${c.image || ''}" placeholder="https://..."></div>
@@ -377,8 +395,10 @@ window.editCategory = async function(catTr) {
   `);
   document.getElementById('editCatForm').onsubmit = async (e) => {
     e.preventDefault();
+    const new_tr = document.getElementById('ecTr').value.trim();
     await api('/api/admin/categories', { method: 'PUT', body: {
       category_tr: cat,
+      new_tr: isCustom ? new_tr : undefined,
       ar: document.getElementById('ecAr').value,
       en: document.getElementById('ecEn').value,
       image: document.getElementById('ecImage').value,

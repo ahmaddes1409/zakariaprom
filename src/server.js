@@ -92,7 +92,8 @@ function getCategoryFallbackImage(catTr) {
   if (lower.includes('şapka') || lower.includes('sapka') || lower.includes('cap') || lower.includes('hat')) return 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&h=300&fit=crop';
   if (lower.includes('açacak') || lower.includes('acacak') || lower.includes('şişe') || lower.includes('sise')) return 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&h=300&fit=crop';
   if (lower.includes('tişört') || lower.includes('tisort') || lower.includes('tekstil') || lower.includes('t-shirt')) return 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400&h=300&fit=crop';
-  if (lower.includes('bayrak') || lower.includes('byrak') || lower.includes('flag')) return 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&h=300&fit=crop';
+  if (lower.includes('bayrak') || lower.includes('byrak') || lower.includes('flag') || lower.includes('سارية') || lower.includes('أعلام') || lower.includes('علم')) return 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&h=300&fit=crop';
+  if (lower.includes('fuar') || lower.includes('stand') || lower.includes('roll up') || lower.includes('rollup') || lower.includes('معارض') || lower.includes('ستاند')) return 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=300&fit=crop';
   if (lower.includes('plaket') || lower.includes('kupa') || lower.includes('madalya')) return 'https://images.unsplash.com/photo-1569437061241-a848be43cc82?w=400&h=300&fit=crop';
   return 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=300&fit=crop';
 }
@@ -145,6 +146,156 @@ app.get('/sitemap.xml', async (req, res) => {
     console.error('[Sitemap Error]:', e.message);
     res.status(500).send('Error generating sitemap');
   }
+});
+
+// Admin panel common typos redirect (handles /admni, /amdin, /admim, /adimn)
+app.get(['/admni', '/amdin', '/admim', '/adimn'], (req, res) => {
+  res.redirect('/admin');
+});
+
+// Recursive search helper for missing uploads on Hostinger server
+function findFileRecursive(dir, filename, depth = 0) {
+  if (depth > 5 || !fs.existsSync(dir)) return null;
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const ent of entries) {
+      if (ent.isDirectory()) {
+        if (ent.name === 'node_modules' || ent.name === '.git' || ent.name === '.cache') continue;
+        const res = findFileRecursive(path.join(dir, ent.name), filename, depth + 1);
+        if (res) return res;
+      } else if (ent.isFile() && ent.name === filename) {
+        return path.join(dir, ent.name);
+      }
+    }
+  } catch(e) {}
+  return null;
+}
+
+// Auto-recovery function on server boot for all uploaded product images across Hostinger deployments
+function recoverExistingUploads() {
+  const hostingerBase = '/home/u424368414/domains/zakariaprom.com';
+  const permDir = fs.existsSync(hostingerBase) 
+    ? path.join(hostingerBase, 'uploads', 'products')
+    : path.join(__dirname, '..', 'public', 'uploads', 'products');
+  const localDir = path.join(__dirname, '..', 'public', 'uploads', 'products');
+  
+  try {
+    if (!fs.existsSync(permDir)) fs.mkdirSync(permDir, { recursive: true, mode: 0o777 });
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true, mode: 0o777 });
+  } catch(e) {}
+
+  if (!fs.existsSync(hostingerBase)) return;
+
+  const searchRoots = [
+    path.join(hostingerBase, 'hbuilds'),
+    path.join(hostingerBase, 'public_html'),
+    path.join(hostingerBase, 'nodejs'),
+    hostingerBase,
+    '/home/u424368414/backups'
+  ];
+
+  let recoveredCount = 0;
+  function scanAndRecover(dir, depth = 0) {
+    if (depth > 6 || !fs.existsSync(dir)) return;
+    try {
+      const list = fs.readdirSync(dir, { withFileTypes: true });
+      for (const item of list) {
+        const full = path.join(dir, item.name);
+        if (item.isDirectory()) {
+          if (item.name === 'node_modules' || item.name === '.git' || item.name === '.cache') continue;
+          scanAndRecover(full, depth + 1);
+        } else if (item.isFile() && item.name.startsWith('prod_')) {
+          const targetPerm = path.join(permDir, item.name);
+          const targetLocal = path.join(localDir, item.name);
+          if (!fs.existsSync(targetPerm)) {
+            try { fs.copyFileSync(full, targetPerm); recoveredCount++; } catch(e) {}
+          }
+          if (!fs.existsSync(targetLocal)) {
+            try { fs.copyFileSync(full, targetLocal); } catch(e) {}
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  for (const root of searchRoots) {
+    if (fs.existsSync(root)) scanAndRecover(root, 0);
+  }
+  if (recoveredCount > 0) {
+    console.log(`[Uploads Auto-Recovery] Successfully restored ${recoveredCount} uploaded product images!`);
+  }
+}
+
+// Persistent & Multi-path Uploads Server
+const permanentUploadDirs = [
+  path.join(__dirname, '..', 'public', 'uploads'),
+  '/home/u424368414/domains/zakariaprom.com/uploads',
+  '/home/u424368414/domains/zakariaprom.com/public_html/uploads',
+  '/home/u424368414/domains/zakariaprom.com/nodejs/public/uploads',
+  '/home/u424368414/domains/zakariaprom.com/data/uploads'
+];
+
+app.use('/uploads', (req, res, next) => {
+  const cleanPath = decodeURIComponent(req.path).replace(/^\/+/, '');
+  
+  // 1. Check known directories
+  for (const dir of permanentUploadDirs) {
+    const full = path.join(dir, cleanPath);
+    if (fs.existsSync(full)) {
+      try {
+        if (fs.statSync(full).isFile()) {
+          // Auto-mirror to permanent and local public/uploads if missing
+          const localTarget = path.join(__dirname, '..', 'public', 'uploads', cleanPath);
+          if (!fs.existsSync(localTarget)) {
+            fs.mkdirSync(path.dirname(localTarget), { recursive: true });
+            fs.copyFileSync(full, localTarget);
+          }
+          const permTarget = path.join('/home/u424368414/domains/zakariaprom.com/uploads', cleanPath);
+          if (fs.existsSync('/home/u424368414/domains/zakariaprom.com') && !fs.existsSync(permTarget)) {
+            fs.mkdirSync(path.dirname(permTarget), { recursive: true });
+            fs.copyFileSync(full, permTarget);
+          }
+          return res.sendFile(full);
+        }
+      } catch(e) {}
+    }
+  }
+
+  // 2. If not found, do recursive search across server candidate dirs for filename
+  const filename = path.basename(cleanPath);
+  if (filename) {
+    const searchBases = [
+      '/home/u424368414/domains/zakariaprom.com/hbuilds',
+      '/home/u424368414/domains/zakariaprom.com',
+      '/home/u424368414/backups',
+      '/home/u424368414'
+    ];
+    for (const base of searchBases) {
+      if (fs.existsSync(base)) {
+        const found = findFileRecursive(base, filename, 0);
+        if (found) {
+          console.log(`[Uploads Recovered] Found ${filename} at ${found}`);
+          try {
+            const localTarget = path.join(__dirname, '..', 'public', 'uploads', cleanPath);
+            fs.mkdirSync(path.dirname(localTarget), { recursive: true });
+            fs.copyFileSync(found, localTarget);
+            const permTarget = path.join('/home/u424368414/domains/zakariaprom.com/uploads', cleanPath);
+            fs.mkdirSync(path.dirname(permTarget), { recursive: true });
+            fs.copyFileSync(found, permTarget);
+          } catch(e) {}
+          return res.sendFile(found);
+        }
+      }
+    }
+  }
+
+  // 3. Graceful fallback image if missing from disk (never show broken browser box)
+  const ext = path.extname(cleanPath).toLowerCase();
+  if (['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
+    const fallback = path.join(__dirname, '..', 'public', 'real_logo.png');
+    if (fs.existsSync(fallback)) return res.sendFile(fallback);
+  }
+  next();
 });
 
 // Serve static files (React build + admin panel) with no-cache headers to prevent stale JS bundle
@@ -366,6 +517,7 @@ function ensureDbReady() {
     dbReadyPromise = (async () => {
       await initDatabaseAsync();
       initializeDatabase();
+      recoverExistingUploads();
       migrateCategories(database.db);
       setTimeout(async () => {
         try {
@@ -1320,7 +1472,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 
   // Dedicated route handlers for brand logo, favicon and debug stubs to guarantee 0 404 console errors
-  app.get(['/assets/logo_zakaria.jpg', '/logo_zakaria.jpg', '/assets/logo_zakaria.png', '/logo_zakaria.png'], (req, res) => {
+  app.get(['/assets/logo_zakaria.jpg', '/logo_zakaria.jpg', '/assets/logo_zakaria.png', '/logo_zakaria.png', '/real_logo.png'], (req, res) => {
+    const pReal = path.join(__dirname, '..', 'public', 'real_logo.png');
+    if (fs.existsSync(pReal)) return res.sendFile(pReal);
     const p1 = path.join(__dirname, '..', 'public', 'assets', 'logo_zakaria.jpg');
     if (fs.existsSync(p1)) return res.sendFile(p1);
     const p2 = path.join(__dirname, '..', 'public', 'logo_zakaria.jpg');
@@ -1328,7 +1482,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     res.status(404).end();
   });
 
-  app.get('/favicon.ico', (req, res) => {
+  app.get(['/favicon.ico', '/favicon.png'], (req, res) => {
+    const pReal = path.join(__dirname, '..', 'public', 'real_logo.png');
+    if (fs.existsSync(pReal)) return res.sendFile(pReal);
     const icoPath = path.join(__dirname, '..', 'public', 'favicon.ico');
     if (fs.existsSync(icoPath)) return res.sendFile(icoPath);
     const svgPath = path.join(__dirname, '..', 'public', 'favicon.svg');
@@ -1343,8 +1499,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     res.type('application/javascript').send('/* debug-collector stub */');
   });
 
-  // Admin panel - serve admin.html
-  app.get('/admin', (req, res) => {
+  // Admin panel - serve admin.html (and handle typos like /admni, /amdin)
+  app.get(['/admin', '/admni', '/amdin', '/admim', '/adimn'], (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
   });
 

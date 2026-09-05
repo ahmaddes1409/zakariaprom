@@ -1740,11 +1740,24 @@ router.delete('/custom-categories/:id', adminAuth, (req, res) => {
 // ========== LOCAL PRODUCTS (Add/Edit/Delete manual products) ==========
 const multer = require('multer');
 
+function getHostingerUploadsDir() {
+  const hostingerBase = '/home/u424368414/domains/zakariaprom.com';
+  if (fs.existsSync(hostingerBase)) {
+    const perm = path.join(hostingerBase, 'uploads', 'products');
+    if (!fs.existsSync(perm)) {
+      try { fs.mkdirSync(perm, { recursive: true, mode: 0o777 }); } catch(e) {}
+    }
+    return perm;
+  }
+  return null;
+}
+
 const localProductUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
       const dir = path.join(__dirname, '..', '..', 'public', 'uploads', 'products');
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      getHostingerUploadsDir(); // Ensure permanent storage directory exists
       cb(null, dir);
     },
     filename: (req, file, cb) => {
@@ -1753,6 +1766,59 @@ const localProductUpload = multer({
     }
   }),
   limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+// Force scan and restore all uploaded product photos from older Hostinger builds/backups
+router.post('/recover-uploads', adminAuth, (req, res) => {
+  try {
+    const hostingerBase = '/home/u424368414/domains/zakariaprom.com';
+    const permDir = getHostingerUploadsDir() || path.join(__dirname, '..', '..', 'public', 'uploads', 'products');
+    const localDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'products');
+    
+    if (!fs.existsSync(permDir)) fs.mkdirSync(permDir, { recursive: true, mode: 0o777 });
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true, mode: 0o777 });
+
+    const searchRoots = [
+      path.join(hostingerBase, 'hbuilds'),
+      path.join(hostingerBase, 'public_html'),
+      path.join(hostingerBase, 'nodejs'),
+      hostingerBase,
+      '/home/u424368414/backups'
+    ];
+
+    let recovered = [];
+    function scan(dir, depth = 0) {
+      if (depth > 6 || !fs.existsSync(dir)) return;
+      try {
+        const list = fs.readdirSync(dir, { withFileTypes: true });
+        for (const item of list) {
+          const full = path.join(dir, item.name);
+          if (item.isDirectory()) {
+            if (item.name === 'node_modules' || item.name === '.git' || item.name === '.cache') continue;
+            scan(full, depth + 1);
+          } else if (item.isFile() && item.name.startsWith('prod_')) {
+            const targetPerm = path.join(permDir, item.name);
+            const targetLocal = path.join(localDir, item.name);
+            if (!fs.existsSync(targetPerm)) {
+              try { fs.copyFileSync(full, targetPerm); } catch(e) {}
+            }
+            if (!fs.existsSync(targetLocal)) {
+              try { fs.copyFileSync(full, targetLocal); } catch(e) {}
+            }
+            recovered.push({ name: item.name, from: full });
+          }
+        }
+      } catch(e) {}
+    }
+
+    for (const root of searchRoots) {
+      if (fs.existsSync(root)) scan(root, 0);
+    }
+
+    res.json({ success: true, count: recovered.length, recovered });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // GET all local products
@@ -1794,6 +1860,14 @@ router.post('/local-products', adminAuth, localProductUpload.array('images', 10)
     const { name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes } = req.body;
     const images = (req.files || []).map(f => '/uploads/products/' + f.filename);
 
+    // Mirror to permanent Hostinger storage
+    const permDir = getHostingerUploadsDir();
+    if (permDir && req.files && req.files.length > 0) {
+      req.files.forEach(f => {
+        try { fs.copyFileSync(f.path, path.join(permDir, f.filename)); } catch(e) {}
+      });
+    }
+
     const result = db.prepare(
       'INSERT INTO local_products (name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
@@ -1817,6 +1891,14 @@ router.put('/local-products/:id', adminAuth, localProductUpload.array('images', 
     const newImages = (req.files || []).map(f => '/uploads/products/' + f.filename);
     const keepImages = existing_images ? (typeof existing_images === 'string' ? JSON.parse(existing_images) : existing_images) : [];
     const allImages = [...keepImages, ...newImages];
+
+    // Mirror to permanent Hostinger storage
+    const permDir = getHostingerUploadsDir();
+    if (permDir && req.files && req.files.length > 0) {
+      req.files.forEach(f => {
+        try { fs.copyFileSync(f.path, path.join(permDir, f.filename)); } catch(e) {}
+      });
+    }
 
     db.prepare(
       'UPDATE local_products SET name_tr=?, name_ar=?, name_en=?, model=?, description=?, price=?, quantity=?, category_tr=?, category_ar=?, category_en=?, colors=?, sizes=?, images=?, updated_at=CURRENT_TIMESTAMP WHERE id=?'

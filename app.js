@@ -1,4 +1,4 @@
-// Hostinger LiteSpeed / Passenger Node entry point (v2.0.6 - Reliable category images, replace translation overrides, remove bad car image)
+// Hostinger LiteSpeed / Passenger Node entry point (v2.0.7 - Force passenger restart & live sync Sep 5 2026)
 const app = require('./src/server.js');
 
 module.exports = app;

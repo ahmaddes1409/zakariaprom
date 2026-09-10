@@ -222,6 +222,10 @@ router.get('/deep-find-posts', adminAuth, async (req, res) => {
     // Git inspection on server
     try {
       const { execSync } = require('child_process');
+      if (req.query.pull === 'true') {
+        const pullOutput = execSync('git pull origin main', { timeout: 15000, encoding: 'utf8' }).trim();
+        results.serverInfo.gitPull = pullOutput;
+      }
       const gitLog = execSync('git log -n 5 --oneline', { timeout: 3000, encoding: 'utf8' }).trim();
       results.serverInfo.gitLog = gitLog;
     } catch(e) {
@@ -231,6 +235,22 @@ router.get('/deep-find-posts', adminAuth, async (req, res) => {
     res.json(results);
   } catch(err) {
     res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// Git pull trigger for admin deployment
+router.post('/git-pull', adminAuth, async (req, res) => {
+  try {
+    const { execSync } = require('child_process');
+    const output = execSync('git pull origin main', { timeout: 15000, encoding: 'utf8' });
+    try {
+      const fs = require('fs');
+      const restartPath = path.join(__dirname, '..', '..', 'tmp', 'restart.txt');
+      fs.writeFileSync(restartPath, `v2.2.0 - ${Date.now()}\n`);
+    } catch(e) {}
+    res.json({ success: true, output });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

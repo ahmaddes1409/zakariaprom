@@ -82,6 +82,197 @@ router.get('/db-status', adminAuth, (req, res) => {
   }
 });
 
+// Deep scan across entire server filesystem for blog posts in any active or historical DB / backups / free pages
+router.get('/deep-find-posts', adminAuth, async (req, res) => {
+  try {
+    const initSqlJs = require('sql.js');
+    let SQL = null;
+    try { SQL = await initSqlJs(); } catch(e) {}
+
+    const results = {
+      activeDbPath: database.getDbPath ? database.getDbPath() : 'unknown',
+      activeDbPosts: [],
+      activeDbSequence: [],
+      databasesFound: [],
+      postsFoundAcrossFiles: [],
+      rawTextMatches: [],
+      serverInfo: {}
+    };
+
+    const currentDb = getDb();
+    if (currentDb) {
+      try {
+        results.activeDbPosts = currentDb.prepare('SELECT * FROM posts').all();
+      } catch(e) {
+        results.activeDbPostsError = e.message;
+      }
+      try {
+        results.activeDbSequence = currentDb.prepare('SELECT * FROM sqlite_sequence').all();
+      } catch(e) {}
+    }
+
+    const visited = new Set();
+    const foundDbFiles = [];
+
+    function scan(dir, depth = 0) {
+      if (depth > 6 || !fs.existsSync(dir)) return;
+      try {
+        const list = fs.readdirSync(dir, { withFileTypes: true });
+        for (const item of list) {
+          const full = path.join(dir, item.name);
+          if (item.isDirectory()) {
+            if (item.name === 'node_modules' || item.name === '.npm' || item.name === '.cache') continue;
+            scan(full, depth + 1);
+          } else if (item.isFile()) {
+            const nameLower = item.name.toLowerCase();
+            if (
+              nameLower.endsWith('.db') || 
+              nameLower.endsWith('.sqlite') || 
+              nameLower.endsWith('.sqlite3') || 
+              nameLower.includes('zakariaprom') || 
+              nameLower.includes('backup') || 
+              nameLower.includes('.bak') ||
+              nameLower.includes('posts')
+            ) {
+              if (!visited.has(full)) {
+                visited.add(full);
+                try {
+                  const stat = fs.statSync(full);
+                  if (stat.size > 500) {
+                    foundDbFiles.push({ path: full, size: stat.size, mtime: stat.mtime });
+                  }
+                } catch(e) {}
+              }
+            }
+          }
+        }
+      } catch(e) {}
+    }
+
+    const searchRoots = [
+      '/home/u424368414/domains/zakariaprom.com/nodejs',
+      '/home/u424368414/domains/zakariaprom.com/public_html',
+      '/home/u424368414/domains/zakariaprom.com',
+      '/home/u424368414/hbuilds',
+      '/home/u424368414/backups',
+      '/home/u424368414/.trash',
+      '/home/u424368414/data',
+      '/home/u424368414',
+      path.resolve(path.join(__dirname, '..', '..'))
+    ];
+
+    for (const root of searchRoots) {
+      if (fs.existsSync(root)) {
+        scan(root, 0);
+      }
+    }
+
+    results.databasesFound = foundDbFiles;
+
+    for (const f of foundDbFiles) {
+      try {
+        const buf = fs.readFileSync(f.path);
+        
+        // Try opening as SQLite database
+        if (SQL) {
+          try {
+            const testDb = new SQL.Database(buf);
+            const tablesRes = testDb.exec("SELECT name FROM sqlite_master WHERE type='table'");
+            const tableNames = (tablesRes.length > 0 && tablesRes[0].values) ? tablesRes[0].values.map(v => v[0]) : [];
+            if (tableNames.includes('posts')) {
+              const pRes = testDb.exec("SELECT * FROM posts");
+              if (pRes.length > 0) {
+                const cols = pRes[0].columns;
+                const rows = pRes[0].values.map(vals => {
+                  const obj = {};
+                  cols.forEach((col, idx) => { obj[col] = vals[idx]; });
+                  return obj;
+                });
+                results.postsFoundAcrossFiles.push({
+                  sourceFile: f.path,
+                  modifiedAt: f.mtime,
+                  count: rows.length,
+                  posts: rows
+                });
+              }
+            }
+            testDb.close();
+          } catch(dbErr) {}
+        }
+
+        // Scan raw buffer for Arabic text strings that might be deleted or uncommitted posts
+        const text = buf.toString('utf8');
+        const matches = text.match(/[\u0600-\u06FF\s\d\.\,\!\?\:\-\(\)]{20,}/g);
+        if (matches && matches.length > 0) {
+          const interesting = matches
+            .map(m => m.trim())
+            .filter(m => m.length >= 25 && (m.includes('مقال') || m.includes('مدونة') || m.includes('طباعة') || m.includes('نقدم') || m.includes('أعلام') || m.includes('هدايا') || m.includes('تسويق') || m.includes('دعاية')))
+            .slice(0, 10);
+          if (interesting.length > 0) {
+            results.rawTextMatches.push({
+              sourceFile: f.path,
+              snippets: interesting
+            });
+          }
+        }
+      } catch(e) {}
+    }
+
+    // Git inspection on server
+    try {
+      const { execSync } = require('child_process');
+      const gitLog = execSync('git log -n 5 --oneline', { timeout: 3000, encoding: 'utf8' }).trim();
+      results.serverInfo.gitLog = gitLog;
+    } catch(e) {
+      results.serverInfo.gitError = e.message;
+    }
+
+    res.json(results);
+  } catch(err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// Restore/inject multiple blog posts into active database
+router.post('/restore-posts', adminAuth, async (req, res) => {
+  try {
+    const { posts } = req.body || {};
+    if (!Array.isArray(posts) || posts.length === 0) {
+      return res.status(400).json({ error: 'Array of posts required' });
+    }
+
+    const db = getDb();
+    if (!db) return res.status(500).json({ error: 'Database not available' });
+
+    let inserted = 0;
+    const stmt = db.prepare(`
+      INSERT INTO posts (title_ar, title_en, title_tr, content_ar, content_en, content_tr, image, published)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const p of posts) {
+      const titleAr = p.title_ar || p.title || '';
+      const contentAr = p.content_ar || p.content || '';
+      stmt.run(
+        titleAr,
+        p.title_en || '',
+        p.title_tr || '',
+        contentAr,
+        p.content_en || '',
+        p.content_tr || '',
+        p.image || '',
+        p.published !== undefined ? (p.published ? 1 : 0) : 1
+      );
+      inserted++;
+    }
+
+    database.saveDatabase();
+    res.json({ success: true, inserted });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Inspect all existing databases and backups across Hostinger server paths
 router.get('/inspect-server-databases', adminAuth, async (req, res) => {
   try {

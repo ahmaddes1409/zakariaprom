@@ -664,6 +664,7 @@ window.addPost = function() {
       <div class="form-group"><label>العنوان (إنجليزي)</label><input id="apTitleEn"></div>
       <div class="form-group"><label>العنوان (تركي)</label><input id="apTitleTr"></div>
       <div class="form-group"><label>المحتوى</label><textarea id="apContent" rows="6"></textarea></div>
+      <div class="form-group"><label>رابط الصورة (اختياري)</label><input id="apImage" placeholder="https://..."></div>
       <div class="form-group"><label>نشر مباشرة</label><label class="toggle"><input type="checkbox" id="apPublished" checked><span class="toggle-slider"></span></label></div>
       <button type="submit" class="btn-primary">حفظ المقال</button>
     </form>
@@ -672,12 +673,46 @@ window.addPost = function() {
     e.preventDefault();
     await api('/api/admin/posts', { method: 'POST', body: {
       title: document.getElementById('apTitle').value,
+      title_ar: document.getElementById('apTitle').value,
       title_en: document.getElementById('apTitleEn').value,
       title_tr: document.getElementById('apTitleTr').value,
       content: document.getElementById('apContent').value,
+      content_ar: document.getElementById('apContent').value,
+      image: document.getElementById('apImage').value,
       published: document.getElementById('apPublished').checked
     }});
     toast('تم حفظ المقال');
+    closeModal();
+    renderPosts();
+  };
+};
+
+window.editPost = async function(id) {
+  const posts = await api('/api/admin/posts');
+  const post = (Array.isArray(posts) ? posts : []).find(p => p.id === id);
+  if (!post) return toast('المقال غير موجود');
+  showModal('تعديل المقال', `
+    <form id="editPostForm">
+      <div class="form-group"><label>العنوان (عربي)</label><input id="epTitle" value="${(post.title_ar || post.title || '').replace(/"/g, '&quot;')}" required></div>
+      <div class="form-group"><label>العنوان (إنجليزي)</label><input id="epTitleEn" value="${(post.title_en || '').replace(/"/g, '&quot;')}"></div>
+      <div class="form-group"><label>العنوان (تركي)</label><input id="epTitleTr" value="${(post.title_tr || '').replace(/"/g, '&quot;')}"></div>
+      <div class="form-group"><label>المحتوى</label><textarea id="epContent" rows="6">${(post.content_ar || post.content || '').replace(/</g, '&lt;')}</textarea></div>
+      <div class="form-group"><label>رابط الصورة (اختياري)</label><input id="epImage" value="${(post.image || '').replace(/"/g, '&quot;')}"></div>
+      <div class="form-group"><label>نشر مباشرة</label><label class="toggle"><input type="checkbox" id="epPublished" ${post.published ? 'checked' : ''}><span class="toggle-slider"></span></label></div>
+      <button type="submit" class="btn-primary">تحديث المقال</button>
+    </form>
+  `);
+  document.getElementById('editPostForm').onsubmit = async (e) => {
+    e.preventDefault();
+    await api(`/api/admin/posts/${id}`, { method: 'PUT', body: {
+      title_ar: document.getElementById('epTitle').value,
+      title_en: document.getElementById('epTitleEn').value,
+      title_tr: document.getElementById('epTitleTr').value,
+      content_ar: document.getElementById('epContent').value,
+      image: document.getElementById('epImage').value,
+      published: document.getElementById('epPublished').checked
+    }});
+    toast('تم تحديث المقال بنجاح');
     closeModal();
     renderPosts();
   };

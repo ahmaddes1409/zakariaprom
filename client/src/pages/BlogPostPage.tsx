@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Calendar, ArrowLeft, ArrowRight } from "lucide-react";
 import { Link, useParams } from "wouter";
 
-const API_BASE = "https://zakariaprom.com";
+const API_BASE = "";
 
 interface Post {
   id: number;

@@ -254,8 +254,8 @@ const termTranslations = {
 // UI translations
 const uiTranslations = {
   ar: {
-    siteName: "زكريا بروم",
-    siteSlogan: "منتجات الدعاية والإعلان",
+    siteName: "مكتبة زكريا",
+    siteSlogan: "أعلام عربية و أجنبية هدايا دعائية مطبوعات ورقية",
     home: "الرئيسية",
     products: "المنتجات",
     categories: "الفئات",

@@ -62,6 +62,14 @@ export default function Home() {
   const [currentBanner, setCurrentBanner] = useState(0);
 
   useEffect(() => {
+    if (language === "ar") {
+      document.title = "مكتبة زكريا أعلام عربية و أجنبية هدايا دعائية مطبوعات ورقية";
+    } else if (language === "tr") {
+      document.title = "ZAKARIYA PROMOSYON - Arap ve Yabancı Bayraklar, Promosyon Hediyeler, Matbaa Ürünleri";
+    } else {
+      document.title = "Zakaria Promotional - Arabic & Foreign Flags, Corporate Gifts, Printing Products";
+    }
+
     Promise.all([
       fetchCategories(),
       fetchProducts({ limit: 16, lang: language }),

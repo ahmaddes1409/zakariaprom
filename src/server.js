@@ -532,6 +532,9 @@ function migrateCategories(db) {
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baskı', 'en', 'Ofset Baskı')").run();
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baski', 'ar', 'مطبوعات ورقية')").run();
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baski', 'en', 'Ofset Baskı')").run();
+
+      // Update site_slogan_ar in settings
+      db.prepare("UPDATE settings SET value = 'أعلام عربية و أجنبية هدايا دعائية مطبوعات ورقية' WHERE key = 'site_slogan_ar'").run();
     } catch(errFix) {
       console.error('[Ofset Baskı Fix Error]:', errFix.message);
     }

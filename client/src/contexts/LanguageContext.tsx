@@ -12,7 +12,7 @@ const fallbackTranslations: Record<Language, Record<string, string>> = {
     "nav.blog": "المدونة",
     "nav.contact": "اتصل بنا",
     "search.placeholder": "ابحث عن المنتجات...",
-    "hero.title": "منتجات الدعاية والإعلان",
+    "hero.title": "أعلام عربية و أجنبية هدايا دعائية مطبوعات ورقية",
     "hero.subtitle": "إنتاج واستيراد - بيع بالجملة",
     "hero.cta": "تصفح المنتجات",
     "hero.tagline": "علامتك التجارية... شغفنا",

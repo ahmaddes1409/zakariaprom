@@ -867,13 +867,21 @@ router.get('/products', adminAuth, async (req, res) => {
       );
     }
 
-    // Category filter
+    // Category filter (support exact & partial match on Turkish & Arabic names)
     if (category) {
       const catLower = category.toLowerCase().trim();
-      products = products.filter(p => 
-        ((p.topCategory && p.topCategory.tr) || "").toLowerCase().includes(catLower) ||
-        ((p.categories && Array.isArray(p.categories.tr)) ? p.categories.tr : []).some(c => c.toLowerCase().includes(catLower))
-      );
+      products = products.filter(p => {
+        const topTr = ((p.topCategory && p.topCategory.tr) || "").toLowerCase().trim();
+        const topAr = ((p.topCategory && p.topCategory.ar) || "").toLowerCase().trim();
+        const catsTr = (p.categories && Array.isArray(p.categories.tr)) ? p.categories.tr.map(c => c.toLowerCase().trim()) : [];
+        const catsAr = (p.categories && Array.isArray(p.categories.ar)) ? p.categories.ar.map(c => c.toLowerCase().trim()) : [];
+        return topTr === catLower || 
+               topAr === catLower ||
+               topTr.includes(catLower) || 
+               topAr.includes(catLower) ||
+               catsTr.some(c => c === catLower || c.includes(catLower)) ||
+               catsAr.some(c => c === catLower || c.includes(catLower));
+      });
     }
 
     // Add hidden status

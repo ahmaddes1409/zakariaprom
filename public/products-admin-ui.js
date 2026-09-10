@@ -81,12 +81,28 @@ async function getProductCounts() {
   return { total: 0, xml: 0, etkin: 0, local: 0 };
 }
 
+let adminCategoriesCache = null;
+async function fetchAdminCategoriesList() {
+  if (adminCategoriesCache && adminCategoriesCache.length > 0) return adminCategoriesCache;
+  try {
+    const res = await api('/api/admin/categories');
+    adminCategoriesCache = ((res && res.categories) || [])
+      .filter(c => !c.hidden && (c.count > 0 || c.productCount > 0))
+      .sort((a, b) => (b.count || b.productCount || 0) - (a.count || a.productCount || 0));
+    return adminCategoriesCache;
+  } catch(e) {
+    return [];
+  }
+}
+
 async function renderXmlProducts() {
   const container = document.getElementById('productsContent');
   if (!container) return;
   container.innerHTML = '<div style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;color:var(--text-muted);">جاري تحميل المنتجات...</p></div>';
 
   try {
+    const categories = await fetchAdminCategoriesList();
+
     let url = `/api/admin/products?page=${productsPage}&limit=20`;
     if (currentProductsTab && currentProductsTab !== 'all') {
       url += `&source=${currentProductsTab}`;
@@ -113,15 +129,77 @@ async function renderXmlProducts() {
     const total = (res.total !== undefined) ? res.total : (res.pagination?.total || products.length);
     const totalPages = res.totalPages || Math.ceil(total / 20) || 1;
 
-    // Render search and filters
+    // Render search and filters with Category Dropdown & Quick Category Pills
     let html = `
-      <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
-        <input type="text" placeholder="بحث بالاسم أو الكود..." value="${productsSearchQuery || ''}" 
-               onkeyup="if(event.key==='Enter'){productsSearchQuery=this.value;productsPage=1;renderProducts()}" 
-               style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;">
-        <button class="btn-secondary" onclick="productsSearchQuery=this.previousElementSibling.value;productsPage=1;renderProducts()">بحث</button>
-        ${productsSearchQuery ? '<button class="btn-secondary" onclick="productsSearchQuery=\'\';productsPage=1;renderProducts()">إلغاء البحث</button>' : ''}
+      <div style="background:var(--card-bg, #fff);border:1px solid var(--border, #e2e8f0);border-radius:10px;padding:16px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        <!-- Top Search & Category Filter Bar -->
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <!-- Text Search -->
+          <div style="flex:1;min-width:220px;position:relative;">
+            <input type="text" id="adminProductSearchInput" placeholder="بحث بالاسم أو الكود أو الموديل..." value="${productsSearchQuery || ''}" 
+                   onkeyup="if(event.key==='Enter'){productsSearchQuery=this.value.trim();productsPage=1;renderProducts()}" 
+                   style="width:100%;padding:9px 12px;border:1px solid var(--border, #cbd5e1);border-radius:6px;font-size:14px;outline:none;">
+          </div>
+
+          <!-- Category Dropdown Filter (كل فئة على حدا) -->
+          <div style="flex:1;min-width:240px;">
+            <select id="productsCategorySelect" 
+                    onchange="productsCategoryFilter=this.value;productsPage=1;renderProducts()" 
+                    style="width:100%;padding:9px 12px;border:1px solid var(--border, #cbd5e1);border-radius:6px;font-size:14px;background:#fff;cursor:pointer;outline:none;">
+              <option value="">📂 جميع الفئات (عرض الكل)</option>
+              ${categories.map(c => `
+                <option value="${c.tr}" ${productsCategoryFilter === c.tr ? 'selected' : ''}>
+                  ${c.tr} ${c.ar ? `(${c.ar})` : ''} [${c.count || 0} منتج]
+                </option>
+              `).join('')}
+            </select>
+          </div>
+
+          <!-- Filter Button -->
+          <button class="btn-primary" onclick="productsSearchQuery=document.getElementById('adminProductSearchInput').value.trim();productsPage=1;renderProducts()" style="padding:9px 18px;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-filter"></i> تصفية
+          </button>
+
+          <!-- Reset Filter Button -->
+          ${(productsSearchQuery || productsCategoryFilter) ? `
+            <button class="btn-secondary" onclick="productsSearchQuery='';productsCategoryFilter='';productsPage=1;renderProducts()" style="padding:9px 14px;color:#dc2626;border-color:#fca5a5;display:flex;align-items:center;gap:6px;">
+              <i class="fas fa-times"></i> إلغاء الفلترة
+            </button>
+          ` : ''}
+        </div>
+
+        <!-- Quick Category Pills (شريط الفئات السريع لاختيار كل فئة بنقرة واحدة) -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border, #e2e8f0);max-height:120px;overflow-y:auto;">
+          <span style="font-size:12px;color:var(--text-muted, #64748b);font-weight:bold;margin-left:4px;">
+            <i class="fas fa-layer-group"></i> الفئات:
+          </span>
+          <button type="button" 
+                  onclick="productsCategoryFilter='';productsPage=1;renderProducts()"
+                  style="cursor:pointer;padding:4px 12px;border-radius:20px;font-size:12px;border:1px solid ${!productsCategoryFilter ? 'var(--primary, #00a8a8)' : '#cbd5e1'};background:${!productsCategoryFilter ? 'var(--primary, #00a8a8)' : '#f8fafc'};color:${!productsCategoryFilter ? '#fff' : '#475569'};font-weight:${!productsCategoryFilter ? 'bold' : 'normal'};transition:all 0.15s;">
+            📂 الكل
+          </button>
+          ${categories.map(c => `
+            <button type="button" 
+                    onclick="productsCategoryFilter='${c.tr.replace(/'/g, "\\'")}';productsPage=1;renderProducts()"
+                    style="cursor:pointer;padding:4px 12px;border-radius:20px;font-size:12px;border:1px solid ${productsCategoryFilter === c.tr ? 'var(--primary, #00a8a8)' : '#e2e8f0'};background:${productsCategoryFilter === c.tr ? 'var(--primary, #00a8a8)' : '#ffffff'};color:${productsCategoryFilter === c.tr ? '#fff' : '#334155'};font-weight:${productsCategoryFilter === c.tr ? 'bold' : 'normal'};transition:all 0.15s;">
+              ${c.ar || c.tr} (${c.count || c.productCount || 0})
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- Active Filter Indicator -->
+        ${productsCategoryFilter ? `
+          <div style="margin-top:10px;background:#f0fdfa;border:1px solid #ccfbf1;padding:8px 12px;border-radius:6px;font-size:13px;color:#0f766e;display:flex;justify-content:space-between;align-items:center;">
+            <span>
+              <i class="fas fa-check-circle"></i> أنت تستعرض الآن فئة: <strong>${productsCategoryFilter}</strong> ${categories.find(c => c.tr === productsCategoryFilter)?.ar ? `(${categories.find(c => c.tr === productsCategoryFilter).ar})` : ''} — <strong>${total}</strong> منتج
+            </span>
+            <button type="button" onclick="productsCategoryFilter='';productsPage=1;renderProducts()" style="background:none;border:none;color:#0f766e;font-size:12px;text-decoration:underline;cursor:pointer;font-weight:bold;">
+              عرض كل الفئات ✕
+            </button>
+          </div>
+        ` : ''}
       </div>
+
       <div class="table-responsive">
         <table class="data-table">
           <thead>
@@ -139,7 +217,7 @@ async function renderXmlProducts() {
             </tr>
           </thead>
           <tbody>
-            ${products.length === 0 ? '<tr><td colspan="10" style="text-align:center;padding:30px;">لا توجد منتجات</td></tr>' : products.map(p => renderXmlProductRow(p)).join('')}
+            ${products.length === 0 ? '<tr><td colspan="10" style="text-align:center;padding:30px;">لا توجد منتجات مطابقة للبحث أو الفئة المحددة</td></tr>' : products.map(p => renderXmlProductRow(p)).join('')}
           </tbody>
         </table>
       </div>

@@ -27,7 +27,7 @@ const fallbackTranslations: Record<Language, Record<string, string>> = {
     "services.design": "تصميم إبداعي",
     "services.designDesc": "فريق تصميم محترف لإنشاء هوية بصرية مميزة",
     "services.delivery": "شحن وتوصيل",
-    "services.deliveryDesc": "نوصل طلباتكم إلى جميع أنحاء تركيا وسوريا والمنطقة",
+    "services.deliveryDesc": "توصيل طلباتكم إلى جميع أنحاء تركيا وسوريا",
     "about.title": "من نحن",
     "about.desc": "مكتبة زكريا شركة رائدة في مجال إنتاج واستيراد منتجات الدعاية والإعلان والهدايا الترويجية.",
     "contact.title": "تواصل معنا",

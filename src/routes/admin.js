@@ -116,6 +116,21 @@ router.get('/list-uploads', adminAuth, (req, res) => {
   }
 });
 
+// Export all database tables as structured JSON for complete Git backup
+router.get('/export-data-json', adminAuth, (req, res) => {
+  try {
+    const db = getDb();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map(t => t.name);
+    const dump = {};
+    for (const tbl of tables) {
+      dump[tbl] = db.prepare(`SELECT * FROM ${tbl}`).all();
+    }
+    res.json({ success: true, exportedAt: new Date().toISOString(), tables: dump });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Deep scan across entire server filesystem for blog posts in any active or historical DB / backups / free pages
 router.get('/deep-find-posts', adminAuth, async (req, res) => {
   try {

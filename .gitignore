@@ -33,9 +33,10 @@ npm-debug.log*
 client/public/__manus__/version.json
 public/__manus__/
 
-# Uploaded files (exist on server)
+# Uploaded files
 public/uploads/*
 !public/uploads/categories/
+!public/uploads/products/
 
 # Dev tools (not needed for deployment)
 pnpm-lock.yaml

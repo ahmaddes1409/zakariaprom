@@ -1324,7 +1324,9 @@ router.get('/categories', adminAuth, async (req, res) => {
       });
     });
 
-    res.json({ categories: result });
+    // Filter out categories with 0 products (strictly count > 0)
+    const activeCategories = result.filter(c => c && typeof c.count === 'number' && c.count > 0);
+    res.json({ categories: activeCategories });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2357,14 +2359,23 @@ router.post('/audit-and-sync-etkin', adminAuth, async (req, res) => {
       ) OR images LIKE '%karmedya.com%'
     `).run();
 
-    // 2. Fetch all products from Etkin API
+    // 2. Purge orphaned empty categories with 0 products
+    const purgeEmpty = db.prepare(`
+      DELETE FROM custom_categories 
+      WHERE name_tr NOT IN (
+        SELECT DISTINCT category_tr FROM local_products 
+        WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%' AND category_tr IS NOT NULL AND category_tr != ''
+      )
+    `).run();
+
+    // 3. Fetch all products from Etkin API
     const items = await fetchEtkinApi(db, 'tum_urunler');
     const totalApiProducts = Array.isArray(items) ? items.length : 0;
 
-    // 3. Perform synchronization into database
+    // 4. Perform synchronization into database
     const syncResult = await syncEtkinProducts(db, database.saveDatabase);
 
-    // 4. Verify count in DB
+    // 5. Verify count in DB
     const etkinInDb = db.prepare("SELECT count(*) as c FROM local_products WHERE product_id LIKE 'etkin_%'").get().c;
     const localInDb = db.prepare("SELECT count(*) as c FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND images NOT LIKE '%karmedya.com%'").get().c;
     const karmedyaInDb = db.prepare("SELECT count(*) as c FROM local_products WHERE images LIKE '%karmedya.com%'").get().c;
@@ -2380,7 +2391,8 @@ router.post('/audit-and-sync-etkin', adminAuth, async (req, res) => {
         missingCount: Math.max(0, totalApiProducts - etkinInDb),
         localManualProducts: localInDb,
         karmedyaRemaining: karmedyaInDb,
-        purgedKarmedyaCount: purge.changes
+        purgedKarmedyaCount: purge.changes,
+        purgedEmptyCategories: purgeEmpty.changes
       },
       syncResult
     });
@@ -2406,7 +2418,16 @@ router.post('/sync-all', async (req, res) => {
       ) OR images LIKE '%karmedya.com%'
     `).run();
 
-    // 2. Sync Etkin products
+    // 2. Purge orphaned empty categories with 0 products
+    db.prepare(`
+      DELETE FROM custom_categories 
+      WHERE name_tr NOT IN (
+        SELECT DISTINCT category_tr FROM local_products 
+        WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%' AND category_tr IS NOT NULL AND category_tr != ''
+      )
+    `).run();
+
+    // 3. Sync Etkin products
     const etkinResult = await syncEtkinProducts(db, database.saveDatabase);
 
     const totalRow = db.prepare('SELECT COUNT(*) as count FROM local_products WHERE hidden = 0').get();

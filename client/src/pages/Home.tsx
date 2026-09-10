@@ -315,7 +315,7 @@ export default function Home() {
             <div className="text-center py-12 text-gray-400">{t("general.loading")}</div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {categories.map((cat, i) => (
+              {categories.filter((cat) => cat && typeof cat.count === 'number' && cat.count > 0).map((cat, i) => (
                 <motion.div
                   key={cat.tr}
                   initial={{ opacity: 0, scale: 0.95 }}

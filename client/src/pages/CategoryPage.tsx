@@ -47,7 +47,7 @@ export default function CategoryPage() {
   const currentCategory = categories.find((c) => c.tr === categoryTr);
 
   useEffect(() => {
-    fetchCategories().then(setCategories);
+    fetchCategories().then((cats) => setCategories(cats.filter((c) => c && typeof c.count === 'number' && c.count > 0)));
   }, []);
 
   // Reset when category changes

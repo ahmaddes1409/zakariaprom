@@ -1,1 +1,1 @@
-v2.1.7 - Purge Karmedya products, exclusive Etkin Promosyon catalog, 100% sync
+v2.1.8 - Remove 0-count categories, purge orphaned custom categories

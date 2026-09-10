@@ -364,9 +364,33 @@ function purgeKarmedyaProducts(db, saveDb) {
   }
 }
 
+function purgeEmptyCategories(db, saveDb) {
+  if (!db) return 0;
+  try {
+    const res = db.prepare(`
+      DELETE FROM custom_categories 
+      WHERE name_tr NOT IN (
+        SELECT DISTINCT category_tr FROM local_products 
+        WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%' AND category_tr IS NOT NULL AND category_tr != ''
+      )
+    `).run();
+    if (res.changes > 0) {
+      console.log(`[Purge Empty Categories] Deleted ${res.changes} empty categories with 0 products.`);
+      if (typeof saveDb === 'function') {
+        saveDb();
+      }
+    }
+    return res.changes;
+  } catch(e) {
+    console.error('[Purge Empty Categories Error]:', e.message);
+    return 0;
+  }
+}
+
 async function syncXmlToDb(db, saveDatabase) {
   console.log('[Auto XML Sync] Karmedya XML sync is permanently disabled in favor of Etkin Promosyon.');
   purgeKarmedyaProducts(db, saveDatabase);
+  purgeEmptyCategories(db, saveDatabase);
 }
 
 const database = require('./database');
@@ -533,8 +557,9 @@ function ensureDbReady() {
       migrateCategories(database.db);
       setTimeout(async () => {
         try {
-          console.log('[Startup Auto Sync] Purging any residual Karmedya products...');
+          console.log('[Startup Auto Sync] Purging any residual Karmedya products and empty categories...');
           purgeKarmedyaProducts(database.db, saveDatabase);
+          purgeEmptyCategories(database.db, saveDatabase);
           console.log('[Startup Auto Sync] Syncing Etkin Promosyon API products...');
           const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
           await syncEtkinProducts(database.db, saveDatabase);
@@ -660,8 +685,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     try {
       setTimeout(async () => {
         try {
-          console.log('[Background Sync] Purging any residual Karmedya products...');
+          console.log('[Background Sync] Purging any residual Karmedya products and empty categories...');
           purgeKarmedyaProducts(database.db, saveDatabase);
+          purgeEmptyCategories(database.db, saveDatabase);
           console.log('[Background Sync] Starting Etkin API sync...');
           const { syncEtkinProducts } = require('./services/etkinService');
           await syncEtkinProducts(database.db, saveDatabase);
@@ -1073,43 +1099,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         };
       });
 
-      // Add custom categories (that are active, not hidden, and not mojikake)
-      const customCats = safeQuery('SELECT * FROM custom_categories WHERE active = 1 OR active IS NULL');
-      customCats.forEach(cc => {
-        if (!cc) return;
-        let cNameTr = cc.name_tr || '';
-        let cNameAr = cc.name_ar || '';
-        let cNameEn = cc.name_en || '';
-        let cImg = cc.image_url || '';
-
-        // If URL was pasted into name_tr by mistake, fix it
-        if (cNameTr.startsWith('http://') || cNameTr.startsWith('https://')) {
-          if (!cImg) cImg = cNameTr;
-          cNameTr = cNameEn && !cNameEn.startsWith('http') ? cNameEn : 'Ofset Baskı';
-        }
-        if (!cNameTr) cNameTr = cNameEn || cNameAr || 'Ofset Baskı';
-
-        // Skip corrupted mojikake rows
-        if (cNameTr.includes('Ã') || cNameTr.includes('Ä') || cNameTr.includes('Å') || cNameTr.includes('§')) return;
-        const normCc = normalizeCategoryName(cNameTr);
-        if (!hiddenCategorySet.has(cNameTr) && !hiddenCategorySet.has(normCc) && !result.find(r => r && (r.tr === cNameTr || normalizeCategoryName(r.tr) === normCc))) {
-          const rawCustomImg = imageMap[cNameTr] || cImg || getCategoryFallbackImage(cNameTr);
-          const catImage = normalizeImageUrl(rawCustomImg);
-          const catOverrides = overrideMap[cNameTr] || {};
-          result.push({
-            tr: cNameTr,
-            ar: catOverrides.ar || cNameAr || translateCategory(cNameTr, 'ar'),
-            en: catOverrides.en || cNameEn || translateCategory(cNameTr, 'en'),
-            count: 0,
-            subcategories: [],
-            image: catImage
-          });
-        }
-      });
-
-      // Filter out hidden categories strictly from public website response
+      // Filter out hidden categories and EXCLUDE ANY categories with 0 products (strictly count > 0)
       result = result.filter(c => {
         if (!c || !c.tr) return false;
+        if (!c.count || c.count <= 0) return false;
         const norm = normalizeCategoryName(c.tr);
         return !hiddenCategorySet.has(c.tr) && !hiddenCategorySet.has(norm);
       });

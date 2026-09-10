@@ -89,7 +89,7 @@ export async function fetchCategories(): Promise<ApiCategory[]> {
     const res = await fetch(`${API_BASE}/api/categories`);
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data) ? data.filter(c => c && typeof c.count === 'number' && c.count > 0) : [];
   } catch {
     return [];
   }

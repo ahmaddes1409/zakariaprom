@@ -33,10 +33,10 @@ npm-debug.log*
 client/public/__manus__/version.json
 public/__manus__/
 
-# Uploaded files
-public/uploads/*
+# Uploaded files (persisted on Hostinger server)
+public/uploads/categories/cat_*
+public/uploads/products/*
 !public/uploads/categories/
-!public/uploads/products/
 
 # Dev tools (not needed for deployment)
 pnpm-lock.yaml

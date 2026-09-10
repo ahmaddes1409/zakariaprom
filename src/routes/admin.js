@@ -290,11 +290,16 @@ router.get('/deep-find-posts', adminAuth, async (req, res) => {
 router.post('/git-pull', adminAuth, async (req, res) => {
   try {
     const { execSync } = require('child_process');
-    const output = execSync('git pull origin main', { timeout: 15000, encoding: 'utf8' });
+    let output = '';
+    try {
+      output = execSync('git fetch origin main && git reset --hard origin/main', { timeout: 25000, encoding: 'utf8' });
+    } catch(e) {
+      output = execSync('git pull origin main', { timeout: 15000, encoding: 'utf8' });
+    }
     try {
       const fs = require('fs');
       const restartPath = path.join(__dirname, '..', '..', 'tmp', 'restart.txt');
-      fs.writeFileSync(restartPath, `v2.2.0 - ${Date.now()}\n`);
+      fs.writeFileSync(restartPath, `v2.2.1 - ${Date.now()}\n`);
     } catch(e) {}
     res.json({ success: true, output });
   } catch(err) {

@@ -17,6 +17,8 @@ function fixImageUrl(url) {
 let productsPage = 1;
 let localProductsPage = 1;
 let currentProductsTab = 'all'; // 'all', 'xml', 'etkin', 'local'
+let productsSearchQuery = '';
+let productsCategoryFilter = '';
 
 async function renderProducts() {
   const area = document.getElementById('contentArea');
@@ -81,71 +83,106 @@ async function getProductCounts() {
 
 async function renderXmlProducts() {
   const container = document.getElementById('productsContent');
-  container.innerHTML = '<div style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin-top:10px;color:var(--text-muted);">جاري تحميل المنتجات...</p></div>';
 
-  let url = `/api/admin/products?page=${productsPage}&limit=20`;
-  if (currentProductsTab !== 'all') {
-    url += `&source=${currentProductsTab}`;
-  }
-  if (productsSearchQuery) {
-    url += `&search=${encodeURIComponent(productsSearchQuery)}`;
-  }
-  if (productsCategoryFilter) {
-    url += `&category=${encodeURIComponent(productsCategoryFilter)}`;
-  }
+  try {
+    let url = `/api/admin/products?page=${productsPage}&limit=20`;
+    if (currentProductsTab && currentProductsTab !== 'all') {
+      url += `&source=${currentProductsTab}`;
+    }
+    if (productsSearchQuery && productsSearchQuery.trim()) {
+      url += `&search=${encodeURIComponent(productsSearchQuery.trim())}`;
+    }
+    if (productsCategoryFilter && productsCategoryFilter.trim()) {
+      url += `&category=${encodeURIComponent(productsCategoryFilter.trim())}`;
+    }
 
-  const res = await api(url);
-  const products = res.products || [];
-  const total = res.pagination?.total || 0;
+    const res = await api(url);
+    if (!res || res.error) {
+      container.innerHTML = `
+        <div class="card" style="text-align:center;padding:40px;color:red;">
+          <i class="fas fa-exclamation-triangle fa-2x" style="margin-bottom:10px;"></i>
+          <p>خطأ أثناء تحميل المنتجات: ${res?.error || 'تعذر الاتصال بالخادم'}</p>
+          <button class="btn-secondary" onclick="renderProducts()">إعادة المحاولة</button>
+        </div>`;
+      return;
+    }
 
-  // Render search and filters
-  let html = `
-    <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
-      <input type="text" placeholder="بحث بالاسم أو الكود..." value="${productsSearchQuery}" 
-             onkeyup="if(event.key==='Enter'){productsSearchQuery=this.value;productsPage=1;renderProducts()}" 
-             style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;">
-      <button class="btn-secondary" onclick="productsSearchQuery=this.previousElementSibling.value;productsPage=1;renderProducts()">بحث</button>
-      ${productsSearchQuery ? '<button class="btn-secondary" onclick="productsSearchQuery=\'\';productsPage=1;renderProducts()">إلغاء البحث</button>' : ''}
-    </div>
-    <div class="table-responsive">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>الصورة</th>
-            <th>الاسم (تركي)</th>
-            <th>الاسم (عربي)</th>
-            <th>المصدر</th>
-            <th>الفئة</th>
-            <th>الكود</th>
-            <th>السعر</th>
-            <th>المخزون</th>
-            <th>الحالة</th>
-            <th>الإجراءات</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${products.length === 0 ? '<tr><td colspan="10" style="text-align:center;padding:30px;">لا توجد منتجات</td></tr>' : products.map(p => renderXmlProductRow(p)).join('')}
-        </tbody>
-      </table>
-    </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;">
-      <button class="btn-secondary" onclick="productsPage--;renderProducts()" ${productsPage <= 1 ? 'disabled' : ''}>السابق</button>
-      <span>صفحة ${productsPage} من ${Math.ceil(total/20) || 1}</span>
-      <button class="btn-secondary" onclick="productsPage++;renderProducts()" ${productsPage >= Math.ceil(total/20) ? 'disabled' : ''}>التالي</button>
-    </div>
-  `;
-  container.innerHTML = html;
+    const products = Array.isArray(res.products) ? res.products : [];
+    const total = (res.total !== undefined) ? res.total : (res.pagination?.total || products.length);
+    const totalPages = res.totalPages || Math.ceil(total / 20) || 1;
+
+    // Render search and filters
+    let html = `
+      <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
+        <input type="text" placeholder="بحث بالاسم أو الكود..." value="${productsSearchQuery || ''}" 
+               onkeyup="if(event.key==='Enter'){productsSearchQuery=this.value;productsPage=1;renderProducts()}" 
+               style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;">
+        <button class="btn-secondary" onclick="productsSearchQuery=this.previousElementSibling.value;productsPage=1;renderProducts()">بحث</button>
+        ${productsSearchQuery ? '<button class="btn-secondary" onclick="productsSearchQuery=\'\';productsPage=1;renderProducts()">إلغاء البحث</button>' : ''}
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>الصورة</th>
+              <th>الاسم (تركي)</th>
+              <th>الاسم (عربي)</th>
+              <th>المصدر</th>
+              <th>الفئة</th>
+              <th>الكود</th>
+              <th>السعر</th>
+              <th>المخزون</th>
+              <th>الحالة</th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${products.length === 0 ? '<tr><td colspan="10" style="text-align:center;padding:30px;">لا توجد منتجات</td></tr>' : products.map(p => renderXmlProductRow(p)).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;">
+        <button class="btn-secondary" onclick="productsPage--;renderProducts()" ${productsPage <= 1 ? 'disabled' : ''}>السابق</button>
+        <span>صفحة ${productsPage} من ${totalPages} (${total} منتج)</span>
+        <button class="btn-secondary" onclick="productsPage++;renderProducts()" ${productsPage >= totalPages ? 'disabled' : ''}>التالي</button>
+      </div>
+    `;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('renderXmlProducts error:', err);
+    container.innerHTML = `
+      <div class="card" style="text-align:center;padding:40px;color:red;">
+        <i class="fas fa-exclamation-triangle fa-2x" style="margin-bottom:10px;"></i>
+        <p>حدث خطأ أثناء عرض المنتجات: ${err.message}</p>
+        <button class="btn-secondary" onclick="renderProducts()">إعادة المحاولة</button>
+      </div>`;
+  }
 }
 
 function renderXmlProductRow(p) {
-  const category = p.topCategory?.tr || p.categories?.tr?.[0]?.split(' > ')[0] || '-';
-  const sourceLabel = p.source === 'etkin' ? '<span class="badge" style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:4px;font-size:11px;">Etkin Promosyon</span>' : 
-                                             '<span class="badge" style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;">يدوي</span>';
+  if (!p) return '';
+  const category = (p.topCategory && typeof p.topCategory === 'object' ? p.topCategory.tr : '') || 
+                   (p.categories && Array.isArray(p.categories.tr) ? p.categories.tr[0]?.split(' > ')[0] : '') || 
+                   (typeof p.topCategory === 'string' ? p.topCategory : '') || '-';
+  const sourceLabel = p.source === 'etkin' 
+    ? '<span class="badge" style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:4px;font-size:11px;">Etkin Promosyon</span>' 
+    : '<span class="badge" style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;">يدوي</span>';
+  
+  const imgUrl = Array.isArray(p.images) && p.images.length > 0 ? fixImageUrl(p.images[0]) : '';
+  const pNameTr = (p.name && p.name.tr) || '';
+  const pNameAr = (p.name && p.name.ar) || '';
+  const safeId = String(p.id || '').replace(/'/g, "\\'");
+  const safeModel = String(p.model || '').replace(/'/g, "\\'");
+  const safeCat = String(category).replace(/'/g, "\\'");
+  const isLocal = !!(p.isLocal || p.source === 'local' || String(p.id).startsWith('local_'));
+
   return `
     <tr>
-      <td><img src="${p.images?.[0] || ''}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;" onerror="this.style.display='none'"></td>
-      <td>${p.name?.tr || ''}</td>
-      <td>${p.name?.ar || ''}</td>
+      <td>${imgUrl ? `<img src="${imgUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;" onerror="this.style.display='none'">` : '-'}</td>
+      <td>${pNameTr}</td>
+      <td>${pNameAr}</td>
       <td>${sourceLabel}</td>
       <td><span class="badge" style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:4px;font-size:12px;">${category}</span></td>
       <td>${p.model || ''}</td>
@@ -153,9 +190,9 @@ function renderXmlProductRow(p) {
       <td>${p.quantity || 0}</td>
       <td>${p.hidden ? '<span class="status status-cancelled">مخفي</span>' : '<span class="status status-completed">ظاهر</span>'}</td>
       <td style="white-space:nowrap;">
-        <button class="btn-secondary btn-sm" onclick="editProduct('${p.id}', ${p.isLocal || p.source === 'local' || String(p.id).startsWith('local_')})">تعديل</button>
-        <button class="btn-sm" style="background:var(--warning);color:#fff;" onclick="changeCategoryModal('${p.id}','${p.model}','${category}')">نقل</button>
-        <button class="btn-sm ${p.hidden ? 'btn-success' : 'btn-danger'}" onclick="toggleProduct('${p.model || p.id}', ${!p.hidden})">${p.hidden ? 'إظهار' : 'إخفاء'}</button>
+        <button class="btn-secondary btn-sm" onclick="editProduct('${safeId}', ${isLocal})">تعديل</button>
+        <button class="btn-sm" style="background:var(--warning);color:#fff;" onclick="changeCategoryModal('${safeId}','${safeModel}','${safeCat}')">نقل</button>
+        <button class="btn-sm ${p.hidden ? 'btn-success' : 'btn-danger'}" onclick="toggleProduct('${safeModel || safeId}', ${!p.hidden})">${p.hidden ? 'إظهار' : 'إخفاء'}</button>
       </td>
     </tr>`;
 }

@@ -792,8 +792,8 @@ router.post('/products/show', adminAuth, (req, res) => {
 router.get('/product-counts', adminAuth, (req, res) => {
   try {
     const db = getDb();
-    const etkinRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
-    const localRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND images NOT LIKE '%karmedya.com%' AND hidden = 0").get();
+    const etkinRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND (hidden = 0 OR hidden IS NULL OR hidden = 'false')").get();
+    const localRow = db.prepare("SELECT count(*) as count FROM local_products WHERE (product_id NOT LIKE 'etkin_%' OR product_id IS NULL) AND (images NOT LIKE '%karmedya.com%' OR images IS NULL) AND (hidden = 0 OR hidden IS NULL OR hidden = 'false')").get();
     const etkin = etkinRow ? etkinRow.count : 0;
     const local = localRow ? localRow.count : 0;
 

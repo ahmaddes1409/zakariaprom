@@ -83,6 +83,39 @@ router.get('/db-status', adminAuth, (req, res) => {
   }
 });
 
+// Export active database binary file
+router.get('/export-database', adminAuth, (req, res) => {
+  try {
+    const dbPath = database.getDbPath ? database.getDbPath() : null;
+    if (!dbPath || !fs.existsSync(dbPath)) {
+      return res.status(404).json({ error: 'Database file not found' });
+    }
+    res.download(dbPath, 'zakariaprom.db');
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List all uploaded media files on server
+router.get('/list-uploads', adminAuth, (req, res) => {
+  try {
+    const hostingerBase = '/home/u424368414/domains/zakariaprom.com';
+    const catDir = fs.existsSync(hostingerBase) 
+      ? path.join(hostingerBase, 'uploads', 'categories') 
+      : path.join(__dirname, '..', '..', 'public', 'uploads', 'categories');
+    const prodDir = fs.existsSync(hostingerBase) 
+      ? path.join(hostingerBase, 'uploads', 'products') 
+      : path.join(__dirname, '..', '..', 'public', 'uploads', 'products');
+
+    const catFiles = fs.existsSync(catDir) ? fs.readdirSync(catDir).map(f => ({ name: f, type: 'categories', url: '/uploads/categories/' + f })) : [];
+    const prodFiles = fs.existsSync(prodDir) ? fs.readdirSync(prodDir).map(f => ({ name: f, type: 'products', url: '/uploads/products/' + f })) : [];
+
+    res.json({ categories: catFiles, products: prodFiles });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Deep scan across entire server filesystem for blog posts in any active or historical DB / backups / free pages
 router.get('/deep-find-posts', adminAuth, async (req, res) => {
   try {

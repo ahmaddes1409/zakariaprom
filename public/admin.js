@@ -246,6 +246,57 @@ window.updateOrderStatus = async function(id) {
 // ========== PRODUCTS ==========
 // Products management is handled by products-admin-ui.js
 // ========== CATEGORIES (UPDATED) ==========
+window.updateCatPreview = function(url, previewId) {
+  const preview = document.getElementById(previewId);
+  if (!preview) return;
+  if (!url || !url.trim()) {
+    preview.innerHTML = '<small style="color:#a0aec0;">لا توجد صورة محددة</small>';
+    return;
+  }
+  const cleanUrl = url.trim();
+  preview.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
+    <img src="${cleanUrl}" style="max-width:140px;max-height:90px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;box-shadow:0 2px 4px rgba(0,0,0,0.05);" onerror="this.onerror=null;this.src='/real_logo.png'">
+    <span style="font-size:11px;color:#718096;">معاينة الصورة</span>
+  </div>`;
+};
+
+window.uploadCategoryFile = async function(fileInput, urlInputId, previewId, statusId) {
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) return;
+  
+  const statusEl = document.getElementById(statusId);
+  if (statusEl) statusEl.innerHTML = '<span style="color:#3182ce;font-size:12px;">جاري الرفع إلى السيرفر... ⏳</span>';
+  
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const token = localStorage.getItem('token') || '';
+    const res = await fetch('/api/admin/upload-category-image', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token
+      },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'فشل رفع الصورة');
+    }
+    
+    const urlInput = document.getElementById(urlInputId);
+    if (urlInput) {
+      urlInput.value = data.url;
+    }
+    window.updateCatPreview(data.url, previewId);
+    if (statusEl) statusEl.innerHTML = '<span style="color:#38a169;font-size:12px;font-weight:bold;">✓ تم رفع وتخزين الصورة في السيرفر بنجاح!</span>';
+    toast('تم رفع الصورة وحفظها في السيرفر بنجاح');
+  } catch(err) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:#e53e3e;font-size:12px;">✗ ' + err.message + '</span>';
+    toast(err.message, 'error');
+  }
+};
+
 async function renderCategories() {
   const data = await api('/api/admin/categories');
   const area = document.getElementById('contentArea');
@@ -260,15 +311,18 @@ async function renderCategories() {
       <div class="card-body">
         <div class="table-responsive">
           <table>
-            <thead><tr><th>الفئة (تركي)</th><th>الفئة (عربي)</th><th>الفئة (إنجليزي)</th><th>عدد المنتجات</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <thead><tr><th style="width:60px;">الصورة</th><th>الفئة (تركي)</th><th>الفئة (عربي)</th><th>الفئة (إنجليزي)</th><th>عدد المنتجات</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody>${cats.map(c => `
               <tr style="${c.hidden ? 'opacity:0.5;' : ''}">
+                <td>
+                  <img src="${c.image || '/real_logo.png'}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;" onerror="this.onerror=null;this.src='/real_logo.png'">
+                </td>
                 <td><strong>${c.tr}</strong></td>
                 <td>${c.ar || c.tr}</td>
                 <td>${c.en || c.tr}</td>
                 <td><span class="badge">${c.count || 0}</span></td>
                 <td>${c.hidden ? '<span class="status status-cancelled">مخفي</span>' : '<span class="status status-completed">ظاهر</span>'}</td>
-                <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                   <button class="btn-secondary btn-sm" onclick="editCategory('${encodeURIComponent(c.tr)}')">تعديل</button>
                   <button class="btn-sm ${c.hidden ? 'btn-primary' : 'btn-danger'}" onclick="toggleCategoryVisibility('${encodeURIComponent(c.tr)}', ${!c.hidden})">${c.hidden ? 'إظهار' : 'إخفاء'}</button>
                   ${c.isCustom ? `<button class="btn-sm btn-danger" style="background:#e53e3e;color:#fff;" onclick="deleteCategory('${encodeURIComponent(c.tr)}')">حذف</button>` : ''}
@@ -313,21 +367,42 @@ window.addNewCategory = function() {
       <div class="form-group"><label>الاسم (تركي)</label><input id="ncTr" placeholder="Category name in Turkish" required></div>
       <div class="form-group"><label>الاسم (عربي)</label><input id="ncAr" placeholder="اسم الفئة بالعربي" required></div>
       <div class="form-group"><label>الاسم (إنجليزي)</label><input id="ncEn" placeholder="Category name in English"></div>
-      <div class="form-group"><label>رابط صورة الفئة</label><input id="ncImage" placeholder="https://..."></div>
+      <div class="form-group">
+        <label>صورة الفئة</label>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+          <input type="file" id="ncFile" accept="image/*" style="display:none" onchange="uploadCategoryFile(this, 'ncImage', 'ncImgPreview', 'ncUploadStatus')">
+          <button type="button" class="btn-secondary btn-sm" onclick="document.getElementById('ncFile').click()">📁 رفع صورة من جهازك</button>
+          <span id="ncUploadStatus" style="font-size:12px;color:#718096;"></span>
+        </div>
+        <input id="ncImage" placeholder="https://... أو مسار الصورة المرفوعة" oninput="updateCatPreview(this.value, 'ncImgPreview')">
+      </div>
+      <div id="ncImgPreview" style="margin-bottom:12px;"><small style="color:#a0aec0;">لا توجد صورة محددة</small></div>
       <button type="submit" class="btn-primary">إضافة الفئة</button>
     </form>
   `);
   document.getElementById('addCatForm').onsubmit = async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ والتحقق...'; }
+
     const name_tr = document.getElementById('ncTr').value.trim();
     const name_ar = document.getElementById('ncAr').value.trim();
     const name_en = document.getElementById('ncEn').value.trim();
     const image_url = document.getElementById('ncImage').value.trim();
-    if (!name_ar) return toast('الاسم بالعربي مطلوب', 'error');
+    if (!name_ar) {
+      if (btn) { btn.disabled = false; btn.textContent = origText; }
+      return toast('الاسم بالعربي مطلوب', 'error');
+    }
     
-    await api('/api/admin/custom-categories', { method: 'POST', body: {
+    const res = await api('/api/admin/custom-categories', { method: 'POST', body: {
       name_tr, name_ar, name_en, image_url, sort_order: 0
     }});
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+
+    if (res && res.error) {
+      return toast(res.error, 'error');
+    }
     toast('تم إضافة الفئة بنجاح');
     closeModal();
     renderCategories();
@@ -344,14 +419,29 @@ window.editCustomCategory = async function(id) {
       <div class="form-group"><label>الاسم (تركي)</label><input id="eccTr" value="${cat.name_tr || ''}"></div>
       <div class="form-group"><label>الاسم (عربي)</label><input id="eccAr" value="${cat.name_ar || ''}" required></div>
       <div class="form-group"><label>الاسم (إنجليزي)</label><input id="eccEn" value="${cat.name_en || ''}"></div>
-      <div class="form-group"><label>رابط صورة الفئة</label><input id="eccImage" value="${cat.image_url || ''}" placeholder="https://..."></div>
+      <div class="form-group">
+        <label>صورة الفئة</label>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+          <input type="file" id="eccFile" accept="image/*" style="display:none" onchange="uploadCategoryFile(this, 'eccImage', 'eccImgPreview', 'eccUploadStatus')">
+          <button type="button" class="btn-secondary btn-sm" onclick="document.getElementById('eccFile').click()">📁 رفع صورة من جهازك</button>
+          <span id="eccUploadStatus" style="font-size:12px;color:#718096;"></span>
+        </div>
+        <input id="eccImage" value="${cat.image_url || ''}" placeholder="https://... أو مسار الصورة المرفوعة" oninput="updateCatPreview(this.value, 'eccImgPreview')">
+      </div>
+      <div id="eccImgPreview" style="margin-bottom:12px;">
+        ${cat.image_url ? '<img src="' + cat.image_url + '" style="max-width:140px;max-height:90px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;" onerror="this.onerror=null;this.src=\'/real_logo.png\'">' : '<small style="color:#a0aec0;">لا توجد صورة محددة</small>'}
+      </div>
       <div class="form-group"><label>نشط</label><label class="toggle"><input type="checkbox" id="eccActive" ${cat.active ? 'checked' : ''}><span class="toggle-slider"></span></label></div>
       <button type="submit" class="btn-primary">حفظ</button>
     </form>
   `);
   document.getElementById('editCustomCatForm').onsubmit = async (e) => {
     e.preventDefault();
-    await api('/api/admin/custom-categories/' + id, { method: 'PUT', body: {
+    const btn = e.target.querySelector('button[type="submit"]');
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ والتحقق...'; }
+
+    const res = await api('/api/admin/custom-categories/' + id, { method: 'PUT', body: {
       name_tr: document.getElementById('eccTr').value.trim(),
       name_ar: document.getElementById('eccAr').value.trim(),
       name_en: document.getElementById('eccEn').value.trim(),
@@ -359,6 +449,11 @@ window.editCustomCategory = async function(id) {
       sort_order: cat.sort_order || 0,
       active: document.getElementById('eccActive').checked
     }});
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+
+    if (res && res.error) {
+      return toast(res.error, 'error');
+    }
     toast('تم حفظ التعديلات');
     closeModal();
     renderCategories();
@@ -387,16 +482,30 @@ window.editCategory = async function(catTr) {
       </div>
       <div class="form-group"><label>الاسم (عربي)</label><input id="ecAr" value="${c.ar || ''}"></div>
       <div class="form-group"><label>الاسم (إنجليزي)</label><input id="ecEn" value="${c.en || ''}"></div>
-      <div class="form-group"><label>رابط صورة الفئة</label><input id="ecImage" value="${c.image || ''}" placeholder="https://..."></div>
-      ${c.image ? '<div style="margin-bottom:12px;"><img src="' + c.image + '" style="max-width:200px;border-radius:8px;"></div>' : ''}
+      <div class="form-group">
+        <label>صورة الفئة</label>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+          <input type="file" id="ecFile" accept="image/*" style="display:none" onchange="uploadCategoryFile(this, 'ecImage', 'ecImgPreview', 'ecUploadStatus')">
+          <button type="button" class="btn-secondary btn-sm" onclick="document.getElementById('ecFile').click()">📁 رفع صورة من جهازك</button>
+          <span id="ecUploadStatus" style="font-size:12px;color:#718096;"></span>
+        </div>
+        <input id="ecImage" value="${c.image || ''}" placeholder="https://... أو مسار الصورة المرفوعة" oninput="updateCatPreview(this.value, 'ecImgPreview')">
+      </div>
+      <div id="ecImgPreview" style="margin-bottom:12px;">
+        ${c.image ? '<img src="' + c.image + '" style="max-width:140px;max-height:90px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;" onerror="this.onerror=null;this.src=\'/real_logo.png\'">' : '<small style="color:#a0aec0;">لا توجد صورة محددة</small>'}
+      </div>
       <div class="form-group"><label>إخفاء الفئة</label><label class="toggle"><input type="checkbox" id="ecHidden" ${c.hidden ? 'checked' : ''}><span class="toggle-slider"></span></label></div>
       <button type="submit" class="btn-primary">حفظ</button>
     </form>
   `);
   document.getElementById('editCatForm').onsubmit = async (e) => {
     e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ والتحقق...'; }
+
     const new_tr = document.getElementById('ecTr').value.trim();
-    await api('/api/admin/categories', { method: 'PUT', body: {
+    const res = await api('/api/admin/categories', { method: 'PUT', body: {
       category_tr: cat,
       new_tr: isCustom ? new_tr : undefined,
       ar: document.getElementById('ecAr').value,
@@ -404,7 +513,12 @@ window.editCategory = async function(catTr) {
       image: document.getElementById('ecImage').value,
       hidden: document.getElementById('ecHidden').checked
     }});
-    toast('تم حفظ التعديلات');
+    if (btn) { btn.disabled = false; btn.textContent = origText; }
+
+    if (res && res.error) {
+      return toast(res.error, 'error');
+    }
+    toast('تم حفظ التعديلات بنجاح');
     closeModal();
     renderCategories();
   };

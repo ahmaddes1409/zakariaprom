@@ -171,17 +171,38 @@ function findFileRecursive(dir, filename, depth = 0) {
   return null;
 }
 
-// Auto-recovery function on server boot for all uploaded product images across Hostinger deployments
+// Auto-recovery function on server boot for all uploaded product and category images across Hostinger deployments
 function recoverExistingUploads() {
   const hostingerBase = '/home/u424368414/domains/zakariaprom.com';
   const permDir = fs.existsSync(hostingerBase) 
     ? path.join(hostingerBase, 'uploads', 'products')
     : path.join(__dirname, '..', 'public', 'uploads', 'products');
   const localDir = path.join(__dirname, '..', 'public', 'uploads', 'products');
+
+  const permCatDir = fs.existsSync(hostingerBase)
+    ? path.join(hostingerBase, 'uploads', 'categories')
+    : path.join(__dirname, '..', 'public', 'uploads', 'categories');
+  const localCatDir = path.join(__dirname, '..', 'public', 'uploads', 'categories');
   
   try {
     if (!fs.existsSync(permDir)) fs.mkdirSync(permDir, { recursive: true, mode: 0o777 });
     if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true, mode: 0o777 });
+    if (!fs.existsSync(permCatDir)) fs.mkdirSync(permCatDir, { recursive: true, mode: 0o777 });
+    if (!fs.existsSync(localCatDir)) fs.mkdirSync(localCatDir, { recursive: true, mode: 0o777 });
+  } catch(e) {}
+
+  // Mirror any local category images to permanent storage if present
+  try {
+    if (fs.existsSync(localCatDir) && fs.existsSync(permCatDir)) {
+      const localFiles = fs.readdirSync(localCatDir);
+      for (const f of localFiles) {
+        const src = path.join(localCatDir, f);
+        const dst = path.join(permCatDir, f);
+        if (fs.existsSync(src) && !fs.existsSync(dst)) {
+          fs.copyFileSync(src, dst);
+        }
+      }
+    }
   } catch(e) {}
 
   if (!fs.existsSync(hostingerBase)) return;
@@ -213,6 +234,15 @@ function recoverExistingUploads() {
           if (!fs.existsSync(targetLocal)) {
             try { fs.copyFileSync(full, targetLocal); } catch(e) {}
           }
+        } else if (item.isFile() && (item.name.startsWith('cat_') || dir.endsWith('categories'))) {
+          const targetPerm = path.join(permCatDir, item.name);
+          const targetLocal = path.join(localCatDir, item.name);
+          if (!fs.existsSync(targetPerm)) {
+            try { fs.copyFileSync(full, targetPerm); recoveredCount++; } catch(e) {}
+          }
+          if (!fs.existsSync(targetLocal)) {
+            try { fs.copyFileSync(full, targetLocal); } catch(e) {}
+          }
         }
       }
     } catch(e) {}
@@ -222,7 +252,7 @@ function recoverExistingUploads() {
     if (fs.existsSync(root)) scanAndRecover(root, 0);
   }
   if (recoveredCount > 0) {
-    console.log(`[Uploads Auto-Recovery] Successfully restored ${recoveredCount} uploaded product images!`);
+    console.log(`[Uploads Auto-Recovery] Successfully restored ${recoveredCount} uploaded product/category images!`);
   }
 }
 
@@ -451,15 +481,9 @@ function migrateCategories(db) {
       UPDATE custom_categories SET name_ar = 'آلات حاسبة', name_en = 'Calculators' WHERE name_tr LIKE '%Hesap Makine%';
       UPDATE custom_categories SET name_ar = 'ولاعات', name_en = 'Lighters' WHERE name_tr LIKE '%akmak%' OR name_tr LIKE '%Cakmak%';
 
-      -- Clean up bad car image across all tables
-      DELETE FROM category_images WHERE image_url LIKE '%1qbCRjJ6sDc9oI2WX1u5TAhuXVL%';
-      DELETE FROM custom_categories WHERE image_url LIKE '%1qbCRjJ6sDc9oI2WX1u5TAhuXVL%';
-      UPDATE custom_categories SET image_url = '' WHERE image_url LIKE '%1qbCRjJ6sDc9oI2WX1u5TAhuXVL%';
-
       -- Clean up corrupted Mojikake categories and entries
       DELETE FROM custom_categories WHERE name_tr LIKE '%Ã%' OR name_tr LIKE '%Ä%' OR name_tr LIKE '%Å%' OR name_tr LIKE '%?%' OR name_tr LIKE '%§%';
       DELETE FROM custom_categories WHERE name_tr LIKE '%Kapalı Ürünler%';
-      DELETE FROM custom_categories WHERE id NOT IN (SELECT min(id) FROM custom_categories GROUP BY name_tr);
 
       DELETE FROM translation_overrides WHERE type = 'category' AND (translation LIKE '%ler' OR translation LIKE '%lar' OR original_key IN ('Metal Kalemler', 'Plastik Kalemler', 'Metal Kalem', 'Plastik Kalem'));
       DELETE FROM translation_overrides WHERE original_key LIKE '%Ã%' OR original_key LIKE '%Ä%' OR original_key LIKE '%Å%' OR original_key LIKE '%?%' OR original_key LIKE '%§%';
@@ -479,8 +503,35 @@ function migrateCategories(db) {
       INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Masa Sümenleri', 'ar', 'لبادات مكتب فاخرة');
     `);
 
-    // Migrate Google Drive sharing links to direct image URLs in DB
+    // Auto-migrate Google Drive category images to local permanent storage paths
     try {
+      const driveCategoryMappings = [
+        { id: '1CNT81EXDLb7g09_PsEooJquM755gDt9M', cat: 'Kristal Plaketler', local: '/uploads/categories/kristal_plaketler.jpg' },
+        { id: '1bmtNvZjNMdl9yF-Q73HmLeA3z24b55b5', cat: 'Telefon Standları', local: '/uploads/categories/telefon_standlari.jpg' },
+        { id: '1qbCRjJ6sDc9oI2WX1u5TAhuXVLDcSbpe', cat: 'Çakmaklar', local: '/uploads/categories/cakmaklar.jpg' },
+        { id: '1qbCRjJ6sDc9oI2WX1u5TAhuXVL', cat: 'Çakmaklar', local: '/uploads/categories/cakmaklar.jpg' },
+        { id: '1hl7QNKuUmYWJHJUlScZX3BAMHNMh_TKX', cat: 'Şapka', local: '/uploads/categories/sapka.jpg' },
+        { id: '1JUuFo_LWcfrAWYnZ_kfSO5mInrtRaSuo', cat: 'Bombe Cam Duvar Saatleri', local: '/uploads/categories/bombe_cam_duvar_saatleri.jpg' },
+        { id: '11vCOqcV7XqDNh6Uqk4AXgERtRXMkP1b7', cat: 'Metal Kalem', local: '/uploads/categories/metal_kalem.jpg' },
+        { id: '1PDkBWHJbQxTZlyfkRgn-YTg8M3Bnrl0u', cat: 'Kalemler', local: '/uploads/categories/kalemler.jpg' },
+        { id: '1g9lzrBa4hYxgOxKeJ3THcCTLH8m3AQPg', cat: 'Kutulu Setler', local: '/uploads/categories/kutulu_setler.jpg' },
+        { id: '1gk2ATLras9bBOnsA_iRCn4wAlnsLfIxJ', cat: 'Kalem Setleri', local: '/uploads/categories/kalem_setleri.jpg' },
+        { id: '1iOrDijotii7kSvLSiJH4KRIedbYcDvAo', cat: 'Kutu - Aksesuar', local: '/uploads/categories/kutu_aksesuar.jpg' },
+        { id: '1xeL1Isp4AY1CvU8s9ftYqS1CvM5EttoN', cat: 'Çeşitli Araç Gereç', local: '/uploads/categories/cesitli_arac_gerec.jpg' },
+        { id: '1kp7YC38qGlISIRHI2IgIyl1cYC0I5QcP', cat: 'Masaüstü Ürünler', local: '/uploads/categories/masaustu_urunler.jpg' },
+        { id: '1KdOYsITf0ihJerWkaFdx9fzwXPaMGIHl', cat: 'Matbaa Ürünleri', local: '/uploads/categories/matbaa_urunleri.jpg' },
+        { id: '1uYSL-1L3NA0YJNxUZDMKzpewVwG78l7L', cat: 'Ajanda -Defter', local: '/uploads/categories/ajanda_defter.jpg' },
+        { id: '1Y516j-U5uUmy-scZE5QgwI0_xQsMHxfH', cat: 'Kırtasiye Ürünleri', local: '/uploads/categories/kirtasiye_urunleri.jpg' },
+        { id: '1Ua7oghMRmOmredWEdjLacU_Xr4XMlkMp', cat: 'Ofset Baskı', local: '/uploads/categories/ofset_baski.jpg' }
+      ];
+
+      for (const m of driveCategoryMappings) {
+        db.prepare("UPDATE category_images SET image_url = ? WHERE image_url LIKE ? OR category_name = ?").run(m.local, `%${m.id}%`, m.cat);
+        db.prepare("UPDATE custom_categories SET image_url = ? WHERE image_url LIKE ? OR name_tr = ?").run(m.local, `%${m.id}%`, m.cat);
+        db.prepare("INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)").run(m.cat, m.local);
+      }
+
+      // Migrate any remaining Google Drive links to normalized format
       const driveRows = db.prepare("SELECT id, image_url FROM custom_categories WHERE image_url LIKE '%drive.google.com%'").all();
       for (const r of driveRows) {
         const norm = normalizeImageUrl(r.image_url);
@@ -502,7 +553,9 @@ function migrateCategories(db) {
           db.prepare("UPDATE banners SET image_url = ? WHERE id = ?").run(norm, r.id);
         }
       }
-    } catch(imgErr) {}
+    } catch(imgErr) {
+      console.error("[Category Migration] Error:", imgErr);
+    }
 
     try {
       // Fix misplaced Google Drive URLs in custom_categories name_tr for Ofset Baskı
@@ -1075,18 +1128,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       const imageMap = {};
       images.forEach(i => { 
         if (i && i.category_name) {
-          // Skip bad car image for Cakmaklar
-          if (i.image_url && i.image_url.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) return;
           imageMap[i.category_name] = i.image_url; 
         }
       });
 
-      // Build custom categories image map as fallback (skipping bad car image)
+      // Build custom categories image map as fallback
       const allCustomCats = safeQuery('SELECT name_tr, image_url, name_ar, name_en FROM custom_categories');
       const customImageMap = {};
       allCustomCats.forEach(cc => { 
         if (cc && cc.name_tr && cc.image_url) {
-          if (cc.image_url.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) return;
           customImageMap[cc.name_tr] = cc.image_url; 
         }
       });
@@ -1098,13 +1148,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         if (!r || !r.category_tr || prodImageMap[r.category_tr]) return;
         try {
           const parsed = typeof r.images === 'string' ? JSON.parse(r.images) : r.images;
-          if (Array.isArray(parsed) && parsed[0] && !parsed[0].includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) {
+          if (Array.isArray(parsed) && parsed[0]) {
             prodImageMap[r.category_tr] = parsed[0];
-          } else if (typeof r.images === 'string' && r.images.startsWith('http') && !r.images.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) {
+          } else if (typeof r.images === 'string' && r.images.startsWith('http')) {
             prodImageMap[r.category_tr] = r.images.split(',')[0].trim();
           }
         } catch(e) {
-          if (typeof r.images === 'string' && r.images.startsWith('http') && !r.images.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL')) {
+          if (typeof r.images === 'string' && r.images.startsWith('http')) {
             prodImageMap[r.category_tr] = r.images.split(',')[0].trim();
           }
         }
@@ -1125,11 +1175,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         if (typeof catAr === 'string') catAr = fixMojikake(catAr).replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
         if (typeof catEn === 'string') catEn = fixMojikake(catEn).replace(/ler$/gi, '').replace(/lar$/gi, '').trim();
 
-        // Image priority: 1) explicit category_images (not bad car) -> 2) custom_categories image -> 3) product image -> 4) category fallback keyword image
+        // Image priority: 1) explicit category_images -> 2) custom_categories image -> 3) product image -> 4) category fallback keyword image
         const xmlProdImg = (products.find(p => {
           if (!p) return false;
           const pCat = p.topCategory?.tr || (p.categories?.tr && p.categories.tr[0]);
-          return (pCat === cleanTr || pCat === cat.tr) && Array.isArray(p.images) && p.images[0] && !p.images[0].includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL');
+          return (pCat === cleanTr || pCat === cat.tr) && Array.isArray(p.images) && p.images[0];
         })?.images?.[0]) || '';
 
         const rawImg = imageMap[cleanTr] || customImageMap[cleanTr] || prodImageMap[cleanTr] || prodImageMap[cat.tr] || xmlProdImg || getCategoryFallbackImage(cleanTr);
@@ -1163,7 +1213,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         if (cNameTr.includes('Ã') || cNameTr.includes('Ä') || cNameTr.includes('Å') || cNameTr.includes('§')) return;
         const normCc = normalizeCategoryName(cNameTr);
         if (!hiddenCategorySet.has(cNameTr) && !hiddenCategorySet.has(normCc) && !result.find(r => r && (r.tr === cNameTr || normalizeCategoryName(r.tr) === normCc))) {
-          const rawCustomImg = imageMap[cNameTr] || (cImg && !cImg.includes('1qbCRjJ6sDc9oI2WX1u5TAhuXVL') ? cImg : '') || getCategoryFallbackImage(cNameTr);
+          const rawCustomImg = imageMap[cNameTr] || cImg || getCategoryFallbackImage(cNameTr);
           const catImage = normalizeImageUrl(rawCustomImg);
           const catOverrides = overrideMap[cNameTr] || {};
           result.push({

@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const express = require('express');
+const multer = require('multer');
 const database = require('../database');
 const { adminAuth, adminLogin } = require('../auth');
 const { fetchAndParseProducts, getCategories } = require('../dataService');
@@ -1271,6 +1272,136 @@ router.put('/products/:id/visibility', adminAuth, async (req, res) => {
   }
 });
 
+// Category Uploads Directory & Multer setup
+function getHostingerCategoryUploadsDir() {
+  const hostingerBase = '/home/u424368414/domains/zakariaprom.com';
+  if (fs.existsSync(hostingerBase)) {
+    const perm = path.join(hostingerBase, 'uploads', 'categories');
+    if (!fs.existsSync(perm)) {
+      try { fs.mkdirSync(perm, { recursive: true, mode: 0o777 }); } catch(e) {}
+    }
+    return perm;
+  }
+  return null;
+}
+
+const categoryUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = path.join(__dirname, '..', '..', 'public', 'uploads', 'categories');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      getHostingerCategoryUploadsDir();
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname) || '.jpg';
+      cb(null, 'cat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6) + ext);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+async function cacheExternalCategoryImageUrl(url, catName = 'category') {
+  if (!url || typeof url !== 'string') return '';
+  url = url.trim();
+
+  // If already a local uploaded file, keep it
+  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
+    return url.startsWith('/') ? url : '/' + url;
+  }
+
+  // Check if it's an external URL
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return url;
+  }
+
+  // Check if it matches a Google Drive link
+  let downloadUrl = url;
+  const driveFileMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  const driveIdMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  const userContentMatch = url.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+  const driveId = driveFileMatch ? driveFileMatch[1] : (driveIdMatch ? driveIdMatch[1] : (userContentMatch ? userContentMatch[1] : null));
+
+  if (driveId) {
+    downloadUrl = `https://lh3.googleusercontent.com/d/${driveId}`;
+  }
+
+  try {
+    const axios = require('axios');
+    const response = await axios.get(downloadUrl, {
+      responseType: 'arraybuffer',
+      timeout: 12000,
+      maxRedirects: 5,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      validateStatus: status => status >= 200 && status < 400
+    });
+
+    const contentType = (response.headers['content-type'] || '').toLowerCase();
+    
+    // If it returned HTML, it redirected to Google Login page because permissions are restricted
+    if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
+      console.warn(`[Category Image] URL returned HTML instead of image (likely Google Login redirect): ${url}`);
+      throw new Error('رابط Google Drive هذا غير متاح للعامة أو يتطلب تسجيل الدخول. يرجى ضبط مشاركة الملف في Drive إلى "أي شخص لديه الرابط"، أو استخدم زر "رفع صورة من جهازك" لرفع الصورة مباشرة.');
+    }
+
+    let ext = '.jpg';
+    if (contentType.includes('png')) ext = '.png';
+    else if (contentType.includes('webp')) ext = '.webp';
+    else if (contentType.includes('gif')) ext = '.gif';
+    else if (contentType.includes('svg')) ext = '.svg';
+
+    const safeName = (catName || 'cat')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/gi, '_')
+      .replace(/_+/g, '_')
+      .substring(0, 20);
+    const filename = `cat_${safeName}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}${ext}`;
+
+    const localDir = path.join(__dirname, '..', '..', 'public', 'uploads', 'categories');
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+    const filePath = path.join(localDir, filename);
+
+    fs.writeFileSync(filePath, Buffer.from(response.data));
+
+    const permDir = getHostingerCategoryUploadsDir();
+    if (permDir) {
+      try {
+        fs.writeFileSync(path.join(permDir, filename), Buffer.from(response.data));
+      } catch(e) {}
+    }
+
+    console.log(`[Category Image Cached] Saved ${url} -> /uploads/categories/${filename}`);
+    return '/uploads/categories/' + filename;
+  } catch (err) {
+    console.error(`[Category Image Cache Error] Failed to download ${url}:`, err.message);
+    if (err.message.includes('Google Drive') || err.message.includes('مشاركة الملف')) throw err;
+    return url;
+  }
+}
+
+// Upload category image endpoint
+router.post('/upload-category-image', adminAuth, categoryUpload.single('image'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'لم يتم اختيار أي ملف صورة' });
+    }
+    const filename = req.file.filename;
+    const localPath = path.join(__dirname, '..', '..', 'public', 'uploads', 'categories', filename);
+    const permDir = getHostingerCategoryUploadsDir();
+    if (permDir && fs.existsSync(localPath)) {
+      try {
+        fs.copyFileSync(localPath, path.join(permDir, filename));
+      } catch(e) {}
+    }
+    const publicUrl = '/uploads/categories/' + filename;
+    res.json({ success: true, url: publicUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ===== CATEGORIES MANAGEMENT =====
 router.get('/categories', adminAuth, async (req, res) => {
   try {
@@ -1406,7 +1537,7 @@ router.get('/categories/:name', adminAuth, async (req, res) => {
   }
 });
 
-router.put('/categories', adminAuth, (req, res) => {
+router.put('/categories', adminAuth, async (req, res) => {
   const db = getDb();
   const { category_tr, new_tr, ar, en, hidden, image } = req.body;
   if (!category_tr) return res.status(400).json({ error: 'category_tr required' });
@@ -1426,6 +1557,16 @@ router.put('/categories', adminAuth, (req, res) => {
     } catch(renErr) {}
   }
 
+  // Handle caching image if external
+  let finalImage = image;
+  if (image !== undefined && image) {
+    try {
+      finalImage = await cacheExternalCategoryImageUrl(image, category_tr);
+    } catch(imgErr) {
+      return res.status(400).json({ error: imgErr.message });
+    }
+  }
+
   // Update custom_categories table if present
   const customCat = db.prepare("SELECT * FROM custom_categories WHERE name_tr = ? OR name_tr = ?").get(category_tr, normCat);
   if (customCat) {
@@ -1434,7 +1575,7 @@ router.put('/categories', adminAuth, (req, res) => {
       const params = [];
       if (ar) { updates.push('name_ar = ?'); params.push(ar); }
       if (en) { updates.push('name_en = ?'); params.push(en); }
-      if (image !== undefined) { updates.push('image_url = ?'); params.push(image || ''); }
+      if (image !== undefined) { updates.push('image_url = ?'); params.push(finalImage || ''); }
       if (hidden !== undefined) { updates.push('active = ?'); params.push(hidden ? 0 : 1); }
       if (updates.length > 0) {
         params.push(customCat.id);
@@ -1487,10 +1628,10 @@ router.put('/categories', adminAuth, (req, res) => {
 
   // Handle image
   if (image !== undefined) {
-    if (image) {
-      db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(category_tr, image);
+    if (finalImage) {
+      db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(category_tr, finalImage);
       if (normCat !== category_tr) {
-        db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(normCat, image);
+        db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(normCat, finalImage);
       }
     } else {
       db.prepare('DELETE FROM category_images WHERE category_name = ? OR category_name = ?').run(category_tr, normCat);
@@ -1498,7 +1639,7 @@ router.put('/categories', adminAuth, (req, res) => {
   }
 
   database.saveDatabase();
-  res.json({ success: true });
+  res.json({ success: true, image: finalImage });
 });
 
 router.get('/categories/hidden', adminAuth, (req, res) => {
@@ -1569,7 +1710,7 @@ router.get('/custom-categories', adminAuth, (req, res) => {
   }
 });
 
-router.post('/custom-categories', adminAuth, (req, res) => {
+router.post('/custom-categories', adminAuth, async (req, res) => {
   try {
     const db = getDb();
     const { name_tr, name_ar, name_en, image_url, sort_order = 0 } = req.body;
@@ -1581,11 +1722,20 @@ router.post('/custom-categories', adminAuth, (req, res) => {
       return res.status(400).json({ error: 'Category name is required' });
     }
 
+    let finalImage = image_url || '';
+    if (image_url) {
+      try {
+        finalImage = await cacheExternalCategoryImageUrl(image_url, cleanTr);
+      } catch(imgErr) {
+        return res.status(400).json({ error: imgErr.message });
+      }
+    }
+
     const stmt = db.prepare(`
       INSERT INTO custom_categories (name_tr, name_ar, name_en, image_url, sort_order, active, created_at)
       VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
     `);
-    stmt.run(cleanTr, cleanAr, cleanEn, image_url || '', sort_order);
+    stmt.run(cleanTr, cleanAr, cleanEn, finalImage || '', sort_order);
 
     if (cleanAr) {
       db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'ar'`).run(cleanTr);
@@ -1595,18 +1745,18 @@ router.post('/custom-categories', adminAuth, (req, res) => {
       db.prepare(`DELETE FROM translation_overrides WHERE type = 'category' AND original_key = ? AND lang = 'en'`).run(cleanTr);
       db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)`).run(cleanTr, cleanEn);
     }
-    if (image_url) {
-      db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(cleanTr, image_url);
+    if (finalImage) {
+      db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(cleanTr, finalImage);
     }
 
     database.saveDatabase();
-    res.json({ success: true, message: 'Category added successfully' });
+    res.json({ success: true, message: 'Category added successfully', image: finalImage });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.put('/custom-categories/:id', adminAuth, (req, res) => {
+router.put('/custom-categories/:id', adminAuth, async (req, res) => {
   try {
     const db = getDb();
     const { name_tr, name_ar, name_en, image_url, active, sort_order } = req.body;
@@ -1614,12 +1764,21 @@ router.put('/custom-categories/:id', adminAuth, (req, res) => {
     const existing = db.prepare('SELECT * FROM custom_categories WHERE id = ?').get(catId);
     if (!existing) return res.status(404).json({ error: 'Category not found' });
 
+    let finalImage = image_url;
+    if (image_url !== undefined && image_url) {
+      try {
+        finalImage = await cacheExternalCategoryImageUrl(image_url, existing.name_tr);
+      } catch(imgErr) {
+        return res.status(400).json({ error: imgErr.message });
+      }
+    }
+
     const updates = [];
     const params = [];
     if (name_tr !== undefined) { updates.push('name_tr = ?'); params.push(name_tr); }
     if (name_ar !== undefined) { updates.push('name_ar = ?'); params.push(name_ar); }
     if (name_en !== undefined) { updates.push('name_en = ?'); params.push(name_en); }
-    if (image_url !== undefined) { updates.push('image_url = ?'); params.push(image_url); }
+    if (image_url !== undefined) { updates.push('image_url = ?'); params.push(finalImage || ''); }
     if (active !== undefined) { updates.push('active = ?'); params.push(active ? 1 : 0); }
     if (sort_order !== undefined) { updates.push('sort_order = ?'); params.push(sort_order); }
 
@@ -1638,8 +1797,8 @@ router.put('/custom-categories/:id', adminAuth, (req, res) => {
       db.prepare(`INSERT INTO translation_overrides (type, original_key, lang, translation, updated_at) VALUES ('category', ?, 'en', ?, CURRENT_TIMESTAMP)`).run(targetTr, name_en);
     }
     if (image_url !== undefined) {
-      if (image_url) {
-        db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(targetTr, image_url);
+      if (finalImage) {
+        db.prepare('INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(targetTr, finalImage);
       } else {
         db.prepare('DELETE FROM category_images WHERE category_name = ?').run(targetTr);
       }
@@ -1654,7 +1813,7 @@ router.put('/custom-categories/:id', adminAuth, (req, res) => {
     }
 
     database.saveDatabase();
-    res.json({ success: true });
+    res.json({ success: true, image: finalImage });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2050,7 +2209,6 @@ router.delete('/custom-categories/:id', adminAuth, (req, res) => {
 
 
 // ========== LOCAL PRODUCTS (Add/Edit/Delete manual products) ==========
-const multer = require('multer');
 
 function getHostingerUploadsDir() {
   const hostingerBase = '/home/u424368414/domains/zakariaprom.com';

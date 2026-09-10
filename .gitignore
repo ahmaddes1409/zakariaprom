@@ -34,7 +34,8 @@ client/public/__manus__/version.json
 public/__manus__/
 
 # Uploaded files (exist on server)
-public/uploads/
+public/uploads/*
+!public/uploads/categories/
 
 # Dev tools (not needed for deployment)
 pnpm-lock.yaml

@@ -4,6 +4,23 @@ const { fetchAndParseProducts, searchProducts, getCategories } = require('../dat
 
 function getDb() { return database.db; }
 
+function getActiveProducts() {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM local_products WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%'").all();
+  return rows.map(lp => {
+    let images = [];
+    try { images = JSON.parse(lp.images || '[]'); } catch(e) { if (lp.images) images = [lp.images]; }
+    return {
+      id: lp.product_id || ('local_' + lp.id),
+      model: lp.model || '',
+      name: { tr: lp.name_tr || '', ar: lp.name_ar || lp.name_tr || '', en: lp.name_en || lp.name_tr || '' },
+      price: lp.price || 0,
+      images,
+      categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || ''], en: [lp.category_en || ''] }
+    };
+  });
+}
+
 const router = express.Router();
 
 // Get chatbot config
@@ -63,7 +80,7 @@ router.post('/message', async (req, res) => {
   // 2. Try product search if no FAQ match
   if (!response || response.confidence < 0.3) {
     try {
-      const products = await fetchAndParseProducts();
+      const products = getActiveProducts();
       const results = searchProducts(products, query, lang);
       if (results.length > 0) {
         const topResults = results.slice(0, 5);
@@ -96,7 +113,7 @@ router.post('/message', async (req, res) => {
   // 3. Try category suggestion
   if (!response) {
     try {
-      const products = await fetchAndParseProducts();
+      const products = getActiveProducts();
       const categories = getCategories(products);
       const matchedCat = categories.find(c => {
         return query.includes(c.tr.toLowerCase()) || 

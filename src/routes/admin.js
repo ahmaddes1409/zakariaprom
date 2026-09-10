@@ -495,206 +495,47 @@ router.post('/merge-amendments', adminAuth, async (req, res) => {
   }
 });
 
-// Synchronize Karmedya XML Feed directly into permanent database
+// Synchronize Karmedya XML Feed permanently disabled in favor of Etkin Promosyon
 router.post('/sync-karmedya-xml', adminAuth, async (req, res) => {
-  try {
-    const { parseStringPromise } = require('xml2js');
-    const { translateProductName, fixMojikake } = require('../translations');
-    const XML_URL = 'https://karmedya.com/xml/xml_export_product.xml';
-
-    console.log('[Admin XML Sync] Fetching live XML feed from:', XML_URL);
-    const xmlRes = await fetch(XML_URL, {
-      signal: AbortSignal.timeout(20000),
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-    });
-    if (!xmlRes.ok) {
-      throw new Error(`Failed to fetch XML feed, status: ${xmlRes.status}`);
-    }
-    const xmlText = await xmlRes.text();
-    const result = await parseStringPromise(xmlText, { explicitArray: false, trim: true });
-    if (!result || !result.SHOP || !result.SHOP.SHOPITEM) {
-      throw new Error('Invalid XML feed structure');
-    }
-    const rawItems = Array.isArray(result.SHOP.SHOPITEM) ? result.SHOP.SHOPITEM : [result.SHOP.SHOPITEM];
-
-    const TOP_CATEGORY_MAP = {
-      'Kalemler': { ar: 'أقلام دعاية وإعلان', en: 'Promotional Pens' },
-      'Teknoloji Ürünleri': { ar: 'منتجات تكنولوجية وبادج', en: 'Technology Products' },
-      'Teknoloji': { ar: 'منتجات تكنولوجية وبادج', en: 'Technology Products' },
-      'Termos - Matara': { ar: 'حافظات حرارية وترمس', en: 'Thermos & Flasks' },
-      'Termos': { ar: 'حافظات حرارية وترمس', en: 'Thermos & Flasks' },
-      'Anahtarlık - Rozet': { ar: 'ميداليات مفاتيح وشعارات', en: 'Keychains & Badges' },
-      'Anahtarlık': { ar: 'ميداليات مفاتيح وشعارات', en: 'Keychains & Badges' },
-      'Saatler': { ar: 'ساعات حائط ومكتب', en: 'Clocks & Watches' },
-      'Kalem Setleri': { ar: 'أطقم أقلام فاخرة', en: 'Pen Sets' },
-      'Kırtasiye Ürünleri': { ar: 'أدوات قرطاسية ومكتبية', en: 'Stationery Products' },
-      'Kırtasiye': { ar: 'أدوات قرطاسية ومكتبية', en: 'Stationery Products' },
-      'Ajanda -Defter': { ar: 'أجندات ودفاتر 2026', en: 'Agendas & Notebooks' },
-      'Ajanda': { ar: 'أجندات ودفاتر 2026', en: 'Agendas & Notebooks' },
-      'Kutulu Setler': { ar: 'أطقم هدايا دعائية', en: 'Gift Sets' },
-      'Çakmaklar': { ar: 'قداحات وولاعات', en: 'Lighters' },
-      'Çakmak': { ar: 'قداحات وولاعات', en: 'Lighters' },
-      'Masaüstü Ürünler': { ar: 'مستلزمات وطقم مكتب', en: 'Desk Accessories' },
-      'Çanta': { ar: 'حقائب دعائية', en: 'Bags' },
-      'Matbaa Ürünleri': { ar: 'مطبوعات ورقية وتقاويم', en: 'Printing & Calendars' },
-      'Seramik - Cam Ürünler': { ar: 'أكواب سيراميك وزجاج', en: 'Mugs & Glassware' },
-      'Kutu - Aksesuar': { ar: 'علب وهدايا', en: 'Boxes & Accessories' },
-      'Çeşitli Araç Gereç': { ar: 'أدوات ومستلزمات متنوعة', en: 'Miscellaneous Tools' },
-      'Plaket - Ödül Ürünleri': { ar: 'دروع تذكارية وجوائز', en: 'Plaques & Awards' },
-      'Plaket': { ar: 'دروع تذكارية وجوائز', en: 'Plaques & Awards' },
-      'Byrak': { ar: 'أعلام ورايات', en: 'Flags & Banners' },
-      'اعلام': { ar: 'أعلام ورايات', en: 'Flags & Banners' },
-      'Şapka - Tişört': { ar: 'قبعات وتيشيرتات', en: 'Caps & T-Shirts' },
-      'VIP Setler': { ar: 'مجموعات VIP فاخرة', en: 'VIP Gift Sets' }
-    };
-
-    function extractCats(item) {
-      if (!item.CATEGORIES || !item.CATEGORIES.CATEGORY) return [];
-      const c = item.CATEGORIES.CATEGORY;
-      return Array.isArray(c) ? c : [c];
-    }
-
-    function cleanCatStr(rawStr) {
-      if (!rawStr) return '';
-      let clean = rawStr;
-      if (clean.includes('|')) clean = clean.split('|')[0].trim();
-      const parts = clean.split('>').map(p => p.trim()).filter(Boolean);
-      const unique = [];
-      for (const p of parts) {
-        if (unique.length === 0 || unique[unique.length - 1] !== p) unique.push(p);
-      }
-      return unique.join(' > ');
-    }
-
-    function getCatTrans(catTr) {
-      if (!catTr) return { tr: '', ar: '', en: '' };
-      const parts = catTr.split(' > ');
-      const topTr = parts[0].trim();
-      const topMap = TOP_CATEGORY_MAP[topTr] || { ar: topTr, en: topTr };
-      if (parts.length > 1) {
-        const subTr = parts.slice(1).join(' > ');
-        return { tr: catTr, ar: `${topMap.ar} > ${subTr}`, en: `${topMap.en} > ${subTr}` };
-      }
-      return { tr: topTr, ar: topMap.ar, en: topMap.en };
-    }
-
-    const db = database.db;
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO local_products 
-      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `);
-
-    db.exec('BEGIN TRANSACTION');
-
-    let inserted = 0;
-    const categoryMap = new Map();
-
-    for (const item of rawItems) {
-      const allCats = extractCats(item).filter(c => c && c !== '--Kapalı Ürünler Kategorisi');
-      if (allCats.length === 0) continue;
-      const textCats = allCats.filter(c => !String(c).match(/^\d+$/));
-      const chosenCat = textCats.length > 0 ? textCats.reduce((a, b) => b.length > a.length ? b : a, textCats[0]) : 'Promosyon Ürünleri';
-
-      const cleanCatTr = cleanCatStr(chosenCat);
-      const catTrans = getCatTrans(cleanCatTr);
-
-      const topCatTr = cleanCatTr.split(' > ')[0].trim();
-      if (topCatTr && !categoryMap.has(topCatTr)) {
-        categoryMap.set(topCatTr, getCatTrans(topCatTr));
-      }
-
-      const images = [];
-      if (item.IMAGES) {
-        for (let i = 1; i <= 10; i++) {
-          const k = `IMAGE_${i}`;
-          if (item.IMAGES[k] && typeof item.IMAGES[k] === 'string' && item.IMAGES[k].trim()) {
-            images.push(item.IMAGES[k].trim());
-          }
-        }
-      }
-
-      const nameTr = fixMojikake(item.NAME || '');
-      const nameAr = translateProductName(nameTr, 'ar');
-      const nameEn = translateProductName(nameTr, 'en');
-
-      let desc = item.DESCRIPTION || '';
-      if (typeof desc === 'string') {
-        desc = desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      } else {
-        desc = nameTr;
-      }
-
-      const priceStr = (item.PRICE || '0').toString().replace('TL', '').replace(',', '.').trim();
-      const price = parseFloat(priceStr) || 0;
-      const quantity = parseInt(item.QUANTITY) || 0;
-      const productId = (item.PRODUCT_ID || `xml_${inserted}`).toString();
-
-      stmt.run([
-        productId,
-        nameTr,
-        nameAr,
-        nameEn,
-        item.MODEL || '',
-        desc,
-        price,
-        quantity,
-        catTrans.tr,
-        catTrans.ar,
-        catTrans.en,
-        JSON.stringify([]),
-        JSON.stringify([]),
-        JSON.stringify(images)
-      ]);
-      inserted++;
-    }
-
-    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
-    for (const [key, c] of categoryMap) {
-      if (c && c.tr) {
-        try { catStmt.run(c.tr, c.ar || c.tr, c.en || c.tr); } catch(e) {}
-      }
-    }
-
-    db.exec('COMMIT');
-    database.saveDatabase();
-
-    const totalRow = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
-    const xmlRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
-    const etkinRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
-
-    res.json({
-      success: true,
-      message: `Successfully synced ${inserted} Karmedya XML products into database`,
-      inserted,
-      total: totalRow ? totalRow.count : 0,
-      xml: xmlRow ? xmlRow.count : 0,
-      etkin: etkinRow ? etkinRow.count : 0
-    });
-  } catch(err) {
-    try { database.db.exec('ROLLBACK'); } catch(e) {}
-    res.status(500).json({ success: false, error: err.message, stack: err.stack });
-  }
+  res.json({
+    success: false,
+    message: 'تم إيقاف مزامنة خلاصة Karmedya بشكل دائم والاعتماد الحصري على منتجات Etkin Promosyon.'
+  });
 });
 
-// Sync All feeds (Karmedya XML + Etkin API) into permanent database
+// Sync All feeds (Purge Karmedya + Sync Etkin API) into permanent database
 router.post('/sync-all-feeds', adminAuth, async (req, res) => {
   try {
-    const { syncEtkinProducts } = require('../services/etkinService');
-    const etkinResult = await syncEtkinProducts(database.db, database.saveDatabase);
-
     const db = database.db;
+
+    // 1. Purge any Karmedya products
+    const purgeResult = db.prepare(`
+      DELETE FROM local_products 
+      WHERE (
+        (product_id NOT LIKE 'etkin_%' AND (product_id IS NOT NULL AND product_id != ''))
+        AND product_id NOT LIKE 'prod_%' 
+        AND product_id NOT LIKE 'local_%' 
+        AND id NOT IN (133477, 137094, 137095)
+      ) OR images LIKE '%karmedya.com%'
+    `).run();
+    console.log(`[Admin Sync All Feeds] Purged ${purgeResult.changes} Karmedya products.`);
+
+    // 2. Sync Etkin API products
+    const { syncEtkinProducts } = require('../services/etkinService');
+    const etkinResult = await syncEtkinProducts(db, database.saveDatabase);
+
     const totalRow = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
-    const xmlRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
     const etkinRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
+    const localRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND images NOT LIKE '%karmedya.com%' AND hidden = 0").get();
 
     res.json({
       success: true,
       etkin: etkinResult,
       dbCounts: {
         total: totalRow ? totalRow.count : 0,
-        xml: xmlRow ? xmlRow.count : 0,
-        etkin: etkinRow ? etkinRow.count : 0
+        xml: 0,
+        etkin: etkinRow ? etkinRow.count : 0,
+        local: localRow ? localRow.count : 0
       }
     });
   } catch(err) {
@@ -859,11 +700,8 @@ router.get('/translations/products', adminAuth, async (req, res) => {
     const db = getDb();
     const { page = 1, limit = 20, search = '' } = req.query;
     
-    // Read all products from local_products database table
-    let products = db.prepare('SELECT product_id as id, model, name_tr, name_ar, name_en FROM local_products WHERE hidden = 0').all();
-    if (products.length === 0) {
-      products = await fetchAndParseProducts();
-    }
+    // Read all products from local_products database table (excluding Karmedya)
+    let products = db.prepare("SELECT product_id as id, model, name_tr, name_ar, name_en FROM local_products WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%'").all();
     
     // Apply search filter
     if (search) {
@@ -954,16 +792,16 @@ router.post('/products/show', adminAuth, (req, res) => {
 router.get('/product-counts', adminAuth, (req, res) => {
   try {
     const db = getDb();
-    const totalRow = db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
-    const xmlRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND (is_local IS NULL OR is_local = 0) AND hidden = 0").get();
     const etkinRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
-    const localRow = db.prepare("SELECT count(*) as count FROM local_products WHERE (is_local = 1 OR product_id LIKE 'local_%') AND hidden = 0").get();
+    const localRow = db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND images NOT LIKE '%karmedya.com%' AND hidden = 0").get();
+    const etkin = etkinRow ? etkinRow.count : 0;
+    const local = localRow ? localRow.count : 0;
 
     res.json({
-      total: totalRow ? totalRow.count : 0,
-      xml: xmlRow ? xmlRow.count : 0,
-      etkin: etkinRow ? etkinRow.count : 0,
-      local: localRow ? localRow.count : 0
+      total: etkin + local,
+      xml: 0,
+      etkin,
+      local
     });
   } catch (err) {
     res.status(500).json({ error: err.message, total: 0, xml: 0, etkin: 0, local: 0 });
@@ -976,7 +814,7 @@ router.get('/products', adminAuth, async (req, res) => {
     const db = getDb();
     const { search, category, source = 'all', page = 1, limit = 20 } = req.query;
 
-    let dbRows = db.prepare('SELECT * FROM local_products').all();
+    let dbRows = db.prepare("SELECT * FROM local_products WHERE images NOT LIKE '%karmedya.com%'").all();
     let products = dbRows.map(lp => {
       let images = [];
       try { images = JSON.parse(lp.images || '[]'); } catch(e) { if (lp.images) images = [lp.images]; }
@@ -987,7 +825,7 @@ router.get('/products', adminAuth, async (req, res) => {
 
       const pId = lp.product_id || ('local_' + lp.id);
       const isEtkin = pId.startsWith('etkin_');
-      const isLocal = lp.is_local === 1 || pId.startsWith('local_');
+      const isLocal = !isEtkin;
 
       return {
         id: pId,
@@ -1008,15 +846,9 @@ router.get('/products', adminAuth, async (req, res) => {
         sizes,
         isEtkin,
         isLocal,
-        source: isEtkin ? 'etkin' : (isLocal ? 'local' : 'xml')
+        source: isEtkin ? 'etkin' : 'local'
       };
     });
-
-    // Fallback if local_products table is empty
-    if (products.length === 0) {
-      const xml = await fetchAndParseProducts();
-      products = xml.map(p => ({ ...p, source: 'xml' }));
-    }
 
     // Source filter
     if (source && source !== 'all') {
@@ -1116,9 +948,6 @@ router.get('/products/:id', adminAuth, async (req, res) => {
         colors,
         sizes
       };
-    } else {
-      const products = await fetchAndParseProducts();
-      product = products.find(p => p.id === pId || p.model === pId);
     }
 
     if (!product) return res.status(404).json({ error: 'Product not found' });
@@ -1409,7 +1238,7 @@ router.get('/categories', adminAuth, async (req, res) => {
     
     // Read all products from local_products database table
     const { fixMojikake, translateCategory } = require('../translations');
-    let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+    let dbRows = db.prepare("SELECT * FROM local_products WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%'").all();
     let products = dbRows.map(lp => {
       const cTr = fixMojikake(lp.category_tr || '');
       const cAr = fixMojikake(lp.category_ar || '');
@@ -1421,9 +1250,6 @@ router.get('/categories', adminAuth, async (req, res) => {
         categories: { tr: [cTr], ar: [cAr], en: [cEn] }
       };
     });
-    if (products.length === 0) {
-      products = await fetchAndParseProducts();
-    }
 
     const categories = getCategories(products);
     const hiddenCats = db.prepare('SELECT category_name FROM hidden_categories').all().map(h => fixMojikake(h.category_name));
@@ -1509,13 +1335,12 @@ router.get('/categories/:name', adminAuth, async (req, res) => {
     const db = getDb();
     const { normalizeImageUrl } = require('../translations');
     const catName = decodeURIComponent(req.params.name);
-    let dbRows = db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
+    let dbRows = db.prepare("SELECT * FROM local_products WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%'").all();
     let products = dbRows.map(lp => ({
       id: lp.product_id,
       model: lp.model,
       categories: { tr: [lp.category_tr || ''], ar: [lp.category_ar || ''], en: [lp.category_en || ''] }
     }));
-    if (products.length === 0) products = await fetchAndParseProducts();
 
     const categories = getCategories(products);
     let cat = categories.find(c => c.tr === catName);
@@ -2515,58 +2340,78 @@ router.post('/sync-etkin', adminAuth, async (req, res) => {
   }
 });
 
-// Trigger Full Synchronization for all feeds (Karmedya XML + Etkin Promosyon)
+// Full Audit & Sync for Etkin Promosyon (Verifies 100% catalog completeness)
+router.post('/audit-and-sync-etkin', adminAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const { fetchEtkinApi, syncEtkinProducts } = require('../services/etkinService');
+
+    // 1. Purge any leftover Karmedya products
+    const purge = db.prepare(`
+      DELETE FROM local_products 
+      WHERE (
+        (product_id NOT LIKE 'etkin_%' AND (product_id IS NOT NULL AND product_id != ''))
+        AND product_id NOT LIKE 'prod_%' 
+        AND product_id NOT LIKE 'local_%' 
+        AND id NOT IN (133477, 137094, 137095)
+      ) OR images LIKE '%karmedya.com%'
+    `).run();
+
+    // 2. Fetch all products from Etkin API
+    const items = await fetchEtkinApi(db, 'tum_urunler');
+    const totalApiProducts = Array.isArray(items) ? items.length : 0;
+
+    // 3. Perform synchronization into database
+    const syncResult = await syncEtkinProducts(db, database.saveDatabase);
+
+    // 4. Verify count in DB
+    const etkinInDb = db.prepare("SELECT count(*) as c FROM local_products WHERE product_id LIKE 'etkin_%'").get().c;
+    const localInDb = db.prepare("SELECT count(*) as c FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND images NOT LIKE '%karmedya.com%'").get().c;
+    const karmedyaInDb = db.prepare("SELECT count(*) as c FROM local_products WHERE images LIKE '%karmedya.com%'").get().c;
+
+    const isComplete = (etkinInDb >= totalApiProducts && totalApiProducts > 0);
+
+    res.json({
+      success: true,
+      audit: {
+        etkinApiTotal: totalApiProducts,
+        etkinDbTotal: etkinInDb,
+        isCatalogComplete: isComplete,
+        missingCount: Math.max(0, totalApiProducts - etkinInDb),
+        localManualProducts: localInDb,
+        karmedyaRemaining: karmedyaInDb,
+        purgedKarmedyaCount: purge.changes
+      },
+      syncResult
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
+});
+
+// Trigger Full Synchronization (Etkin Promosyon only)
 router.post('/sync-all', async (req, res) => {
   try {
     const db = getDb();
     const { syncEtkinProducts } = require('../services/etkinService');
-    const { fetchAndParseProducts } = require('../dataService');
-    const { translateCategory, translateProductName } = require('../translations');
 
-    // 1. Sync XML products
-    const products = await fetchAndParseProducts();
-    let xmlCount = 0;
-    if (products && products.length > 0) {
-      db.exec('BEGIN TRANSACTION');
-      const stmt = db.prepare(`
-        INSERT OR REPLACE INTO local_products 
-        (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `);
-      for (const p of products) {
-        if (!p.id) continue;
-        let catTr = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : '';
-        if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
-        const catAr = (p.categories && p.categories.ar && p.categories.ar.length > 0) ? p.categories.ar[p.categories.ar.length - 1] : translateCategory(catTr, 'ar');
-        const catEn = (p.categories && p.categories.en && p.categories.en.length > 0) ? p.categories.en[p.categories.en.length - 1] : translateCategory(catTr, 'en');
-
-        stmt.run([
-          p.id.toString(),
-          p.name ? (p.name.tr || '') : '',
-          p.name ? (p.name.ar || translateProductName(p.name.tr || '', 'ar')) : '',
-          p.name ? (p.name.en || translateProductName(p.name.tr || '', 'en')) : '',
-          p.model || '',
-          p.description || '',
-          p.price || 0,
-          p.quantity || 0,
-          catTr,
-          catAr,
-          catEn,
-          JSON.stringify(p.colors || []),
-          JSON.stringify(p.sizes || []),
-          JSON.stringify(p.images || [])
-        ]);
-        xmlCount++;
-      }
-      db.exec('COMMIT');
-    }
+    // 1. Purge Karmedya
+    db.prepare(`
+      DELETE FROM local_products 
+      WHERE (
+        (product_id NOT LIKE 'etkin_%' AND (product_id IS NOT NULL AND product_id != ''))
+        AND product_id NOT LIKE 'prod_%' 
+        AND product_id NOT LIKE 'local_%' 
+        AND id NOT IN (133477, 137094, 137095)
+      ) OR images LIKE '%karmedya.com%'
+    `).run();
 
     // 2. Sync Etkin products
     const etkinResult = await syncEtkinProducts(db, database.saveDatabase);
 
     const totalRow = db.prepare('SELECT COUNT(*) as count FROM local_products WHERE hidden = 0').get();
     const total = totalRow ? totalRow.count : 0;
-    res.json({ success: true, totalProducts: total, xmlSynced: xmlCount, etkinResult });
+    res.json({ success: true, totalProducts: total, etkinResult });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -1452,11 +1452,8 @@ async function renderSyncSection() {
       <div class="card-body">
         <p style="color:var(--text-muted);margin-bottom:15px;">قم بتحديث خلاصات المنتجات فوراً من مصادرها الرسمية وتحديث الأسعار والكميات في قاعدة البيانات الدائمة.</p>
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
-          <button class="btn-primary" id="btnSyncXmlLive" onclick="triggerAdminXmlSync()">
-            <i class="fas fa-file-excel"></i> مزامنة خلاصة Karmedya XML الحية
-          </button>
-          <button class="btn-secondary" id="btnSyncAllLive" onclick="triggerAdminAllSync()">
-            <i class="fas fa-sync-alt"></i> مزامنة جميع المصادر (XML + Etkin API)
+          <button class="btn-primary" id="btnSyncAllLive" onclick="triggerAdminAllSync()">
+            <i class="fas fa-sync-alt"></i> تدقيق ومزامنة كامل منتجات Etkin Promosyon
           </button>
         </div>
         <div id="syncResult" style="margin-top:15px;"></div>
@@ -1478,51 +1475,33 @@ async function renderSyncSection() {
   `;
 }
 
-window.triggerAdminXmlSync = async function() {
-  const btn = document.getElementById('btnSyncXmlLive');
-  const resultDiv = document.getElementById('syncResult');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري مزامنة XML...'; }
-  if (resultDiv) resultDiv.innerHTML = '<div style="padding:10px;background:#e0f2fe;color:#0369a1;border-radius:6px;">جاري جلب ملف XML وتحليله وتحديث المنتجات...</div>';
-  try {
-    const res = await api('/api/admin/sync-karmedya-xml', { method: 'POST' });
-    if (res && res.success) {
-      resultDiv.innerHTML = `<div style="padding:10px;background:#ecfdf5;color:#047857;border-radius:6px;">
-        <strong>نجحت المزامنة!</strong> تم تحديث ${res.inserted} منتج (إجمالي منتجات Karmedya: ${res.xml}، الإجمالي الكلي: ${res.total}).
-      </div>`;
-    } else {
-      resultDiv.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#b91c1c;border-radius:6px;">
-        فشلت المزامنة: ${res?.error || 'خطأ غير معروف'}
-      </div>`;
-    }
-  } catch(e) {
-    if (resultDiv) resultDiv.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#b91c1c;border-radius:6px;">خطأ: ${e.message}</div>`;
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-excel"></i> مزامنة خلاصة Karmedya XML الحية'; }
-  }
-};
-
 window.triggerAdminAllSync = async function() {
   const btn = document.getElementById('btnSyncAllLive');
   const resultDiv = document.getElementById('syncResult');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري مزامنة جميع المصادر...'; }
-  if (resultDiv) resultDiv.innerHTML = '<div style="padding:10px;background:#e0f2fe;color:#0369a1;border-radius:6px;">جاري مزامنة خلاصة Karmedya وخلاصة Etkin...</div>';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التدقيق والمزامنة...'; }
+  if (resultDiv) resultDiv.innerHTML = '<div style="padding:10px;background:#e0f2fe;color:#0369a1;border-radius:6px;">جاري فحص وتدقيق واجهة Etkin ومزامنة كافة المنتجات...</div>';
   try {
-    const res = await api('/api/admin/sync-all-feeds', { method: 'POST' });
+    const res = await api('/api/admin/audit-and-sync-etkin', { method: 'POST' });
     if (res && res.success) {
-      resultDiv.innerHTML = `<div style="padding:10px;background:#ecfdf5;color:#047857;border-radius:6px;">
-        <strong>تمت المزامنة بنجاح!</strong> إجمالي المنتجات: ${res.dbCounts?.total || 0} (Karmedya: ${res.dbCounts?.xml || 0}, Etkin: ${res.dbCounts?.etkin || 0}).
+      resultDiv.innerHTML = `<div style="padding:12px;background:#ecfdf5;color:#047857;border-radius:6px;line-height:1.8;">
+        <strong>تمت المراجعة والمزامنة بنجاح!</strong><br>
+        • منتجات Etkin المسجلة: <strong>${res.audit?.etkinDbTotal || 0}</strong><br>
+        • المنتجات المحلية المضافة يدوياً: <strong>${res.audit?.localManualProducts || 0}</strong><br>
+        • اكتمال الكتالوج 100%: <strong>${res.audit?.isCatalogComplete ? 'نعم - كامل تماماً' : 'تم التحديث'}</strong><br>
+        • منتجات Karmedya المتبقية: <strong>${res.audit?.karmedyaRemaining || 0}</strong>
       </div>`;
     } else {
       resultDiv.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#b91c1c;border-radius:6px;">
-        فشلت المزامنة: ${res?.error || 'خطأ'}
+        فشلت العملية: ${res?.error || 'خطأ غير معروف'}
       </div>`;
     }
   } catch(e) {
     if (resultDiv) resultDiv.innerHTML = `<div style="padding:10px;background:#fef2f2;color:#b91c1c;border-radius:6px;">خطأ: ${e.message}</div>`;
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> مزامنة جميع المصادر (XML + Etkin API)'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> تدقيق ومزامنة كامل منتجات Etkin Promosyon'; }
   }
 };
+window.triggerAdminXmlSync = window.triggerAdminAllSync;
 
 window.inspectDatabases = async function() {
   const statusDiv = document.getElementById('dbInspectStatus');

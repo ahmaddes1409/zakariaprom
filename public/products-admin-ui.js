@@ -26,8 +26,8 @@ async function renderProducts() {
     <div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
       <h2 style="margin:0;">إدارة المنتجات</h2>
       <div style="flex:1;"></div>
-      <button class="btn-secondary" id="syncXmlBtn" onclick="triggerXmlSync()" style="margin-left:8px;">
-        <i class="fas fa-sync"></i> مزامنة Karmedya XML
+      <button class="btn-secondary" id="syncEtkinBtn" onclick="triggerEtkinSync()" style="margin-left:8px;">
+        <i class="fas fa-sync"></i> تدقيق ومزامنة Etkin Promosyon
       </button>
       <button class="btn-primary" onclick="showAddProductModal()">
         <i class="fas fa-plus"></i> إضافة منتج جديد
@@ -35,7 +35,6 @@ async function renderProducts() {
     </div>
     <div class="tabs" style="margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap;">
       <button class="tab ${currentProductsTab === 'all' ? 'active' : ''}" onclick="currentProductsTab='all';productsPage=1;renderProducts()">جميع المنتجات (${counts.total})</button>
-      <button class="tab ${currentProductsTab === 'xml' ? 'active' : ''}" onclick="currentProductsTab='xml';productsPage=1;renderProducts()">منتجات Karmedya XML (${counts.xml})</button>
       <button class="tab ${currentProductsTab === 'etkin' ? 'active' : ''}" onclick="currentProductsTab='etkin';productsPage=1;renderProducts()">منتجات Etkin Promosyon (${counts.etkin})</button>
       <button class="tab ${currentProductsTab === 'local' ? 'active' : ''}" onclick="currentProductsTab='local';productsPage=1;renderProducts()">منتجات مضافة يدوياً (${counts.local})</button>
     </div>
@@ -45,16 +44,16 @@ async function renderProducts() {
   await renderXmlProducts();
 }
 
-window.triggerXmlSync = async function() {
-  const btn = document.getElementById('syncXmlBtn');
+window.triggerEtkinSync = async function() {
+  const btn = document.getElementById('syncEtkinBtn');
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري المزامنة...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التدقيق والمزامنة...';
   }
   try {
-    const res = await api('/api/admin/sync-karmedya-xml', { method: 'POST' });
+    const res = await api('/api/admin/audit-and-sync-etkin', { method: 'POST' });
     if (res && res.success) {
-      alert(`تمت المزامنة بنجاح! تم تحديث ${res.inserted} منتج (الإجمالي: ${res.total})`);
+      alert(`تمت مراجعة ومزامنة منتجات Etkin Promosyon بنجاح!\n• إجمالي منتجات Etkin: ${res.audit?.etkinDbTotal || 0}\n• منتجاتك اليدوية: ${res.audit?.localManualProducts || 0}\n• الكتالوج مكتمل بنسبة 100%: ${res.audit?.isCatalogComplete ? 'نعم' : 'تم التحديث'}`);
       renderProducts();
     } else {
       alert('فشلت المزامنة: ' + (res?.error || 'خطأ غير معروف'));
@@ -64,70 +63,84 @@ window.triggerXmlSync = async function() {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-sync"></i> مزامنة Karmedya XML';
+      btn.innerHTML = '<i class="fas fa-sync"></i> تدقيق ومزامنة Etkin Promosyon';
     }
   }
 };
+window.triggerXmlSync = window.triggerEtkinSync;
 
 async function getProductCounts() {
   try {
     const data = await api('/api/admin/product-counts');
     if (data && data.total !== undefined) {
-      return { total: data.total, xml: data.xml || 0, etkin: data.etkin || 0, local: data.local || 0 };
+      return data;
     }
-  } catch(e) {}
+  } catch (e) {}
   return { total: 0, xml: 0, etkin: 0, local: 0 };
 }
 
 async function renderXmlProducts() {
-  const data = await api(`/api/admin/products?source=${currentProductsTab}&page=${productsPage}&limit=20`);
-  const products = data?.products || [];
-  const total = data?.total || 0;
-  const categories = await api('/api/admin/categories');
-  const catList = categories?.categories || [];
+  const container = document.getElementById('productsContent');
+  container.innerHTML = '<div style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
 
-  document.getElementById('productsContent').innerHTML = `
-    <div class="filters-bar" style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
-      <input type="text" placeholder="بحث بالاسم أو الموديل..." id="productSearch" style="flex:1;min-width:200px;">
-      <select id="categoryFilter" style="min-width:150px;">
-        <option value="">كل الفئات</option>
-        ${catList.map(c => `<option value="${c.tr}">${c.tr}</option>`).join('')}
-      </select>
-      <button class="btn-primary" onclick="searchAdminProducts()">بحث</button>
-      <span style="color:var(--text-muted);align-self:center;">${total} منتج</span>
+  let url = `/api/admin/products?page=${productsPage}&limit=20`;
+  if (currentProductsTab !== 'all') {
+    url += `&source=${currentProductsTab}`;
+  }
+  if (productsSearchQuery) {
+    url += `&search=${encodeURIComponent(productsSearchQuery)}`;
+  }
+  if (productsCategoryFilter) {
+    url += `&category=${encodeURIComponent(productsCategoryFilter)}`;
+  }
+
+  const res = await api(url);
+  const products = res.products || [];
+  const total = res.pagination?.total || 0;
+
+  // Render search and filters
+  let html = `
+    <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
+      <input type="text" placeholder="بحث بالاسم أو الكود..." value="${productsSearchQuery}" 
+             onkeyup="if(event.key==='Enter'){productsSearchQuery=this.value;productsPage=1;renderProducts()}" 
+             style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;">
+      <button class="btn-secondary" onclick="productsSearchQuery=this.previousElementSibling.value;productsPage=1;renderProducts()">بحث</button>
+      ${productsSearchQuery ? '<button class="btn-secondary" onclick="productsSearchQuery=\'\';productsPage=1;renderProducts()">إلغاء البحث</button>' : ''}
     </div>
-    <div class="card">
-      <div class="table-responsive">
-        <table>
-          <thead><tr>
-            <th>صورة</th>
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>الصورة</th>
             <th>الاسم (تركي)</th>
             <th>الاسم (عربي)</th>
             <th>المصدر</th>
             <th>الفئة</th>
-            <th>الموديل</th>
+            <th>الكود</th>
             <th>السعر</th>
-            <th>الكمية</th>
+            <th>المخزون</th>
             <th>الحالة</th>
-            <th>إجراءات</th>
-          </tr></thead>
-          <tbody id="productsTable">${products.map(p => renderXmlProductRow(p)).join('')}</tbody>
-        </table>
-      </div>
+            <th>الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${products.length === 0 ? '<tr><td colspan="10" style="text-align:center;padding:30px;">لا توجد منتجات</td></tr>' : products.map(p => renderXmlProductRow(p)).join('')}
+        </tbody>
+      </table>
     </div>
-    <div class="pagination" style="display:flex;gap:10px;justify-content:center;align-items:center;margin-top:15px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;">
       <button class="btn-secondary" onclick="productsPage--;renderProducts()" ${productsPage <= 1 ? 'disabled' : ''}>السابق</button>
       <span>صفحة ${productsPage} من ${Math.ceil(total/20) || 1}</span>
       <button class="btn-secondary" onclick="productsPage++;renderProducts()" ${productsPage >= Math.ceil(total/20) ? 'disabled' : ''}>التالي</button>
     </div>
   `;
+  container.innerHTML = html;
 }
 
 function renderXmlProductRow(p) {
   const category = p.topCategory?.tr || p.categories?.tr?.[0]?.split(' > ')[0] || '-';
-  const sourceLabel = p.source === 'etkin' ? '<span class="badge" style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:4px;font-size:11px;">Etkin</span>' : 
-                     (p.source === 'local' ? '<span class="badge" style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;">يدوي</span>' : 
-                                            '<span class="badge" style="background:#ecfdf5;color:#047857;padding:2px 8px;border-radius:4px;font-size:11px;">Karmedya XML</span>');
+  const sourceLabel = p.source === 'etkin' ? '<span class="badge" style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:4px;font-size:11px;">Etkin Promosyon</span>' : 
+                                             '<span class="badge" style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;">يدوي</span>';
   return `
     <tr>
       <td><img src="${p.images?.[0] || ''}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;" onerror="this.style.display='none'"></td>

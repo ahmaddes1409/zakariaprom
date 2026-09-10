@@ -339,110 +339,34 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
   }
 }));
 
-async function syncXmlToDb(db, saveDatabase) {
+function purgeKarmedyaProducts(db, saveDb) {
+  if (!db) return 0;
   try {
-    const { fetchAndParseProducts } = require('./dataService');
-    const { translateCategory, translateProductName } = require('./translations');
-    console.log('[Auto XML Sync] Starting background sync of Karmedya XML feed to database...');
-    const products = await fetchAndParseProducts(true);
-    console.log(`[Auto XML Sync] Parsed ${products ? products.length : 0} products from XML`);
-    if (!products || products.length === 0) return;
-
-    // 1. Prepare all formatted data BEFORE starting database transaction
-    const preparedRows = [];
-    const categoryMap = new Map();
-
-    for (const p of products) {
-      if (!p.id) continue;
-      const { translateCategory, translateProductName, normalizeCategoryName } = require('./translations');
-      let rawCat = (p.categories && p.categories.tr && p.categories.tr.length > 0) ? p.categories.tr[p.categories.tr.length - 1] : 'Promosyon Ürünleri';
-      if (rawCat.includes('|')) {
-        rawCat = rawCat.split('|')[0].trim();
-      }
-      rawCat = normalizeCategoryName(rawCat);
-      const topCatTr = normalizeCategoryName(rawCat.split('>')[0].trim() || 'Promosyon Ürünleri');
-      const catTr = rawCat;
-      const catAr = (p.categories && p.categories.ar && p.categories.ar.length > 0) ? p.categories.ar[p.categories.ar.length - 1] : translateCategory(catTr, 'ar');
-      const catEn = (p.categories && p.categories.en && p.categories.en.length > 0) ? p.categories.en[p.categories.en.length - 1] : translateCategory(catTr, 'en');
-
-      if (topCatTr && !categoryMap.has(topCatTr)) {
-        const topCatAr = translateCategory(topCatTr, 'ar');
-        const topCatEn = translateCategory(topCatTr, 'en');
-        categoryMap.set(topCatTr, { tr: topCatTr, ar: topCatAr, en: topCatEn });
-      }
-
-      const pId = p.id.toString();
-      const nameTr = p.name ? (p.name.tr || '') : '';
-      const nameAr = p.name ? (p.name.ar || translateProductName(nameTr, 'ar')) : '';
-      const nameEn = p.name ? (p.name.en || translateProductName(nameTr, 'en')) : '';
-
-      let descStr = '';
-      if (typeof p.description === 'object' && p.description !== null) {
-        descStr = p.description.ar || p.description.tr || p.description.en || '';
-      } else if (typeof p.description === 'string') {
-        descStr = p.description;
-      }
-      if (descStr) {
-        descStr = descStr.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      }
-
-      preparedRows.push([
-        pId,
-        nameTr,
-        nameAr,
-        nameEn,
-        p.model || '',
-        descStr,
-        p.price || 0,
-        p.quantity || 0,
-        catTr,
-        catAr,
-        catEn,
-        JSON.stringify(p.colors || []),
-        JSON.stringify(p.sizes || []),
-        JSON.stringify(p.images || [])
-      ]);
-    }
-
-    db.exec('BEGIN TRANSACTION');
-
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO local_products 
-      (product_id, name_tr, name_ar, name_en, model, description, price, quantity, category_tr, category_ar, category_en, colors, sizes, images, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `);
-
-    let count = 0;
-    for (const row of preparedRows) {
-      try {
-        stmt.run(row);
-        count++;
-      } catch(itemErr) {
-        console.error('[XML Item Insert Error]:', itemErr.message);
-      }
-      if (count % 100 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 5));
+    const res = db.prepare(`
+      DELETE FROM local_products 
+      WHERE (
+        (product_id NOT LIKE 'etkin_%' AND (product_id IS NOT NULL AND product_id != ''))
+        AND product_id NOT LIKE 'prod_%' 
+        AND product_id NOT LIKE 'local_%' 
+        AND id NOT IN (133477, 137094, 137095)
+      ) OR images LIKE '%karmedya.com%'
+    `).run();
+    if (res.changes > 0) {
+      console.log(`[Purge Karmedya] Successfully purged ${res.changes} Karmedya products from local_products.`);
+      if (typeof saveDb === 'function') {
+        saveDb();
       }
     }
-
-    const catStmt = db.prepare('INSERT OR IGNORE INTO custom_categories (name_tr, name_ar, name_en) VALUES (?, ?, ?)');
-    for (const [key, c] of categoryMap) {
-      if (c && c.tr) {
-        try { catStmt.run(c.tr, c.ar || c.tr, c.en || c.tr); } catch(e) {}
-      }
-    }
-
-    db.exec('COMMIT');
-
-    if (typeof saveDatabase === 'function') {
-      saveDatabase();
-    }
-    console.log(`[Auto XML Sync] Successfully synced ${preparedRows.length} Karmedya XML products and ${categoryMap.size} clean categories to active database!`);
-  } catch (err) {
-    try { db.exec('ROLLBACK'); } catch(e) {}
-    console.error('[Auto XML Sync Error]:', err.message, err.stack);
-    throw err;
+    return res.changes;
+  } catch (e) {
+    console.error('[Purge Karmedya Error]:', e.message);
+    return 0;
   }
+}
+
+async function syncXmlToDb(db, saveDatabase) {
+  console.log('[Auto XML Sync] Karmedya XML sync is permanently disabled in favor of Etkin Promosyon.');
+  purgeKarmedyaProducts(db, saveDatabase);
 }
 
 const database = require('./database');
@@ -609,8 +533,8 @@ function ensureDbReady() {
       migrateCategories(database.db);
       setTimeout(async () => {
         try {
-          console.log('[Startup Auto Sync] Syncing Karmedya XML feed products...');
-          await syncXmlToDb(database.db, saveDatabase);
+          console.log('[Startup Auto Sync] Purging any residual Karmedya products...');
+          purgeKarmedyaProducts(database.db, saveDatabase);
           console.log('[Startup Auto Sync] Syncing Etkin Promosyon API products...');
           const { syncEtkinProducts, scheduleDailySync } = require('./services/etkinService');
           await syncEtkinProducts(database.db, saveDatabase);
@@ -736,8 +660,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     try {
       setTimeout(async () => {
         try {
-          console.log('[Background Sync] Starting XML feed sync...');
-          await syncXmlToDb(database.db, saveDatabase);
+          console.log('[Background Sync] Purging any residual Karmedya products...');
+          purgeKarmedyaProducts(database.db, saveDatabase);
           console.log('[Background Sync] Starting Etkin API sync...');
           const { syncEtkinProducts } = require('./services/etkinService');
           await syncEtkinProducts(database.db, saveDatabase);
@@ -746,17 +670,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         }
       }, 10);
 
-      let total = 0, xml = 0, etkin = 0;
+      let total = 0, etkin = 0, local = 0;
       try {
         const tRow = database.db.prepare('SELECT count(*) as count FROM local_products WHERE hidden = 0').get();
         if (tRow) total = tRow.count;
-        const xRow = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0").get();
-        if (xRow) xml = xRow.count;
         const eRow = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id LIKE 'etkin_%' AND hidden = 0").get();
         if (eRow) etkin = eRow.count;
+        const lRow = database.db.prepare("SELECT count(*) as count FROM local_products WHERE product_id NOT LIKE 'etkin_%' AND hidden = 0 AND images NOT LIKE '%karmedya.com%'").get();
+        if (lRow) local = lRow.count;
       } catch(dbErr) {}
 
-      res.json({ success: true, message: "Background sync started successfully", total, xml, etkin });
+      res.json({ success: true, message: "Etkin sync and Karmedya purge started successfully", total, etkin, local });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -769,42 +693,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       const { translateProductName, translateCategory } = require('./translations');
       const { getProductsByCategory, searchProducts, resolveStrictCategory } = require('./dataService');
 
-      // Fetch all products directly from local_products database table
-      let dbRows = database.db.prepare('SELECT * FROM local_products WHERE hidden = 0').all();
-      
-      // Merge Karmedya XML feed products alongside local_products
-      try {
-        const xmlProds = await fetchAndParseProducts();
-        if (xmlProds && xmlProds.length > 0) {
-          const existingIds = new Set((dbRows || []).map(r => String(r.product_id || r.id)));
-          const mappedXml = xmlProds.filter(p => p && p.id && !existingIds.has(String(p.id))).map(p => {
-            const catArray = (p.categories && Array.isArray(p.categories.tr)) ? p.categories.tr : [];
-            const catTr = catArray.length > 0 ? (catArray[catArray.length - 1] || 'Promosyon Ürünleri') : 'Promosyon Ürünleri';
-            const nameTr = (p.name && typeof p.name.tr === 'string') ? p.name.tr : (typeof p.name === 'string' ? p.name : '');
-            const pId = p.id ? p.id.toString() : Math.random().toString(36).substring(7);
-
-            return {
-              product_id: pId,
-              name_tr: nameTr,
-              name_ar: p.name && p.name.ar ? p.name.ar : translateProductName(nameTr, 'ar'),
-              name_en: p.name && p.name.en ? p.name.en : translateProductName(nameTr, 'en'),
-              model: p.model || '',
-              description: typeof p.description === 'object' ? (p.description.ar || p.description.tr || '') : (p.description || ''),
-              price: p.price || 0,
-              quantity: p.stock || p.quantity || 100,
-              category_tr: catTr,
-              category_ar: translateCategory(catTr, 'ar'),
-              category_en: translateCategory(catTr, 'en'),
-              colors: '[]',
-              sizes: '[]',
-              images: JSON.stringify(p.images || [])
-            };
-          });
-          dbRows = [...dbRows, ...mappedXml];
-        }
-      } catch(fallbackErr) {
-        console.error('[API Products XML Merge Error]:', fallbackErr.message);
-      }
+      // Fetch all products directly from local_products database table (Etkin + local manual products only)
+      let dbRows = database.db.prepare("SELECT * FROM local_products WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%'").all();
       
       let hiddenProducts = [];
       try { hiddenProducts = database.db.prepare('SELECT product_id FROM hidden_products').all().map(h => String(h.product_id)); } catch(e) {}
@@ -995,16 +885,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       } else if (sort === 'name') {
         products.sort((a, b) => (a.name[lang] || a.name.tr).localeCompare(b.name[lang] || b.name.tr));
       } else {
-        // Interleave Karmedya XML and Etkin products evenly for a balanced mix on Page 1 and every page
-        const etkinProds = products.filter(p => String(p.id).startsWith('etkin_') || (p.model && String(p.model).toUpperCase().startsWith('ETK')));
-        const karmedyaProds = products.filter(p => !String(p.id).startsWith('etkin_') && (!p.model || !String(p.model).toUpperCase().startsWith('ETK')));
-        const mixed = [];
-        const maxLen = Math.max(karmedyaProds.length, etkinProds.length);
-        for (let i = 0; i < maxLen; i++) {
-          if (i < karmedyaProds.length) mixed.push(karmedyaProds[i]);
-          if (i < etkinProds.length) mixed.push(etkinProds[i]);
-        }
-        products = mixed;
+        // Place manual custom products first, followed by Etkin Promosyon products
+        products.sort((a, b) => {
+          const aIsLocal = !String(a.id).startsWith('etkin_');
+          const bIsLocal = !String(b.id).startsWith('etkin_');
+          if (aIsLocal && !bIsLocal) return -1;
+          if (!aIsLocal && bIsLocal) return 1;
+          return 0;
+        });
       }
 
       // Pagination
@@ -1044,20 +932,36 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       await ensureDbReady();
       const { fetchAndParseProducts, getCategories } = require('./dataService');
 
-      let products = [];
-      try { products = await fetchAndParseProducts(); } catch(xmlErr) { console.error("XML fetch failed, using local only:", xmlErr.message); }
-      
       // Safe DB helper
       const safeQuery = (sql) => {
         try { return database.db.prepare(sql).all(); } catch(e) { return []; }
       };
+
+      // Get products directly from local_products (Etkin + local manual products only)
+      const localProducts = safeQuery("SELECT * FROM local_products WHERE hidden = 0 AND images NOT LIKE '%karmedya.com%'");
+      let products = localProducts.map(lp => {
+        if (!lp) return null;
+        const catTr = lp.category_tr || '';
+        const catAr = lp.category_ar || catTr;
+        const catEn = lp.category_en || catTr;
+        return {
+          id: lp.product_id || ('local_' + lp.id),
+          category: { tr: catTr, ar: catAr, en: catEn },
+          categories: { tr: [catTr], ar: [catAr], en: [catEn] },
+          topCategory: {
+            tr: catTr ? catTr.split(' > ')[0].trim() : '',
+            ar: catAr ? catAr.split(' > ')[0].trim() : '',
+            en: catEn ? catEn.split(' > ')[0].trim() : ''
+          }
+        };
+      }).filter(Boolean);
 
       // Apply category overrides to products
       const categoryOverrides = safeQuery('SELECT * FROM product_category_overrides');
       if (categoryOverrides.length > 0) {
         const overrideMap = {};
         categoryOverrides.forEach(o => { if (o && o.product_id) overrideMap[o.product_id] = o; });
-        products = (Array.isArray(products) ? products : []).map(p => {
+        products = products.map(p => {
           if (!p || !p.id) return p;
           const override = overrideMap[p.id];
           if (override && override.new_category_tr) {
@@ -1069,30 +973,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
           }
           return p;
         });
-      }
-
-      // Merge local products
-      const localProducts = safeQuery('SELECT * FROM local_products WHERE hidden = 0');
-      if (localProducts.length > 0) {
-        const localMapped = localProducts.map(lp => {
-          if (!lp) return null;
-          const catTr = lp.category_tr || '';
-          const catAr = lp.category_ar || catTr;
-          const catEn = lp.category_en || catTr;
-          return {
-            id: lp.product_id || ('local_' + lp.id),
-            category: { tr: catTr, ar: catAr, en: catEn },
-            categories: { tr: [catTr], ar: [catAr], en: [catEn] },
-            topCategory: {
-              tr: catTr ? catTr.split(' > ')[0].trim() : '',
-              ar: catAr ? catAr.split(' > ')[0].trim() : '',
-              en: catEn ? catEn.split(' > ')[0].trim() : ''
-            }
-          };
-        }).filter(Boolean);
-        const seenIds = new Set(localMapped.map(p => p.id));
-        const xmlFiltered = (Array.isArray(products) ? products : []).filter(p => p && p.id && !seenIds.has(p.id));
-        products = [...localMapped, ...xmlFiltered];
       }
 
       // Filter hidden categories
@@ -1299,11 +1179,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
           status: true,
           isLocal: true
         };
-      } else {
-        // Fallback to XML live lookup
-        let products = [];
-        try { products = await fetchAndParseProducts(); } catch(xmlErr) {}
-        product = getProductById(products, reqId);
       }
 
       if (product) {

@@ -79,34 +79,65 @@ function resolveWasmFile(file) {
 
 // sql.js wrapper to mimic better-sqlite3 API
 let database = null;
+let SQLInstance = null;
+let isDirty = false;
+let lastLoadedMtime = 0;
+
+function reloadIfChangedOnDisk() {
+  if (!DB_PATH || !fs.existsSync(DB_PATH) || !SQLInstance) return false;
+  try {
+    const stat = fs.statSync(DB_PATH);
+    if (stat.mtimeMs > lastLoadedMtime + 300 && stat.size > 1000) {
+      return reloadDatabaseFromDisk();
+    }
+  } catch(e) {}
+  return false;
+}
 
 // Save database to file safely
-function saveDatabase() {
-  if (database && DB_PATH) {
-    try {
-      const data = database.export();
-      const buffer = Buffer.from(data);
-      const targetDir = path.dirname(DB_PATH);
-      if (!fs.existsSync(targetDir)) {
-        try { fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 }); } catch(e) {}
-      }
-      try {
-        fs.writeFileSync(DB_PATH, buffer);
-        try { fs.chmodSync(DB_PATH, 0o666); } catch(e) {}
-      } catch(writeErr) {
-        console.error('[DB Save Write Error]:', writeErr.message);
-        try {
-          const tmpPath = DB_PATH + '.tmp';
-          fs.writeFileSync(tmpPath, buffer);
-          fs.renameSync(tmpPath, DB_PATH);
-          try { fs.chmodSync(DB_PATH, 0o666); } catch(e) {}
-        } catch(fallbackErr) {
-          console.error('[DB Save Fallback Error]:', fallbackErr.message);
-        }
-      }
-    } catch (err) {
-      console.error('[DB Save Error]:', err.message);
+function saveDatabase(force = false) {
+  if (!database || !DB_PATH) return;
+  if (!force && !isDirty) return; // Never overwrite disk with stale memory if no writes happened in this process
+
+  try {
+    const data = database.export();
+    const buffer = Buffer.from(data);
+    const targetDir = path.dirname(DB_PATH);
+    if (!fs.existsSync(targetDir)) {
+      try { fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 }); } catch(e) {}
     }
+
+    // Keep automatic backup of last good DB before writing
+    if (fs.existsSync(DB_PATH)) {
+      try {
+        const curBuf = fs.readFileSync(DB_PATH);
+        if (curBuf.length > 1000) {
+          fs.writeFileSync(DB_PATH + '.bak', curBuf);
+        }
+      } catch(e) {}
+    }
+
+    try {
+      fs.writeFileSync(DB_PATH, buffer);
+      try { fs.chmodSync(DB_PATH, 0o666); } catch(e) {}
+    } catch(writeErr) {
+      console.error('[DB Save Write Error]:', writeErr.message);
+      try {
+        const tmpPath = DB_PATH + '.tmp';
+        fs.writeFileSync(tmpPath, buffer);
+        fs.renameSync(tmpPath, DB_PATH);
+        try { fs.chmodSync(DB_PATH, 0o666); } catch(e) {}
+      } catch(fallbackErr) {
+        console.error('[DB Save Fallback Error]:', fallbackErr.message);
+      }
+    }
+
+    try {
+      lastLoadedMtime = fs.statSync(DB_PATH).mtimeMs;
+    } catch(e) {}
+    isDirty = false;
+  } catch (err) {
+    console.error('[DB Save Error]:', err.message);
   }
 }
 
@@ -130,6 +161,10 @@ class DatabaseWrapper {
 
   prepare(sql) {
     const self = this;
+    // Auto-sync if another worker updated the DB on disk
+    if (!self.inTransaction) {
+      reloadIfChangedOnDisk();
+    }
     return {
       get(...params) {
         try {
@@ -185,6 +220,7 @@ class DatabaseWrapper {
               lastId = res[0].values[0][0];
             }
           } catch(err) {}
+          isDirty = true;
           if (!self.inTransaction && !sql.toUpperCase().includes('BEGIN')) {
             saveDatabase();
           }
@@ -207,6 +243,7 @@ class DatabaseWrapper {
         this.inTransaction = true;
       }
       this.sqliteDb.exec(sql);
+      isDirty = true;
       if (upper.includes('COMMIT') || upper.includes('ROLLBACK')) {
         this.inTransaction = false;
         saveDatabase();
@@ -330,26 +367,27 @@ async function initDatabaseAsync() {
   // Automatically initialize database schema and migrations
   initializeDatabase();
 
-  // Save immediately to ensure path & file exist
-  saveDatabase();
+  // Save immediately to ensure path & file exist if newly created
+  saveDatabase(true);
+  try { if (DB_PATH && fs.existsSync(DB_PATH)) lastLoadedMtime = fs.statSync(DB_PATH).mtimeMs; } catch(e) {}
 
   if (saveInterval) clearInterval(saveInterval);
-  saveInterval = setInterval(saveDatabase, 30000);
+  // Periodically check if another process updated the file on disk
+  saveInterval = setInterval(reloadIfChangedOnDisk, 15000);
 
-  process.on('exit', saveDatabase);
-  process.on('SIGINT', () => { saveDatabase(); process.exit(); });
-  process.on('SIGTERM', () => { saveDatabase(); process.exit(); });
+  process.on('exit', () => { if (isDirty) saveDatabase(true); });
+  process.on('SIGINT', () => { if (isDirty) saveDatabase(true); process.exit(); });
+  process.on('SIGTERM', () => { if (isDirty) saveDatabase(true); process.exit(); });
 
   return db;
 }
 
-let SQLInstance = null;
-
 function reloadDatabaseFromDisk() {
-  if (!DB_PATH || !fs.existsSync(DB_PATH)) return false;
+  if (!DB_PATH || !fs.existsSync(DB_PATH) || !SQLInstance) return false;
   try {
+    const stat = fs.statSync(DB_PATH);
     const fileBuffer = fs.readFileSync(DB_PATH);
-    if (fileBuffer && fileBuffer.length > 0 && SQLInstance) {
+    if (fileBuffer && fileBuffer.length > 1000) {
       const newSqliteDb = new SQLInstance.Database(fileBuffer);
       database = newSqliteDb;
       if (db) {
@@ -357,7 +395,9 @@ function reloadDatabaseFromDisk() {
       } else {
         db = new DatabaseWrapper(newSqliteDb);
       }
-      console.log(`[DB Reload] Reloaded active database instance (${fileBuffer.length} bytes)`);
+      lastLoadedMtime = stat.mtimeMs;
+      isDirty = false;
+      console.log(`[DB Reload] Reloaded active database instance (${fileBuffer.length} bytes, mtime: ${new Date(stat.mtimeMs).toISOString()})`);
       return true;
     }
   } catch(e) {

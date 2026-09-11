@@ -298,10 +298,19 @@ router.post('/git-pull', adminAuth, async (req, res) => {
     }
     try {
       const fs = require('fs');
-      const restartPath = path.join(__dirname, '..', '..', 'tmp', 'restart.txt');
-      fs.writeFileSync(restartPath, `v2.2.1 - ${Date.now()}\n`);
+      const rootDir = path.join(__dirname, '..', '..');
+      const tmpDir = path.join(rootDir, 'tmp');
+      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+      const restartPath = path.join(tmpDir, 'restart.txt');
+      fs.writeFileSync(restartPath, `v2.2.3 - ${Date.now()}\n`);
+    } catch(e) {}
+    try {
+      execSync('pm2 reload all || pm2 restart all || true', { encoding: 'utf8', timeout: 5000 });
     } catch(e) {}
     res.json({ success: true, output });
+    setTimeout(() => {
+      process.exit(0);
+    }, 500);
   } catch(err) {
     res.status(500).json({ error: err.message });
   }

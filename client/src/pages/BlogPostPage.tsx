@@ -49,6 +49,21 @@ export default function BlogPostPage() {
       .catch(() => setLoading(false));
   }, [params.id]);
 
+  useEffect(() => {
+    if (post) {
+      const title = getTitle(post);
+      document.title = `${title} | Zakaria Prom`;
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement('meta');
+        metaDesc.setAttribute('name', 'description');
+        document.head.appendChild(metaDesc);
+      }
+      const desc = getContent(post).slice(0, 160).replace(/\s+/g, ' ');
+      metaDesc.setAttribute('content', desc);
+    }
+  }, [post, language]);
+
   const getTitle = (p: Post) => {
     if (language === "ar") return p.title_ar || p.title_en || p.title_tr;
     if (language === "tr") return p.title_tr || p.title_ar || p.title_en;
@@ -123,7 +138,7 @@ export default function BlogPostPage() {
 
       {/* Article Content */}
       <article className="flex-1 py-10">
-        <div className="container max-w-3xl">
+        <div className="container max-w-4xl">
           {/* Back link */}
           <Link href="/blog" className="inline-flex items-center gap-1 text-[#1a8a7d] hover:underline mb-6 text-sm">
             {language === "ar" ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
@@ -135,7 +150,7 @@ export default function BlogPostPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-2xl md:text-4xl font-black text-gray-900 mb-4">
+            <h1 className="text-2xl md:text-4xl font-black text-gray-900 mb-4 leading-tight">
               {getTitle(post)}
             </h1>
 
@@ -144,8 +159,38 @@ export default function BlogPostPage() {
               <span>{formatDate(post.created_at)}</span>
             </div>
 
-            <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+            <div className="prose prose-lg max-w-none text-gray-800 leading-relaxed whitespace-pre-wrap font-sans">
               {getContent(post)}
+            </div>
+
+            {/* Executive Corporate CTA Banner */}
+            <div className="mt-12 p-8 bg-gradient-to-br from-[#0a2e4a] to-[#0d4a6b] rounded-2xl text-white shadow-xl">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-xl font-bold mb-2">
+                    {language === "ar" ? "هل تبحث عن حلول طباعة وهدايا دعائية مخصصة لشركتك؟" : language === "tr" ? "Şirketiniz İçin Özel Baskı ve Promosyon Çözümleri mi Arıyorsunuz?" : "Looking for Custom Corporate Printing & Promotional Gifts?"}
+                  </h3>
+                  <p className="text-gray-200 text-sm max-w-xl">
+                    {language === "ar" ? "نقدم في زكريا بروم أسعار الجملة التنافسية، عينات تجريبية للمؤسسات، وشحناً سريعاً وموثوقاً لجميع الولايات التركية ومحافظات سوريا." : language === "tr" ? "Zakaria Prom olarak toptan fiyat avantajı, kurumsal numune desteği ve Türkiye ile Suriye genelinde hızlı teslimat sunuyoruz." : "At Zakaria Prom, we offer competitive wholesale pricing, sample verification, and fast reliable shipping across Turkey & Syria."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  <a
+                    href="https://wa.me/905383564552"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold px-5 py-3 rounded-xl shadow transition"
+                  >
+                    <span>{language === "ar" ? "طلب عرض سعر فوري (واتساب)" : language === "tr" ? "Hemen Fiyat Al (WhatsApp)" : "Request Instant Quote"}</span>
+                  </a>
+                  <Link
+                    href="/products"
+                    className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold px-5 py-3 rounded-xl border border-white/20 transition"
+                  >
+                    <span>{language === "ar" ? "تصفح كتالوج المنتجات" : language === "tr" ? "Ürün Kataloğu" : "Browse Catalog"}</span>
+                  </Link>
+                </div>
+              </div>
             </div>
           </motion.div>
         </div>

@@ -132,12 +132,23 @@ app.get('/sitemap.xml', async (req, res) => {
     });
 
     if (db) {
-      // Dynamic Products (All 3,550+ Products)
+      // Dynamic Products (All Products)
       const products = db.prepare('SELECT id, updated_at FROM local_products WHERE hidden = 0').all();
       products.forEach(prod => {
         const lastmod = prod.updated_at ? String(prod.updated_at).split(' ')[0] : today;
         xml += `  <url>\n    <loc>${baseUrl}/product/${encodeURIComponent(prod.id)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
       });
+
+      // Dynamic Blog Posts (CEO & SEO Content)
+      try {
+        const posts = db.prepare('SELECT id, updated_at FROM posts WHERE published = 1').all();
+        posts.forEach(post => {
+          const lastmod = post.updated_at ? String(post.updated_at).split(' ')[0] : today;
+          xml += `  <url>\n    <loc>${baseUrl}/blog/${encodeURIComponent(post.id)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
+        });
+      } catch (postErr) {
+        console.warn('[Sitemap warning - posts]:', postErr.message);
+      }
     }
 
     xml += `</urlset>`;

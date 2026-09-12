@@ -55,8 +55,11 @@ export default function Footer() {
   const fullAddress = (settings[addressKey] as string) || "";
   const branches = fullAddress.split("|").map(b => b.trim()).filter(Boolean);
 
-  const syriaAddress = branches[0] || (language === "ar" ? "دمشق - الحلبوني - بناء صلاح وخولي" : "Damascus - Halbouni");
-  const turkeyAddress = branches[1] || (language === "ar" ? "إسطنبول - التوب كبي - مجمع المطابع" : "Istanbul - Topkapi");
+  let rawSyria = branches[0] || (language === "ar" ? "دمشق - الحلبوني - بناء صلاح وخولي" : "Damascus - Halbouni");
+  let rawTurkey = branches[1] || (language === "ar" ? "إسطنبول - التوب كبي - مجمع المطابع" : "Istanbul - Topkapi");
+
+  const syriaAddress = rawSyria.replace(/^(فرع سوريا\s*:\s*|Suriye\s*:\s*|Syria\s*:\s*)/i, "").trim();
+  const turkeyAddress = rawTurkey.replace(/^(فرع تركيا\s*:\s*|T[uü]rkiye\s*:\s*|Turkey\s*:\s*)/i, "").trim();
 
   return (
     <footer className="bg-[#0a2e4a] text-white/90">

@@ -11,12 +11,33 @@ export default function ContactPage() {
   const [formData, setFormData] = useState({ name: "", email: "", message: "" });
   const [loading, setLoading] = useState(false);
 
-  const phone = settings.phone || "+90 542 810 4208";
+  const phoneTurkey = settings.phone || "+905428104208";
+  const phoneSyria = settings.phone2 || "+963112242368";
   const email = settings.email || "info@zakariaprom.com";
   const whatsapp = settings.whatsapp || "905428104208";
+
   const addressKey = `address_${language}` as keyof typeof settings;
-  const address = (settings[addressKey] as string) || 
-    (language === "ar" ? "إسطنبول، تركيا" : language === "tr" ? "İstanbul, Türkiye" : "Istanbul, Turkey");
+  const fullAddress = (settings[addressKey] as string) || "";
+
+  // Parse branches cleanly
+  let syriaAddress = "";
+  let turkeyAddress = "";
+  if (fullAddress.includes("|")) {
+    const parts = fullAddress.split("|").map((s) => s.trim());
+    syriaAddress = parts[0] || "";
+    turkeyAddress = parts[1] || "";
+  } else {
+    turkeyAddress = fullAddress;
+  }
+  syriaAddress = syriaAddress.replace(/^(فرع سوريا\s*:\s*|Suriye\s*:\s*|Syria\s*:\s*)/i, "").trim();
+  turkeyAddress = turkeyAddress.replace(/^(فرع تركيا\s*:\s*|T[uü]rkiye\s*:\s*|Turkey\s*:\s*)/i, "").trim();
+
+  if (!syriaAddress) {
+    syriaAddress = language === "ar" ? "دمشق - الحلبوني - بناء صلاح وخولي" : language === "tr" ? "Şam - Halbouni - Salah ve Khawli Binası" : "Damascus - Halbouni - Salah & Khawli Bldg";
+  }
+  if (!turkeyAddress) {
+    turkeyAddress = language === "ar" ? "إسطنبول - التوب كبي - مجمع المطابع - TÜRKİYE / İSTANBUL / TOPKAPI / 2.MATBAACILAR SİT. C Blok" : "İstanbul / Topkapı / 2.Matbaacılar Sit. C Blok";
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,23 +94,57 @@ export default function ContactPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {/* Contact Info Cards */}
             <div className="space-y-4">
-              {/* Branch Info */}
+              {/* Turkey Branch */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.4 }}
-                className="bg-white rounded-xl p-6 shadow-sm"
+                className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
               >
-                <h3 className="font-bold text-[#0e4a6f] mb-4 text-lg">{t("footer.turkey")}</h3>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">🇹🇷</span>
+                  <h3 className="font-bold text-[#0e4a6f] text-lg">{t("footer.turkey")}</h3>
+                </div>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-[#00a8a8] shrink-0 mt-0.5" />
-                    <span className="text-gray-600 text-sm">{address}</span>
+                    <span className="text-gray-600 text-sm leading-relaxed">{turkeyAddress}</span>
                   </li>
                   <li className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-[#00a8a8] shrink-0" />
-                    <a href={`tel:${phone}`} dir="ltr" className="text-gray-600 hover:text-[#00a8a8] text-sm transition-colors">
-                      {phone}
+                    <a href={`tel:${phoneTurkey}`} dir="ltr" className="text-gray-600 hover:text-[#00a8a8] text-sm font-medium transition-colors">
+                      {phoneTurkey}
+                    </a>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-[#00a8a8] shrink-0" />
+                    <a href={`mailto:${email}`} className="text-gray-600 hover:text-[#00a8a8] text-sm transition-colors">
+                      {email}
+                    </a>
+                  </li>
+                </ul>
+              </motion.div>
+
+              {/* Syria Branch */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1, duration: 0.4 }}
+                className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">🇸🇾</span>
+                  <h3 className="font-bold text-[#0e4a6f] text-lg">{t("footer.syria")}</h3>
+                </div>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-[#00a8a8] shrink-0 mt-0.5" />
+                    <span className="text-gray-600 text-sm leading-relaxed">{syriaAddress}</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <Phone className="w-5 h-5 text-[#00a8a8] shrink-0" />
+                    <a href={`tel:${phoneSyria}`} dir="ltr" className="text-gray-600 hover:text-[#00a8a8] text-sm font-medium transition-colors">
+                      {phoneSyria}
                     </a>
                   </li>
                   <li className="flex items-center gap-3">
@@ -115,7 +170,7 @@ export default function ContactPage() {
                 <div>
                   <div className="font-bold text-sm">WhatsApp</div>
                   <div className="text-white/80 text-xs">
-                    {language === "ar" ? "تواصل معنا مباشرة" : language === "tr" ? "Doğrudan iletişime geçin" : "Contact us directly"}
+                    {language === "ar" ? "تواصل معنا مباشرة عبر واتساب" : language === "tr" ? "Doğrudan WhatsApp'tan yazın" : "Contact us directly on WhatsApp"}
                   </div>
                 </div>
               </motion.a>

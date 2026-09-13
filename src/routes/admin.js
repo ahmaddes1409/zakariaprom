@@ -1422,6 +1422,41 @@ router.get('/categories', adminAuth, async (req, res) => {
   }
 });
 
+router.get('/categories/hidden', adminAuth, (req, res) => {
+  const db = getDb();
+  const hidden = db.prepare('SELECT * FROM hidden_categories').all();
+  res.json(hidden);
+});
+
+router.post('/categories/hide', adminAuth, (req, res) => {
+  const db = getDb();
+  const { category_name } = req.body;
+  const { normalizeCategoryName } = require('../translations');
+  const normCat = normalizeCategoryName(category_name);
+
+  db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_name);
+  if (normCat !== category_name) {
+    db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(normCat);
+  }
+  db.prepare('UPDATE custom_categories SET active = 0 WHERE name_tr = ? OR name_tr = ?').run(category_name, normCat);
+
+  database.saveDatabase();
+  res.json({ success: true });
+});
+
+router.post('/categories/show', adminAuth, (req, res) => {
+  const db = getDb();
+  const { category_name } = req.body;
+  const { normalizeCategoryName } = require('../translations');
+  const normCat = normalizeCategoryName(category_name);
+
+  db.prepare('DELETE FROM hidden_categories WHERE category_name = ? OR category_name = ?').run(category_name, normCat);
+  db.prepare('UPDATE custom_categories SET active = 1 WHERE name_tr = ? OR name_tr = ?').run(category_name, normCat);
+
+  database.saveDatabase();
+  res.json({ success: true });
+});
+
 router.get('/categories/:name', adminAuth, async (req, res) => {
   try {
     const db = getDb();
@@ -1557,41 +1592,6 @@ router.put('/categories', adminAuth, async (req, res) => {
 
   database.saveDatabase();
   res.json({ success: true, image: finalImage });
-});
-
-router.get('/categories/hidden', adminAuth, (req, res) => {
-  const db = getDb();
-  const hidden = db.prepare('SELECT * FROM hidden_categories').all();
-  res.json(hidden);
-});
-
-router.post('/categories/hide', adminAuth, (req, res) => {
-  const db = getDb();
-  const { category_name } = req.body;
-  const { normalizeCategoryName } = require('../translations');
-  const normCat = normalizeCategoryName(category_name);
-
-  db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(category_name);
-  if (normCat !== category_name) {
-    db.prepare('INSERT OR IGNORE INTO hidden_categories (category_name) VALUES (?)').run(normCat);
-  }
-  db.prepare('UPDATE custom_categories SET active = 0 WHERE name_tr = ? OR name_tr = ?').run(category_name, normCat);
-
-  database.saveDatabase();
-  res.json({ success: true });
-});
-
-router.post('/categories/show', adminAuth, (req, res) => {
-  const db = getDb();
-  const { category_name } = req.body;
-  const { normalizeCategoryName } = require('../translations');
-  const normCat = normalizeCategoryName(category_name);
-
-  db.prepare('DELETE FROM hidden_categories WHERE category_name = ? OR category_name = ?').run(category_name, normCat);
-  db.prepare('UPDATE custom_categories SET active = 1 WHERE name_tr = ? OR name_tr = ?').run(category_name, normCat);
-
-  database.saveDatabase();
-  res.json({ success: true });
 });
 
 router.delete('/categories/:name', adminAuth, (req, res) => {

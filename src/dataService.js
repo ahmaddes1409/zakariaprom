@@ -17,9 +17,23 @@ function resolveStrictCategory(catStr, nameStr) {
   let catAr = translateCategory(origCatTr, 'ar');
   let catEn = translateCategory(origCatTr, 'en');
 
-  // 1. PENS SEPARATION
-  if (origCatTr === 'Kalemler' || origCatTr === 'Promosyon Kalemler' || origCatTr === 'Promosyon Kalem' || origCatTr.includes('Kalem')) {
-    if (nameTr.includes('metal') || nameTr.includes('roller') || nameTr.includes('lüks') || nameTr.includes('luks') || origCatTr.includes('Metal')) {
+  // 1. PEN SETS SEPARATION (MUST BE CHECKED FIRST BEFORE GENERAL PENS)
+  const isPenSet = origCatTr === 'Kalem Setleri' || 
+                   origCatTr === 'Set Kalemleri' ||
+                   origCatTr === 'Kalem Seti' ||
+                   origCatTr === 'Hediyelik Kalem Setleri' ||
+                   origCatTr.toLowerCase().includes('kalem set') ||
+                   origCatTr.toLowerCase().includes('set kalem') ||
+                   ((origCatTr.includes('Kalem') || origCatTr.includes('Hediyelik')) && (nameTr.includes('kalem seti') || nameTr.includes('set kalem') || nameTr.includes('kalem set') || nameTr.includes('ikili set') || nameTr.includes('2 li set') || nameTr.includes('3 lü set')));
+
+  if (isPenSet) {
+    catTr = 'Kalem Setleri';
+    catAr = 'أطقم أقلام';
+    catEn = 'Pen Sets';
+  }
+  // 2. PENS SEPARATION
+  else if (origCatTr === 'Kalemler' || origCatTr === 'Promosyon Kalemler' || origCatTr === 'Promosyon Kalem' || origCatTr.includes('Kalem')) {
+    if (origCatTr.includes('Metal') || nameTr.includes('metal') || nameTr.includes('roller') || nameTr.includes('lüks') || nameTr.includes('luks')) {
       catTr = 'Metal Kalemler';
       catAr = 'أقلام معدنية';
       catEn = 'Metal Pens';
@@ -312,6 +326,21 @@ function getProductsByCategory(products, catName, lang = 'ar') {
     }
 
     if (catTr.includes(target) || catAr.includes(target) || catEn.includes(target) || catTr.includes(normTarget)) {
+      return true;
+    }
+
+    // Flexible pen set matching: "set" and "kalem" in any order
+    if ((target.includes('set') && target.includes('kalem')) && (catTr.includes('set') && catTr.includes('kalem'))) {
+      return true;
+    }
+
+    // Flexible metal pen matching: "metal" and "kalem" in any order
+    if ((target.includes('metal') && target.includes('kalem')) && (catTr.includes('metal') && catTr.includes('kalem'))) {
+      return true;
+    }
+
+    // Flexible plastic pen matching: "plastik" and "kalem" in any order
+    if ((target.includes('plastik') && target.includes('kalem')) && (catTr.includes('plastik') && catTr.includes('kalem'))) {
       return true;
     }
 

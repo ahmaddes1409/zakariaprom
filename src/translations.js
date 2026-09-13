@@ -6,8 +6,15 @@ const categoryTranslations = {
   "ofsit baski": { ar: "مطبوعات ورقية", en: "Offset Printing" },
   "Promosyon Kalemler": { ar: "أقلام ترويجية", en: "Promotional Pens" },
   "Metal Kalemler": { ar: "أقلام معدنية", en: "Metal Pens" },
+  "Metal Kalem": { ar: "أقلام معدنية", en: "Metal Pens" },
+  "Metal Kalemleri": { ar: "أقلام معدنية", en: "Metal Pens" },
   "Metal Tükenmez - Roller Kalemler": { ar: "أقلام معدنية - رولر", en: "Metal Ballpoint - Roller Pens" },
   "Plastik Kalemler": { ar: "أقلام بلاستيكية", en: "Plastic Pens" },
+  "Plastik Kalem": { ar: "أقلام بلاستيكية", en: "Plastic Pens" },
+  "Plastik Kalemleri": { ar: "أقلام بلاستيكية", en: "Plastic Pens" },
+  "Kalem Setleri": { ar: "أطقم أقلام", en: "Pen Sets" },
+  "Set Kalemleri": { ar: "أطقم أقلام", en: "Pen Sets" },
+  "Kalem Seti": { ar: "أطقم أقلام", en: "Pen Sets" },
   "Defterler": { ar: "دفاتر ملاحظات", en: "Notebooks" },
   "Anahtarlıklar": { ar: "ميداليات", en: "Keychains" },
   "Plastik Duvar Saatleri": { ar: "ساعات حائط بلاستيكية", en: "Plastic Wall Clocks" },
@@ -413,17 +420,17 @@ function normalizeCategoryName(catTr) {
   str = str.replace(/&gt;/g, '>').trim();
 
   // Plastic Pens
-  if (str === 'Kalemler > Plastik Kalem' || str === 'Plastik Kalem' || str === 'Plastik Kalemleri' || str === 'Promosyon Kalemler > Plastik Kalem') {
+  if (str === 'Kalemler > Plastik Kalem' || str === 'Plastik Kalem' || str === 'Plastik Kalemler' || str === 'Plastik Kalemleri' || str === 'Promosyon Kalemler > Plastik Kalem') {
     return 'Plastik Kalemler';
   }
 
   // Metal Pens
-  if (str === 'Kalemler > Metal Kalem' || str === 'Metal Kalem' || str === 'Metal Kalemleri' || str === 'Metal Tükenmez - Roller Kalemler') {
+  if (str === 'Kalemler > Metal Kalem' || str === 'Metal Kalem' || str === 'Metal Kalemler' || str === 'Metal Kalemleri' || str === 'Metal Tükenmez - Roller Kalemler') {
     return 'Metal Kalemler';
   }
 
   // Pen Sets
-  if (str === 'Kalem Setleri > Kalem Seti' || str === 'KalemSetleri > Kalem Seti' || str === 'Kalem Seti' || str === 'Hediyelik Kalem Setleri') {
+  if (str === 'Kalem Setleri > Kalem Seti' || str === 'KalemSetleri > Kalem Seti' || str === 'Kalem Seti' || str === 'Hediyelik Kalem Setleri' || str === 'Kalem Setleri' || str === 'Set Kalemleri' || str === 'Set Kalem') {
     return 'Kalem Setleri';
   }
 

@@ -32,6 +32,8 @@ function fixImageUrl(url: string): string {
 // Default images for categories based on keywords
 function getCategoryDefaultImage(catTr: string): string {
   const lower = catTr.toLowerCase();
+  if (lower.includes("metal kalem")) return "https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/metal/0555-860/0555-860_pembe.jpg";
+  if (lower.includes("kalem set") || lower.includes("set kalem")) return "https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/set/0510-235/0510-235.jpg";
   if (lower.includes("kalem") || lower.includes("pen")) return CAT_PENS;
   if (lower.includes("termos") || lower.includes("mug") || lower.includes("bardak") || lower.includes("cam")) return CAT_MUGS;
   if (lower.includes("teknoloji") || lower.includes("powerbank") || lower.includes("usb") || lower.includes("kulaklık") || lower.includes("lcd") || lower.includes("kablo")) return CAT_TECH;

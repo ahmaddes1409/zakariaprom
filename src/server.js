@@ -414,9 +414,9 @@ function migrateCategories(db) {
   if (!db) return;
   try {
     db.exec(`
-      UPDATE local_products SET category_tr = 'Plastik Kalemler', top_category_tr = 'Plastik Kalemler', category_ar = 'أقلام بلاستيكية', category_en = 'Plastic Pens' WHERE category_tr IN ('Kalemler > Plastik Kalem', 'Plastik Kalem', 'Plastik Kalemleri', 'Promosyon Kalemler > Plastik Kalem', 'Metal Kalem');
-      UPDATE local_products SET category_tr = 'Metal Kalemler', top_category_tr = 'Metal Kalemler', category_ar = 'أقلام معدنية', category_en = 'Metal Pens' WHERE category_tr IN ('Kalemler > Metal Kalem', 'Metal Kalem', 'Metal Kalemleri', 'Metal Tükenmez - Roller Kalemler');
-      UPDATE local_products SET category_tr = 'Kalem Setleri', top_category_tr = 'Kalem Setleri', category_ar = 'أطقم أقلام', category_en = 'Pen Sets' WHERE category_tr IN ('KalemSetleri > Kalem Seti', 'Kalem Setleri > Kalem Seti', 'Kalem Seti', 'Hediyelik Kalem Setleri');
+      UPDATE local_products SET category_tr = 'Plastik Kalemler', top_category_tr = 'Plastik Kalemler', category_ar = 'أقلام بلاستيكية', category_en = 'Plastic Pens' WHERE category_tr IN ('Kalemler > Plastik Kalem', 'Plastik Kalem', 'Plastik Kalemler', 'Plastik Kalemleri', 'Promosyon Kalemler > Plastik Kalem');
+      UPDATE local_products SET category_tr = 'Metal Kalemler', top_category_tr = 'Metal Kalemler', category_ar = 'أقلام معدنية', category_en = 'Metal Pens' WHERE category_tr IN ('Kalemler > Metal Kalem', 'Metal Kalem', 'Metal Kalemler', 'Metal Kalemleri', 'Metal Tükenmez - Roller Kalemler');
+      UPDATE local_products SET category_tr = 'Kalem Setleri', top_category_tr = 'Kalem Setleri', category_ar = 'أطقم أقلام', category_en = 'Pen Sets' WHERE category_tr IN ('KalemSetleri > Kalem Seti', 'Kalem Setleri > Kalem Seti', 'Kalem Seti', 'Hediyelik Kalem Setleri', 'Kalem Setleri', 'Set Kalemleri', 'Set Kalem');
       UPDATE local_products SET category_tr = 'Plastik Duvar Saatleri', top_category_tr = 'Plastik Duvar Saatleri', category_ar = 'ساعات حائط بلاستيكية', category_en = 'Plastic Wall Clocks' WHERE category_tr IN ('Saatler > Plastik Duvar Saati', 'Plastik Duvar Saati', 'Duvar Saatleri', 'Saatler > Duvar Saati');
       UPDATE local_products SET category_tr = 'USB Bellekler', top_category_tr = 'USB Bellekler', category_ar = 'ذاكرة USB', category_en = 'USB Flash Drives' WHERE category_tr IN ('Teknoloji Ürünleri > USB Bellek', 'Usb Bellekler', 'USB Bellek');
       UPDATE local_products SET category_tr = 'Powerbank', top_category_tr = 'Powerbank', category_ar = 'بطاريات متنقلة', category_en = 'Power Banks' WHERE category_tr IN ('Teknoloji Ürünleri > Powerbank', 'Powerbanklar', 'Power Bank');
@@ -539,11 +539,34 @@ function migrateCategories(db) {
       // Ensure hidden_categories DOES NOT hide Ofset Baskı or misplaced URLs
       db.prepare("DELETE FROM hidden_categories WHERE category_name LIKE '%drive.google.com%' OR category_name LIKE '%http%' OR LOWER(category_name) LIKE '%ofsit%' OR LOWER(category_name) LIKE '%ofset%' OR category_name = 'Ofset Baskı' OR category_name = 'Ofset Baski'").run();
 
+      // Ensure hidden_categories DOES NOT hide Metal Kalemler, Kalem Setleri, or general pens
+      db.prepare("DELETE FROM hidden_categories WHERE category_name IN ('Metal Kalem', 'Metal Kalemler', 'Metal Kalemleri', 'Kalem Setleri', 'Set Kalemleri', 'Set Kalem', 'Kalem Seti', 'Kalemler')").run();
+
+      // Ensure custom_categories has active = 1 and clean translations for Metal Kalemler and Kalem Setleri
+      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أقلام معدنية', name_en = 'Metal Pens' WHERE name_tr IN ('Metal Kalemler', 'Metal Kalemleri', 'Metal Kalem')").run();
+      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أطقم أقلام', name_en = 'Pen Sets' WHERE name_tr IN ('Kalem Setleri', 'Set Kalemleri', 'Kalem Seti')").run();
+
       // Ensure translation_overrides has Ofset Baskı
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baskı', 'ar', 'مطبوعات ورقية')").run();
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baskı', 'en', 'Ofset Baskı')").run();
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baski', 'ar', 'مطبوعات ورقية')").run();
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baski', 'en', 'Ofset Baskı')").run();
+
+      // Ensure translation_overrides has Metal Kalemler and Kalem Setleri
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Kalem Setleri', 'ar', 'أطقم أقلام')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Kalem Setleri', 'en', 'Pen Sets')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Set Kalemleri', 'ar', 'أطقم أقلام')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Set Kalemleri', 'en', 'Pen Sets')").run();
+
+      // Ensure category_images has high-resolution preview images
+      db.prepare("INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES ('Metal Kalemler', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/metal/0555-860/0555-860_pembe.jpg', CURRENT_TIMESTAMP)").run();
+      db.prepare("INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES ('Kalem Setleri', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/set/0510-235/0510-235.jpg', CURRENT_TIMESTAMP)").run();
+
+      // Clean bad Arabic translation 'قلم طقمleri' in local_products
+      db.prepare("UPDATE local_products SET category_ar = 'أطقم أقلام' WHERE category_tr = 'Kalem Setleri' OR category_ar LIKE '%طقمleri%'").run();
+      db.prepare("UPDATE local_products SET category_ar = 'أقلام معدنية' WHERE category_tr = 'Metal Kalemler'").run();
 
       // Update site_slogan_ar in settings
       db.prepare("UPDATE settings SET value = 'أعلام عربية و أجنبية هدايا دعائية مطبوعات ورقية' WHERE key = 'site_slogan_ar'").run();

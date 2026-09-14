@@ -147,19 +147,19 @@ export default function Header() {
       <div className="bg-white shadow-md">
         <div className="container flex items-center justify-between py-3 gap-4">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Link href="/" className="flex items-center gap-2.5 shrink-0">
             {logoUrl ? (
-              <img src={fixImageUrl(logoUrl)} alt={siteName} className="w-14 h-14 rounded-lg object-contain" />
+              <img src={fixImageUrl(logoUrl)} alt={siteName} className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg object-contain" />
             ) : (
-              <div className="w-14 h-14 bg-[#0e4a6f] rounded-lg flex items-center justify-center text-white font-black text-xl tracking-tight">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[#0e4a6f] rounded-lg flex items-center justify-center text-white font-black text-xl tracking-tight">
                 {logoText}
               </div>
             )}
-            <div className="hidden sm:block">
-              <div className="font-bold text-[#0e4a6f] text-3xl leading-tight">
+            <div className="flex flex-col">
+              <div className="font-bold text-[#0e4a6f] text-xl sm:text-2xl md:text-3xl leading-tight">
                 {siteName}
               </div>
-              <div className="text-xs text-[#00a8a8] font-medium">
+              <div className="text-[11px] sm:text-xs text-[#00a8a8] font-medium leading-none mt-0.5">
                 {t("hero.subtitle")}
               </div>
             </div>

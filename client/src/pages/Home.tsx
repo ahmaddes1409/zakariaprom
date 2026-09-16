@@ -137,7 +137,7 @@ export default function Home() {
 
       {/* Banner Slider / Hero Section */}
       {hasApiBanners ? (
-        <section className="relative overflow-hidden h-[380px] sm:h-[480px] md:h-[620px] lg:h-[720px] xl:h-[780px]">
+        <section className="hero-banner-section relative overflow-hidden h-[380px] sm:h-[480px] md:h-[620px] lg:h-[720px] xl:h-[780px]">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentBanner}

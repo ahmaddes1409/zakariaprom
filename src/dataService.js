@@ -79,6 +79,12 @@ function resolveStrictCategory(catStr, nameStr) {
       catEn = 'Keychains';
     }
   }
+  // 4. KUTULU SETLER / GIFT SETS DISAMBIGUATION
+  else if (origCatTr.includes('Kutulu') || origCatTr.includes('Set') || origCatTr.includes('Hediyelik')) {
+    catTr = 'Kutulu Setler';
+    catAr = 'أطقم هدايا بعلب';
+    catEn = 'Boxed Gift Sets';
+  }
 
   return { catTr, catAr, catEn };
 }

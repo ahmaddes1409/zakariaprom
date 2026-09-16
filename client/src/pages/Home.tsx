@@ -137,7 +137,7 @@ export default function Home() {
 
       {/* Banner Slider / Hero Section */}
       {hasApiBanners ? (
-        <section className="relative overflow-hidden h-[250px] sm:h-[350px] md:h-[500px] lg:h-[600px]">
+        <section className="relative overflow-hidden h-[380px] sm:h-[480px] md:h-[620px] lg:h-[720px] xl:h-[780px]">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentBanner}
@@ -150,9 +150,11 @@ export default function Home() {
               <img
                 src={fixImageUrl(banners[currentBanner]?.image_url || '')}
                 alt=""
-                className="w-full h-full object-contain sm:object-cover"
+                className="w-full h-full object-cover"
               />
-
+              {(getBannerTitle(banners[currentBanner]) || getBannerSubtitle(banners[currentBanner])) && (
+                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent rtl:bg-gradient-to-l" />
+              )}
             </motion.div>
           </AnimatePresence>
 
@@ -165,12 +167,12 @@ export default function Home() {
               className="max-w-xl"
             >
               {getBannerTitle(banners[currentBanner]) && (
-                <h1 className="text-2xl sm:text-3xl md:text-5xl font-black text-white leading-tight mb-3">
+                <h1 className="text-2xl sm:text-4xl md:text-6xl font-black text-white leading-tight mb-3 sm:mb-4 drop-shadow-md">
                   {getBannerTitle(banners[currentBanner])}
                 </h1>
               )}
               {getBannerSubtitle(banners[currentBanner]) && (
-                <p className="text-base sm:text-lg md:text-xl text-white/80 mb-6">
+                <p className="text-base sm:text-xl md:text-2xl text-white/90 mb-6 sm:mb-8 font-medium drop-shadow">
                   {getBannerSubtitle(banners[currentBanner])}
                 </p>
               )}
@@ -180,18 +182,18 @@ export default function Home() {
                     href={banners[currentBanner].link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97]"
+                    className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97] shadow-lg text-base"
                   >
                     {t("hero.cta")}
-                    <ArrowIcon className="w-4 h-4" />
+                    <ArrowIcon className="w-5 h-5" />
                   </a>
                 ) : (
                   <Link
                     href={banners[currentBanner].link}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97]"
+                    className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97] shadow-lg text-base"
                   >
                     {t("hero.cta")}
-                    <ArrowIcon className="w-4 h-4" />
+                    <ArrowIcon className="w-5 h-5" />
                   </Link>
                 )
               )}
@@ -203,23 +205,23 @@ export default function Home() {
             <>
               <button
                 onClick={prevBanner}
-                className="absolute start-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                className="absolute start-4 sm:start-6 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-colors shadow-lg"
               >
-                {isRTL ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                {isRTL ? <ChevronRight className="w-6 h-6" /> : <ChevronLeft className="w-6 h-6" />}
               </button>
               <button
                 onClick={nextBanner}
-                className="absolute end-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                className="absolute end-4 sm:end-6 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-colors shadow-lg"
               >
-                {isRTL ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                {isRTL ? <ChevronLeft className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
               </button>
               {/* Dots */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2.5">
                 {banners.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setCurrentBanner(i)}
-                    className={`w-2.5 h-2.5 rounded-full transition-all ${i === currentBanner ? "bg-[#00a8a8] w-6" : "bg-white/50"}`}
+                    className={`h-3 rounded-full transition-all ${i === currentBanner ? "bg-[#00a8a8] w-8" : "bg-white/60 w-3 hover:bg-white"}`}
                   />
                 ))}
               </div>
@@ -227,12 +229,12 @@ export default function Home() {
           )}
         </section>
       ) : (
-        <section className="relative overflow-hidden">
+        <section className="relative overflow-hidden min-h-[420px] sm:min-h-[550px] md:min-h-[650px] flex items-center">
           <div className="absolute inset-0">
             <img src={HERO_IMG} alt="" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-l from-[#0a2e4a]/90 via-[#0a2e4a]/70 to-[#0a2e4a]/40" />
           </div>
-          <div className="container relative py-10 sm:py-16 md:py-24">
+          <div className="container relative py-16 sm:py-24 md:py-32">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}

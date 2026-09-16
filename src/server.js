@@ -485,9 +485,9 @@ function migrateCategories(db) {
       ];
 
       for (const m of driveCategoryMappings) {
-        db.prepare("UPDATE category_images SET image_url = ? WHERE image_url LIKE ? OR category_name = ?").run(m.local, `%${m.id}%`, m.cat);
-        db.prepare("UPDATE custom_categories SET image_url = ? WHERE image_url LIKE ? OR name_tr = ?").run(m.local, `%${m.id}%`, m.cat);
-        db.prepare("INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)").run(m.cat, m.local);
+        db.prepare("UPDATE category_images SET image_url = ? WHERE image_url LIKE ?").run(m.local, `%${m.id}%`);
+        db.prepare("UPDATE custom_categories SET image_url = ? WHERE image_url LIKE ?").run(m.local, `%${m.id}%`);
+        db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)").run(m.cat, m.local);
       }
 
       // Migrate any remaining Google Drive links to normalized format
@@ -560,9 +560,9 @@ function migrateCategories(db) {
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Set Kalemleri', 'ar', 'أطقم أقلام')").run();
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Set Kalemleri', 'en', 'Pen Sets')").run();
 
-      // Ensure category_images has high-resolution preview images
-      db.prepare("INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES ('Metal Kalemler', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/metal/0555-860/0555-860_pembe.jpg', CURRENT_TIMESTAMP)").run();
-      db.prepare("INSERT OR REPLACE INTO category_images (category_name, image_url, updated_at) VALUES ('Kalem Setleri', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/set/0510-235/0510-235.jpg', CURRENT_TIMESTAMP)").run();
+      // Ensure category_images has high-resolution preview images ONLY IF NOT EXISTS
+      db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Metal Kalemler', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/metal/0555-860/0555-860_pembe.jpg', CURRENT_TIMESTAMP)").run();
+      db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Kalem Setleri', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/set/0510-235/0510-235.jpg', CURRENT_TIMESTAMP)").run();
 
       // Clean bad Arabic translation 'قلم طقمleri' in local_products
       db.prepare("UPDATE local_products SET category_ar = 'أطقم أقلام' WHERE category_tr = 'Kalem Setleri' OR category_ar LIKE '%طقمleri%'").run();

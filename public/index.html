@@ -173,49 +173,83 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/assets/bundle-contact-v170.js?v=2.2.9"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DCiC3lag.css?v=2.2.9">
+    <script type="module" crossorigin src="/assets/bundle-contact-v170.js?v=2.3.2"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DCiC3lag.css?v=2.3.2">
   
     <!-- Global Hero Banner Sizing Rules -->
     <!-- Global Hero Banner Sizing Rules (Full Visibility & Large Dimensions) -->
     <style id="hero-banner-custom-style">
       .hero-banner-section {
         width: 100% !important;
-        min-height: 380px !important;
-        height: 60vh !important;
-        max-height: 850px !important;
-        background-color: #0a2e4a !important;
         position: relative !important;
         overflow: hidden !important;
+        background-color: transparent !important;
+        aspect-ratio: 1920 / 600 !important;
+        max-height: 600px !important;
       }
       @media (max-width: 640px) {
         .hero-banner-section {
-          min-height: 320px !important;
-          height: 48vh !important;
-        }
-      }
-      @media (min-width: 641px) and (max-width: 1024px) {
-        .hero-banner-section {
-          min-height: 520px !important;
-          height: 62vh !important;
-        }
-      }
-      @media (min-width: 1025px) {
-        .hero-banner-section {
-          min-height: 680px !important;
-          height: 75vh !important;
-          max-height: 850px !important;
+          aspect-ratio: 16 / 7 !important;
+          min-height: 150px !important;
+          max-height: 240px !important;
         }
       }
       .hero-banner-section img {
-        object-fit: contain !important;
+        object-fit: cover !important;
+        object-position: center center !important;
         width: 100% !important;
         height: 100% !important;
+        display: block !important;
         margin: 0 auto !important;
       }
-    </style>
-
-  </head>
+      .hero-banner-section button[class*="start-"],
+      .hero-banner-section button[class*="end-"] {
+        z-index: 30 !important;
+        background-color: rgba(0, 0, 0, 0.35) !important;
+        backdrop-filter: blur(4px) !important;
+        transition: all 0.2s ease !important;
+      }
+      .hero-banner-section button[class*="start-"]:hover,
+      .hero-banner-section button[class*="end-"]:hover {
+        background-color: rgba(0, 0, 0, 0.7) !important;
+        transform: translateY(-50%) scale(1.06) !important;
+      }
+      @media (max-width: 640px) {
+        .hero-banner-section button[class*="start-"],
+        .hero-banner-section button[class*="end-"] {
+          width: 28px !important;
+          height: 28px !important;
+          opacity: 0.85 !important;
+        }
+        .hero-banner-section button[class*="start-"] {
+          left: 4px !important;
+        }
+        [dir="rtl"] .hero-banner-section button[class*="start-"] {
+          right: 4px !important;
+          left: auto !important;
+        }
+        .hero-banner-section button[class*="end-"] {
+          right: 4px !important;
+        }
+        [dir="rtl"] .hero-banner-section button[class*="end-"] {
+          left: 4px !important;
+          right: auto !important;
+        }
+        .hero-banner-section button[class*="start-"] svg,
+        .hero-banner-section button[class*="end-"] svg {
+          width: 14px !important;
+          height: 14px !important;
+        }
+        .hero-banner-section div[class*="bottom-"] {
+          bottom: 4px !important;
+          gap: 3px !important;
+          z-index: 30 !important;
+        }
+        .hero-banner-section div[class*="bottom-"] button {
+          height: 4px !important;
+        }
+      }
+    </style></head>
 
   <body>
     <script id="manus-runtime">window.__MANUS_HOST_DEV__ = false;

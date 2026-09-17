@@ -137,7 +137,7 @@ export default function Home() {
 
       {/* Banner Slider / Hero Section */}
       {hasApiBanners ? (
-        <section className="hero-banner-section relative overflow-hidden h-[380px] sm:h-[480px] md:h-[620px] lg:h-[720px] xl:h-[780px]">
+        <section className="hero-banner-section relative overflow-hidden w-full aspect-[1920/600] max-h-[600px]">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentBanner}
@@ -145,87 +145,120 @@ export default function Home() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.5 }}
-              className="absolute inset-0"
+              className="absolute inset-0 w-full h-full"
             >
-              <img
-                src={fixImageUrl(banners[currentBanner]?.image_url || '')}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-              {(getBannerTitle(banners[currentBanner]) || getBannerSubtitle(banners[currentBanner])) && (
-                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent rtl:bg-gradient-to-l" />
-              )}
-            </motion.div>
-          </AnimatePresence>
-
-          <div className="container relative h-full flex items-center">
-            <motion.div
-              key={`text-${currentBanner}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
-              className="max-w-xl"
-            >
-              {getBannerTitle(banners[currentBanner]) && (
-                <h1 className="text-2xl sm:text-4xl md:text-6xl font-black text-white leading-tight mb-3 sm:mb-4 drop-shadow-md">
-                  {getBannerTitle(banners[currentBanner])}
-                </h1>
-              )}
-              {getBannerSubtitle(banners[currentBanner]) && (
-                <p className="text-base sm:text-xl md:text-2xl text-white/90 mb-6 sm:mb-8 font-medium drop-shadow">
-                  {getBannerSubtitle(banners[currentBanner])}
-                </p>
-              )}
-              {banners[currentBanner]?.link && (
+              {banners[currentBanner]?.link && !getBannerTitle(banners[currentBanner]) && !getBannerSubtitle(banners[currentBanner]) ? (
                 banners[currentBanner].link.startsWith('http') ? (
                   <a
                     href={banners[currentBanner].link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97] shadow-lg text-base"
+                    className="block w-full h-full cursor-pointer"
                   >
-                    {t("hero.cta")}
-                    <ArrowIcon className="w-5 h-5" />
+                    <img
+                      src={fixImageUrl(banners[currentBanner]?.image_url || '')}
+                      alt={getBannerTitle(banners[currentBanner]) || 'Hero Banner'}
+                      className="w-full h-full object-cover object-center"
+                    />
                   </a>
                 ) : (
                   <Link
                     href={banners[currentBanner].link}
-                    className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97] shadow-lg text-base"
+                    className="block w-full h-full cursor-pointer"
                   >
-                    {t("hero.cta")}
-                    <ArrowIcon className="w-5 h-5" />
+                    <img
+                      src={fixImageUrl(banners[currentBanner]?.image_url || '')}
+                      alt={getBannerTitle(banners[currentBanner]) || 'Hero Banner'}
+                      className="w-full h-full object-cover object-center"
+                    />
                   </Link>
                 )
+              ) : (
+                <img
+                  src={fixImageUrl(banners[currentBanner]?.image_url || '')}
+                  alt={getBannerTitle(banners[currentBanner]) || 'Hero Banner'}
+                  className="w-full h-full object-cover object-center"
+                />
+              )}
+              {(getBannerTitle(banners[currentBanner]) || getBannerSubtitle(banners[currentBanner])) && (
+                <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-transparent rtl:bg-gradient-to-l pointer-events-none" />
               )}
             </motion.div>
-          </div>
+          </AnimatePresence>
+
+          {(getBannerTitle(banners[currentBanner]) || getBannerSubtitle(banners[currentBanner])) && (
+            <div className="container relative h-full flex items-center z-10 pointer-events-none">
+              <motion.div
+                key={`text-${currentBanner}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="max-w-xl pointer-events-auto"
+              >
+                {getBannerTitle(banners[currentBanner]) && (
+                  <h1 className="text-xl sm:text-3xl md:text-5xl font-black text-white leading-tight mb-2 sm:mb-4 drop-shadow-md">
+                    {getBannerTitle(banners[currentBanner])}
+                  </h1>
+                )}
+                {getBannerSubtitle(banners[currentBanner]) && (
+                  <p className="text-sm sm:text-lg md:text-xl text-white/90 mb-4 sm:mb-6 font-medium drop-shadow">
+                    {getBannerSubtitle(banners[currentBanner])}
+                  </p>
+                )}
+                {banners[currentBanner]?.link && (
+                  banners[currentBanner].link.startsWith('http') ? (
+                    <a
+                      href={banners[currentBanner].link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3.5 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97] shadow-lg text-sm sm:text-base"
+                    >
+                      {t("hero.cta")}
+                      <ArrowIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </a>
+                  ) : (
+                    <Link
+                      href={banners[currentBanner].link}
+                      className="inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3.5 bg-[#00a8a8] text-white font-bold rounded-lg hover:bg-[#008f8f] transition-all active:scale-[0.97] shadow-lg text-sm sm:text-base"
+                    >
+                      {t("hero.cta")}
+                      <ArrowIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </Link>
+                  )
+                )}
+              </motion.div>
+            </div>
+          )}
 
           {/* Navigation arrows */}
           {banners.length > 1 && (
-            <>
+            <div className="banner-controls">
               <button
                 onClick={prevBanner}
-                className="absolute start-4 sm:start-6 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-colors shadow-lg"
+                aria-label="Previous Banner"
+                className="absolute start-2 sm:start-5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-11 sm:h-11 bg-black/35 hover:bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all shadow-md z-20"
               >
-                {isRTL ? <ChevronRight className="w-6 h-6" /> : <ChevronLeft className="w-6 h-6" />}
+                {isRTL ? <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" /> : <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6" />}
               </button>
               <button
                 onClick={nextBanner}
-                className="absolute end-4 sm:end-6 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-13 sm:h-13 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-colors shadow-lg"
+                aria-label="Next Banner"
+                className="absolute end-2 sm:end-5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-11 sm:h-11 bg-black/35 hover:bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all shadow-md z-20"
               >
-                {isRTL ? <ChevronLeft className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
+                {isRTL ? <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6" /> : <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" />}
               </button>
               {/* Dots */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2.5">
+              <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2.5 z-20">
                 {banners.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setCurrentBanner(i)}
-                    className={`h-3 rounded-full transition-all ${i === currentBanner ? "bg-[#00a8a8] w-8" : "bg-white/60 w-3 hover:bg-white"}`}
+                    aria-label={`Go to banner ${i + 1}`}
+                    className={`h-2 sm:h-3 rounded-full transition-all ${i === currentBanner ? "bg-[#00a8a8] w-6 sm:w-8" : "bg-white/60 w-2 sm:w-3 hover:bg-white"}`}
                   />
                 ))}
               </div>
-            </>
+            </div>
           )}
         </section>
       ) : (

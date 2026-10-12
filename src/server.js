@@ -542,9 +542,18 @@ function migrateCategories(db) {
       // Ensure hidden_categories DOES NOT hide Metal Kalemler, Kalem Setleri, or general pens
       db.prepare("DELETE FROM hidden_categories WHERE category_name IN ('Metal Kalem', 'Metal Kalemler', 'Metal Kalemleri', 'Kalem Setleri', 'Set Kalemleri', 'Set Kalem', 'Kalem Seti', 'Kalemler')").run();
 
+      // Ensure hidden_categories DOES NOT hide Kutulu Setler, Tarihli Ajandalar, or active Etkin categories
+      db.prepare("DELETE FROM hidden_categories WHERE category_name IN ('Kutulu Setler', 'Tarihli Ajandalar', 'Ajandalar', 'Masaüstü Organizerler', 'Masaustu Organizerler', 'Karton Çantalar', 'Karton Cantalar', 'Ahşap Plaketler', 'Ahsap Plaketler', 'Karışık Ürünler', 'Karisik Urunler')").run();
+
       // Ensure custom_categories has active = 1 and clean translations for Metal Kalemler and Kalem Setleri
       db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أقلام معدنية', name_en = 'Metal Pens' WHERE name_tr IN ('Metal Kalemler', 'Metal Kalemleri', 'Metal Kalem')").run();
       db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أطقم أقلام', name_en = 'Pen Sets' WHERE name_tr IN ('Kalem Setleri', 'Set Kalemleri', 'Kalem Seti')").run();
+      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أطقم هدايا بعلب', name_en = 'Boxed Gift Sets' WHERE name_tr IN ('Kutulu Setler', 'Kutulu Hediyelik Setler')").run();
+      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أجندات مؤرخة', name_en = 'Dated Agendas' WHERE name_tr IN ('Tarihli Ajandalar', '2026 Ajandalar')").run();
+      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أجندات', name_en = 'Agendas' WHERE name_tr = 'Ajandalar'").run();
+      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'منظمات مكتبية', name_en = 'Desk Organizers' WHERE name_tr IN ('Masaüstü Organizerler', 'Masaustu Organizerler')").run();
+      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'حقائب كرتونية ورقية', name_en = 'Paper Bags' WHERE name_tr IN ('Karton Çantalar', 'Karton Cantalar', 'Karton Çanta')").run();
+      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'دروع خشبية', name_en = 'Wooden Plaques' WHERE name_tr IN ('Ahşap Plaketler', 'Ahsap Plaketler')").run();
 
       // Ensure translation_overrides has Ofset Baskı
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baskı', 'ar', 'مطبوعات ورقية')").run();
@@ -559,10 +568,25 @@ function migrateCategories(db) {
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Kalem Setleri', 'en', 'Pen Sets')").run();
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Set Kalemleri', 'ar', 'أطقم أقلام')").run();
       db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Set Kalemleri', 'en', 'Pen Sets')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Kutulu Setler', 'ar', 'أطقم هدايا بعلب')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Kutulu Setler', 'en', 'Boxed Gift Sets')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Tarihli Ajandalar', 'ar', 'أجندات مؤرخة')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Tarihli Ajandalar', 'en', 'Dated Agendas')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ajandalar', 'ar', 'أجندات')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ajandalar', 'en', 'Agendas')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Masaüstü Organizerler', 'ar', 'منظمات مكتبية')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Masaüstü Organizerler', 'en', 'Desk Organizers')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Karton Çantalar', 'ar', 'حقائب كرتونية ورقية')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Karton Çantalar', 'en', 'Paper Bags')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ahşap Plaketler', 'ar', 'دروع خشبية')").run();
+      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ahşap Plaketler', 'en', 'Wooden Plaques')").run();
 
       // Ensure category_images has high-resolution preview images ONLY IF NOT EXISTS
       db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Metal Kalemler', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/metal/0555-860/0555-860_pembe.jpg', CURRENT_TIMESTAMP)").run();
       db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Kalem Setleri', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/set/0510-235/0510-235.jpg', CURRENT_TIMESTAMP)").run();
+      db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Kutulu Setler', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/set/0505-115/0505-115.jpg', CURRENT_TIMESTAMP)").run();
+      db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Tarihli Ajandalar', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/ajanda/0405-300/0405-300.jpg', CURRENT_TIMESTAMP)").run();
+      db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Masaüstü Organizerler', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/organizer/0420-110/0420-110.jpg', CURRENT_TIMESTAMP)").run();
 
       // Clean bad Arabic translation 'قلم طقمleri' in local_products
       db.prepare("UPDATE local_products SET category_ar = 'أطقم أقلام' WHERE category_tr = 'Kalem Setleri' OR category_ar LIKE '%طقمleri%'").run();
@@ -945,14 +969,22 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
       } else if (sort === 'name') {
         products.sort((a, b) => (a.name[lang] || a.name.tr).localeCompare(b.name[lang] || b.name.tr));
       } else {
-        // Place manual custom products first, followed by Etkin Promosyon products
-        products.sort((a, b) => {
-          const aIsLocal = !String(a.id).startsWith('etkin_');
-          const bIsLocal = !String(b.id).startsWith('etkin_');
-          if (aIsLocal && !bIsLocal) return -1;
-          if (!aIsLocal && bIsLocal) return 1;
-          return 0;
-        });
+        // Interleave manual custom products and Etkin Promosyon products evenly
+        // so that Etkin products are immediately visible on Page 1 and Home page
+        const localProds = products.filter(p => !String(p.id).startsWith('etkin_'));
+        const etkinProds = products.filter(p => String(p.id).startsWith('etkin_'));
+        const mixed = [];
+        let lIdx = 0;
+        let eIdx = 0;
+        while (lIdx < localProds.length || eIdx < etkinProds.length) {
+          if (lIdx < localProds.length) {
+            mixed.push(localProds[lIdx++]);
+          }
+          for (let k = 0; k < 3 && eIdx < etkinProds.length; k++) {
+            mixed.push(etkinProds[eIdx++]);
+          }
+        }
+        products = mixed;
       }
 
       // Pagination

@@ -190,7 +190,7 @@ export default function Header() {
             {[
               { key: "nav.home", href: "/" },
               { key: "nav.about", href: "/about" },
-              { key: "nav.products", href: "/#categories" },
+              { key: "nav.products", href: "/products" },
               { key: "nav.blog", href: "/blog" },
               { key: "nav.contact", href: "/contact" },
             ].map((item) => (
@@ -246,7 +246,7 @@ export default function Header() {
               {[
                 { key: "nav.home", href: "/" },
                 { key: "nav.about", href: "/about" },
-                { key: "nav.products", href: "/#categories" },
+                { key: "nav.products", href: "/products" },
                 { key: "nav.blog", href: "/blog" },
                 { key: "nav.contact", href: "/contact" },
               ].map((item) => (

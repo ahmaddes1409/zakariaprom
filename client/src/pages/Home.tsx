@@ -414,6 +414,13 @@ export default function Home() {
             <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-[#0e4a6f]">
               {t("general.featuredProducts")}
             </h2>
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#00a8a8] hover:text-[#008f8f] transition-colors"
+            >
+              <span>{language === "ar" ? "عرض جميع المنتجات" : language === "tr" ? "Tüm Ürünleri Gör" : "View All Products"}</span>
+              <ArrowIcon className="w-4 h-4" />
+            </Link>
           </div>
 
           {loading ? (
@@ -460,6 +467,16 @@ export default function Home() {
               ))}
             </div>
           )}
+
+          <div className="text-center mt-8">
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-[#0e4a6f] text-white font-bold rounded-lg hover:bg-[#00a8a8] transition-all shadow-md active:scale-[0.98] text-sm sm:text-base"
+            >
+              <span>{language === "ar" ? "تصفح جميع المنتجات والكتالوج الكامل" : language === "tr" ? "Tüm Ürünleri ve Kataloğu İncele" : "Browse All Products & Full Catalog"}</span>
+              <ArrowIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            </Link>
+          </div>
         </div>
       </section>
 

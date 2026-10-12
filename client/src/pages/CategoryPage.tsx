@@ -27,7 +27,8 @@ function fixImageUrl(url: string): string {
 
 export default function CategoryPage() {
   const { id } = useParams<{ id: string }>();
-  const categoryTr = decodeURIComponent(id || "");
+  const isAllProducts = !id || id === "all" || id === "products";
+  const categoryTr = isAllProducts ? "" : decodeURIComponent(id || "");
   const { language, t, settings } = useLanguage();
   const isRTL = language === "ar";
 
@@ -56,7 +57,7 @@ export default function CategoryPage() {
     setPage(1);
     setHasMore(true);
     setLoading(true);
-  }, [categoryTr]);
+  }, [categoryTr, isAllProducts]);
 
   // Fetch products
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function CategoryPage() {
       setLoadingMore(true);
     }
 
-    fetchProducts({ category: categoryTr, page, limit: 24, lang: language }).then((data) => {
+    fetchProducts({ category: isAllProducts ? undefined : categoryTr, page, limit: 24, lang: language }).then((data) => {
       if (page === 1) {
         setProducts(data.products || []);
       } else {
@@ -78,7 +79,7 @@ export default function CategoryPage() {
       setLoading(false);
       setLoadingMore(false);
     });
-  }, [categoryTr, page, language]);
+  }, [categoryTr, isAllProducts, page, language]);
 
   // Intersection Observer for infinite scroll
   const lastProductRef = useCallback(
@@ -112,7 +113,9 @@ export default function CategoryPage() {
     return p.name.en;
   };
 
-  const categoryName = currentCategory ? getCatName(currentCategory) : categoryTr;
+  const categoryName = isAllProducts
+    ? (language === "ar" ? "جميع المنتجات" : language === "tr" ? "Tüm Ürünler" : "All Products")
+    : (currentCategory ? getCatName(currentCategory) : categoryTr);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -173,13 +176,27 @@ export default function CategoryPage() {
                       </button>
                     </div>
                     <nav>
+                      <Link
+                        href="/products"
+                        onClick={() => setSidebarOpen(false)}
+                        className={`block px-4 py-3 text-sm border-b border-gray-50 transition-colors ${
+                          isAllProducts
+                            ? "bg-[#00a8a8]/10 text-[#00a8a8] font-bold border-s-4 border-s-[#00a8a8]"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-[#0e4a6f]"
+                        }`}
+                      >
+                        <span className="flex items-center justify-between">
+                          <span>📂 {language === "ar" ? "جميع المنتجات" : language === "tr" ? "Tüm Ürünler" : "All Products"}</span>
+                          <span className="text-xs opacity-60">{categories.reduce((acc, c) => acc + (c.count || 0), 0)}</span>
+                        </span>
+                      </Link>
                       {categories.map((cat) => (
                         <Link
                           key={cat.tr}
                           href={`/category/${encodeURIComponent(cat.tr)}`}
                           onClick={() => setSidebarOpen(false)}
                           className={`block px-4 py-3 text-sm border-b border-gray-50 transition-colors ${
-                            cat.tr === categoryTr
+                            !isAllProducts && cat.tr === categoryTr
                               ? "bg-[#00a8a8]/10 text-[#00a8a8] font-bold border-s-4 border-s-[#00a8a8]"
                               : "text-gray-600 hover:bg-gray-50 hover:text-[#0e4a6f]"
                           }`}
@@ -203,12 +220,25 @@ export default function CategoryPage() {
                   <h3 className="font-bold">{t("general.categories")}</h3>
                 </div>
                 <nav className="max-h-[60vh] overflow-y-auto">
+                  <Link
+                    href="/products"
+                    className={`block px-4 py-2.5 text-sm border-b border-gray-50 transition-colors ${
+                      isAllProducts
+                        ? "bg-[#00a8a8]/10 text-[#00a8a8] font-bold border-s-4 border-s-[#00a8a8]"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-[#0e4a6f]"
+                    }`}
+                  >
+                    <span className="flex items-center justify-between">
+                      <span>📂 {language === "ar" ? "جميع المنتجات" : language === "tr" ? "Tüm Ürünler" : "All Products"}</span>
+                      <span className="text-xs opacity-60">{categories.reduce((acc, c) => acc + (c.count || 0), 0)}</span>
+                    </span>
+                  </Link>
                   {categories.map((cat) => (
                     <Link
                       key={cat.tr}
                       href={`/category/${encodeURIComponent(cat.tr)}`}
                       className={`block px-4 py-2.5 text-sm border-b border-gray-50 transition-colors ${
-                        cat.tr === categoryTr
+                        !isAllProducts && cat.tr === categoryTr
                           ? "bg-[#00a8a8]/10 text-[#00a8a8] font-bold border-s-4 border-s-[#00a8a8]"
                           : "text-gray-600 hover:bg-gray-50 hover:text-[#0e4a6f]"
                       }`}

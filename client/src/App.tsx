@@ -23,6 +23,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/products" component={CategoryPage} />
+      <Route path="/category" component={CategoryPage} />
       <Route path="/category/:id" component={CategoryPage} />
       <Route path="/about" component={AboutPage} />
       <Route path="/contact" component={ContactPage} />

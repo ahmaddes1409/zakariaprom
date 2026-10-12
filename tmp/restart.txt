@@ -1,1 +1,1 @@
-v2.2.0 - Add category dropdown filter and quick category chips to admin products search
+v2.4.0 - 100% Etkin Category Matching, Translations and Unhide - 1760301015000

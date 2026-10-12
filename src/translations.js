@@ -1,10 +1,62 @@
 // Category translations: Turkish -> Arabic, English
 const categoryTranslations = {
-  "Ofset Baskı": { ar: "مطبوعات ورقية", en: "Offset Printing" },
-  "Ofset Baski": { ar: "مطبوعات ورقية", en: "Offset Printing" },
-  "Ofsit Baskı": { ar: "مطبوعات ورقية", en: "Offset Printing" },
-  "ofsit baski": { ar: "مطبوعات ورقية", en: "Offset Printing" },
-  "Promosyon Kalemler": { ar: "أقلام ترويجية", en: "Promotional Pens" },
+  // Official Etkin Promosyon Categories & Zakariaprom Custom Categories
+  "Hediyelik Setler": { ar: "أطقم هدايا فاخرة", en: "Luxury Gift Sets" },
+  "Hediyelik Kutular": { ar: "علب هدايا فاخرة", en: "Gift Boxes" },
+  "Lüks Hediyelik Setler": { ar: "أطقم هدايا فاخرة", en: "Luxury Gift Sets" },
+  "Kutulu Setler": { ar: "أطقم هدايا فاخرة", en: "Luxury Gift Sets" },
+  "Kutulu Hediyelik Setler": { ar: "أطقم هدايا فاخرة", en: "Luxury Gift Sets" },
+  "Hediyelik Set - Kişisel Ürünler": { ar: "أطقم هدايا فاخرة", en: "Luxury Gift Sets" },
+  "Kutu - Aksesuar": { ar: "علب وإكسسوارات هدايا", en: "Gift Boxes & Accessories" },
+  "Powerbank": { ar: "بطاريات متنقلة (باور بانك)", en: "Power Banks" },
+  "Powerbanklar": { ar: "بطاريات متنقلة (باور بانك)", en: "Power Banks" },
+  "Power Bank": { ar: "بطاريات متنقلة (باور بانك)", en: "Power Banks" },
+  "Powerbank Organizerler": { ar: "منظمات باور بانك", en: "Power Bank Organizers" },
+  "Speakerlar": { ar: "سماعات ومكبرات صوت", en: "Speakers" },
+  "USB Bellekler": { ar: "فلاشات USB", en: "USB Flash Drives" },
+  "Usb Bellekler": { ar: "فلاشات USB", en: "USB Flash Drives" },
+  "USB Bellek": { ar: "فلاشات USB", en: "USB Flash Drives" },
+  "Elektronik Ürünler": { ar: "منتجات إلكترونية", en: "Electronic Products" },
+  "Teknolojik Ürünler": { ar: "منتجات تكنولوجية", en: "Technology Products" },
+  "Teknoloji Ürünleri": { ar: "منتجات تكنولوجية", en: "Technology Products" },
+  "Teknoloji": { ar: "منتجات تكنولوجية", en: "Technology Products" },
+  "Organizerler": { ar: "منظمات ومفكرات", en: "Organizers" },
+  "Tarihli Ajandalar": { ar: "أجندات سنوية مؤرخة", en: "Dated Agendas" },
+  "2026 Ajandalar": { ar: "أجندات 2026", en: "2026 Agendas" },
+  "Ajandalar": { ar: "أجندات سنوية", en: "Agendas" },
+  "Ajanda ve Defterler": { ar: "أجندات ودفاتر", en: "Agendas & Notebooks" },
+  "Ajanda - Defter": { ar: "أجندات ودفاتر", en: "Agendas & Notebooks" },
+  "Ajanda Aksesuarları": { ar: "إكسسوارات أجندات", en: "Agenda Accessories" },
+  "Ajanda Aksesuarlari": { ar: "إكسسوارات أجندات", en: "Agenda Accessories" },
+  "Doğa Dostu Defterler": { ar: "دفاتر صديقة للبيئة", en: "Eco-Friendly Notebooks" },
+  "Doga Dostu Defterler": { ar: "دفاتر صديقة للبيئة", en: "Eco-Friendly Notebooks" },
+  "Doğa Dostu Notluklar": { ar: "مفكرات صديقة للبيئة", en: "Eco-Friendly Notepads" },
+  "Doga Dostu Notluklar": { ar: "مفكرات صديقة للبيئة", en: "Eco-Friendly Notepads" },
+  "Doğa Dostu Kalemler": { ar: "أقلام صديقة للبيئة", en: "Eco-Friendly Pens" },
+  "Doga Dostu Kalemler": { ar: "أقلام صديقة للبيئة", en: "Eco-Friendly Pens" },
+  "Doğa Dostu Ürünler": { ar: "منتجات صديقة للبيئة", en: "Eco-Friendly Products" },
+  "Doga Dostu Urunler": { ar: "منتجات صديقة للبيئة", en: "Eco-Friendly Products" },
+  "Geri Dönüşüm Ürünler": { ar: "منتجات صديقة للبيئة", en: "Eco-Friendly Products" },
+  "Geri Dönüşümlü Kalemler": { ar: "أقلام صديقة للبيئة", en: "Eco-Friendly Pens" },
+  "Defterler": { ar: "دفاتر ملاحظات", en: "Notebooks" },
+  "Not Defterleri": { ar: "دفاتر ملاحظات", en: "Notebooks" },
+  "Masa Sümenleri": { ar: "لبادات مكتب فاخرة", en: "Desk Blotters" },
+  "Masa Sumenleri": { ar: "لبادات مكتب فاخرة", en: "Desk Blotters" },
+  "Masa Setleri": { ar: "أطقم مكتبية", en: "Desk Sets" },
+  "Masa Seti": { ar: "أطقم مكتبية", en: "Desk Sets" },
+  "Kristal Masa Setleri": { ar: "أطقم مكتب كريستال", en: "Crystal Desk Sets" },
+  "Masaüstü Organizerler": { ar: "منظمات مكتبية", en: "Desk Organizers" },
+  "Masaustu Organizerler": { ar: "منظمات مكتبية", en: "Desk Organizers" },
+  "Masaüstü Ürünler": { ar: "مستلزمات مكتبية", en: "Desk Accessories" },
+  "Masa Setleri ve Sümenleri": { ar: "أطقم ولبادات مكتب", en: "Desk Sets & Blotters" },
+  "Suni Deri Masa Setleri": { ar: "أطقم مكتب جلد صناعي", en: "Faux Leather Desk Sets" },
+  "VIP Lüks Masa Setleri": { ar: "أطقم مكتب VIP فاخرة", en: "VIP Luxury Desk Sets" },
+  "Kalem Setleri": { ar: "أطقم أقلام", en: "Pen Sets" },
+  "Kalem Seti": { ar: "أطقم أقلام", en: "Pen Sets" },
+  "Set Kalemleri": { ar: "أطقم أقلام", en: "Pen Sets" },
+  "Hediyelik Kalem Setleri": { ar: "أطقم أقلام هدايا", en: "Gift Pen Sets" },
+  "Lüks Kalem Setleri (2 li)": { ar: "أطقم أقلام فاخرة (قطعتين)", en: "Luxury Pen Sets (2 pcs)" },
+  "Lüks Kalem Setleri (Tekli)": { ar: "أطقم أقلام فاخرة (قطعة واحدة)", en: "Luxury Pen Sets (Single)" },
   "Metal Kalemler": { ar: "أقلام معدنية", en: "Metal Pens" },
   "Metal Kalem": { ar: "أقلام معدنية", en: "Metal Pens" },
   "Metal Kalemleri": { ar: "أقلام معدنية", en: "Metal Pens" },
@@ -12,151 +64,98 @@ const categoryTranslations = {
   "Plastik Kalemler": { ar: "أقلام بلاستيكية", en: "Plastic Pens" },
   "Plastik Kalem": { ar: "أقلام بلاستيكية", en: "Plastic Pens" },
   "Plastik Kalemleri": { ar: "أقلام بلاستيكية", en: "Plastic Pens" },
-  "Kalem Setleri": { ar: "أطقم أقلام", en: "Pen Sets" },
-  "Set Kalemleri": { ar: "أطقم أقلام", en: "Pen Sets" },
-  "Kalem Seti": { ar: "أطقم أقلام", en: "Pen Sets" },
-  "Kutulu Setler": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
-  "Kutulu Hediyelik Setler": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
-  "Hediyelik Setler": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
-  "Hediye Setleri": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
-  "Kristal Plaketler": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
-  "Kristal Plaket": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
-  "Cam Plaket": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
-  "Cam Plaketler": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
-  "Cam ve Kristal Plaketler": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
-  "Kutulu Kristal Plaketler": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
-  "Kutulu Kristal Plaket": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
-  "Tarihli Ajandalar": { ar: "أجندات مؤرخة", en: "Dated Agendas" },
-  "Ajandalar": { ar: "أجندات", en: "Agendas" },
-  "Masaüstü Organizerler": { ar: "منظمات مكتبية", en: "Desk Organizers" },
-  "Masaustu Organizerler": { ar: "منظمات مكتبية", en: "Desk Organizers" },
-  "Karton Çantalar": { ar: "حقائب كرتونية ورقية", en: "Paper Bags" },
-  "Karton Cantalar": { ar: "حقائب كرتونية ورقية", en: "Paper Bags" },
-  "Ahşap Plaketler": { ar: "دروع خشبية", en: "Wooden Plaques" },
-  "Ahsap Plaketler": { ar: "دروع خشبية", en: "Wooden Plaques" },
-  "Defterler": { ar: "دفاتر ملاحظات", en: "Notebooks" },
-  "Anahtarlıklar": { ar: "ميداليات", en: "Keychains" },
-  "Plastik Duvar Saatleri": { ar: "ساعات حائط بلاستيكية", en: "Plastic Wall Clocks" },
-  "Dokunmatik Ekran Kalemleri": { ar: "أقلام شاشة لمس", en: "Touchscreen Pens" },
-  "Geri Dönüşümlü Kalemler": { ar: "أقلام معاد تدويرها", en: "Recycled Pens" },
+
   "Kurşun Kalemler": { ar: "أقلام رصاص", en: "Pencils" },
-  "Teknoloji Ürünleri": { ar: "منتجات تكنولوجيا", en: "Technology Products" },
-  "Akıllı Saatler": { ar: "ساعات ذكية", en: "Smart Watches" },
-  "Data ve Şarj Kabloları": { ar: "كابلات بيانات وشحن", en: "Data & Charging Cables" },
-  "Kulaklıklar ve Hoparlörler": { ar: "سماعات ومكبرات صوت", en: "Headphones & Speakers" },
-  "LCD Tablet": { ar: "تابلت LCD", en: "LCD Tablets" },
-  "Powerbanklar": { ar: "بطاريات متنقلة", en: "Power Banks" },
-  "Usb Bellekler": { ar: "فلاشات USB", en: "USB Flash Drives" },
-  "Anahtarlık - Rozet": { ar: "ميداليات - شارات", en: "Keychains - Badges" },
+  "Dokunmatik Ekran Kalemleri": { ar: "أقلام شاشة لمس", en: "Touchscreen Pens" },
+  "Promosyon Kalemler": { ar: "أقلام ترويجية", en: "Promotional Pens" },
+  "Anahtarlıklar": { ar: "ميداليات مفاتيح", en: "Keychains" },
+  "Anahtarliklar": { ar: "ميداليات مفاتيح", en: "Keychains" },
+  "Anahtarlık": { ar: "ميداليات مفاتيح", en: "Keychains" },
+  "Anahtarlık - Rozet": { ar: "ميداليات وشارات", en: "Keychains & Badges" },
   "Metal Anahtarlıklar": { ar: "ميداليات معدنية", en: "Metal Keychains" },
-  "Plastolu Anahtarlıklar": { ar: "ميداليات بلاستيكية", en: "Plastic Keychains" },
   "Rozetler": { ar: "شارات", en: "Badges" },
-  "Özel Tasarım Anahtarlık": { ar: "ميداليات تصميم خاص", en: "Custom Design Keychains" },
-  "Termos - Mug": { ar: "ترمس - أكواب", en: "Thermos - Mugs" },
-  "Cam Ürünler": { ar: "منتجات زجاجية", en: "Glass Products" },
-  "Mataralar": { ar: "قوارير مياه", en: "Water Bottles" },
-  "Seramik Kupa Bardaklar": { ar: "أكواب سيراميك", en: "Ceramic Mugs" },
-  "Termos Bardaklar (Mug)": { ar: "أكواب حرارية", en: "Thermal Mugs" },
-  "Termoslar": { ar: "ترمسات", en: "Thermoses" },
-  "Hediyelik Kalem Setleri": { ar: "أطقم أقلام هدايا", en: "Gift Pen Sets" },
-  "Kalem ve Set Kutuları": { ar: "علب أقلام وأطقم", en: "Pen & Set Boxes" },
-  "Lüks Kalem Setleri (2 li)": { ar: "أطقم أقلام فاخرة (قطعتين)", en: "Luxury Pen Sets (2 pcs)" },
-  "Lüks Kalem Setleri (Tekli)": { ar: "أطقم أقلام فاخرة (قطعة واحدة)", en: "Luxury Pen Sets (Single)" },
-  "Ajanda - Not Defteri - Notluk": { ar: "أجندات - دفاتر ملاحظات", en: "Agendas - Notebooks" },
-  "2026 Ajandalar": { ar: "أجندات 2026", en: "2026 Agendas" },
-  "Metal İsim Plakaları": { ar: "لوحات أسماء معدنية", en: "Metal Name Plates" },
-  "Not Defterleri": { ar: "دفاتر ملاحظات", en: "Notebooks" },
-  "Hediyelik Set - Kişisel Ürünler": { ar: "أطقم هدايا - منتجات شخصية", en: "Gift Sets - Personal Items" },
-  "Aynalar": { ar: "مرايا", en: "Mirrors" },
-  "Kartvizitlikler": { ar: "حاملات بطاقات أعمال", en: "Business Card Holders" },
-  "Kutulu Hediyelik Setler": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
-  "Matbaa Ürünleri": { ar: "منتجات مطبعة", en: "Printing Products" },
-  "Bardak Altlıkları": { ar: "قواعد أكواب", en: "Coasters" },
-  "Masa Takvimleri": { ar: "تقويمات مكتبية", en: "Desk Calendars" },
-  "Mousepad": { ar: "لوحات ماوس", en: "Mouse Pads" },
-  "Notluk - Defterler": { ar: "مفكرات - دفاتر", en: "Notepads - Notebooks" },
-  "Oto Ürünleri": { ar: "منتجات سيارات", en: "Auto Products" },
-  "Kırtasiye Ürünleri": { ar: "قرطاسية", en: "Stationery Products" },
-  "Çeşitli Ürünler": { ar: "منتجات متنوعة", en: "Various Products" },
-  "Promosyon Çakmaklar": { ar: "ولاعات ترويجية", en: "Promotional Lighters" },
-  "Clipper Çakmak": { ar: "ولاعات كليبر", en: "Clipper Lighters" },
-  "Cricket Çakmak": { ar: "ولاعات كريكت", en: "Cricket Lighters" },
-  "I-Lighter Çakmak": { ar: "ولاعات آي-لايتر", en: "I-Lighter" },
-  "Koko Çakmak": { ar: "ولاعات كوكو", en: "Koko Lighters" },
-  "MRY Çakmak": { ar: "ولاعات MRY", en: "MRY Lighters" },
-  "Telefon Standlı Çakmak": { ar: "ولاعات بحامل هاتف", en: "Phone Stand Lighters" },
-  "Promosyon Saatler": { ar: "ساعات ترويجية", en: "Promotional Clocks" },
-  "Duvar Saatleri": { ar: "ساعات حائط", en: "Wall Clocks" },
-  "Magnetli Saatler": { ar: "ساعات مغناطيسية", en: "Magnetic Clocks" },
-  "Çanta - Cüzdan - Sekreterlik": { ar: "حقائب - محافظ - ملفات", en: "Bags - Wallets - Portfolios" },
-  "Bez Çantalar": { ar: "حقائب قماشية", en: "Tote Bags" },
-  "Cüzdanlar": { ar: "محافظ", en: "Wallets" },
-  "Evrak Çantaları": { ar: "حقائب أوراق", en: "Briefcases" },
-  "Karton Çanta": { ar: "حقائب كرتون", en: "Paper Bags" },
-  "Sekreterlikler": { ar: "ملفات", en: "Portfolios" },
-  "Sırt Çantaları": { ar: "حقائب ظهر", en: "Backpacks" },
-  "Çakı - El Feneri": { ar: "سكاكين - كشافات", en: "Knives - Flashlights" },
-  "Cep Çakıları": { ar: "سكاكين جيب", en: "Pocket Knives" },
-  "El Fenerleri": { ar: "كشافات يدوية", en: "Flashlights" },
-  "Masa Setleri ve Gereçleri": { ar: "أطقم مكتبية", en: "Desk Sets & Accessories" },
-  "Kalemlikler": { ar: "حاملات أقلام", en: "Pen Holders" },
-  "Resim Çerçevesi": { ar: "إطارات صور", en: "Photo Frames" },
-  "Suni Deri Masa Setleri": { ar: "أطقم مكتب جلد صناعي", en: "Faux Leather Desk Sets" },
-  "VIP Lüks Masa Setleri": { ar: "أطقم مكتب VIP فاخرة", en: "VIP Luxury Desk Sets" },
-  "Tekstil Ürünleri": { ar: "منتجات نسيجية", en: "Textile Products" },
-  "Şemsiyeler": { ar: "مظلات", en: "Umbrellas" },
-  "Lüks Metal Çakmaklar": { ar: "ولاعات معدنية فاخرة", en: "Luxury Metal Lighters" },
-  "Clipper Metal Çakmak": { ar: "ولاعات كليبر معدنية", en: "Clipper Metal Lighters" },
-  "Diğer Teknoloji Ürünleri": { ar: "منتجات تكنولوجية متنوعة", en: "Various Technology Products" },
-  "Diger Teknoloji Ürünleri": { ar: "منتجات تكنولوجية متنوعة", en: "Various Technology Products" },
-  "Diger Teknoloji Urunleri": { ar: "منتجات تكنولوجية متنوعة", en: "Various Technology Products" },
-  "Diğer Kırtasiye Ürünleri": { ar: "قرطاسية وأدوات مكتبية متنوعة", en: "Various Stationery Products" },
-  "Diger Kirtasiye Ürünleri": { ar: "قرطاسية وأدوات مكتبية متنوعة", en: "Various Stationery Products" },
-  "Diger Kirtasiye Urunleri": { ar: "قرطاسية وأدوات مكتبية متنوعة", en: "Various Stationery Products" },
-  "Diğer Termos - Matara": { ar: "ترمسات وقوارير متنوعة", en: "Various Thermoses & Bottles" },
-  "Diger Termos - Matara": { ar: "ترمسات وقوارير متنوعة", en: "Various Thermoses & Bottles" },
-  "Bardak Altı": { ar: "قواعد أكواب", en: "Coasters" },
-  "Bardak Alti": { ar: "قواعد أكواب", en: "Coasters" },
-  "Bardak Altlığı": { ar: "قواعد أكواب", en: "Coasters" },
-  "Bardak Altlıkları": { ar: "قواعد أكواب", en: "Coasters" },
-  "Hesap Makinesi": { ar: "آلات حاسبة", en: "Calculators" },
-  "Çakmak": { ar: "ولاعات", en: "Lighters" },
-  "Cakmak": { ar: "ولاعات", en: "Lighters" },
-  "Çakmaklar": { ar: "ولاعات", en: "Lighters" },
-  "Cakmaklar": { ar: "ولاعات", en: "Lighters" },
-  "Metal Çakmak": { ar: "ولاعات معدنية", en: "Metal Lighters" },
-  "Metal Cakmak": { ar: "ولاعات معدنية", en: "Metal Lighters" },
-  "Masa Sümenleri": { ar: "لبادات مكتب فاخرة", en: "Desk Blotters" },
-  "Masa Sumenleri": { ar: "لبادات مكتب فاخرة", en: "Desk Blotters" },
-  "Açacaklı Magnetler": { ar: "فتاحات مغناطيسية", en: "Bottle Opener Magnets" },
-  "Acacakli Magnetler": { ar: "فتاحات مغناطيسية", en: "Bottle Opener Magnets" },
-  "Gemici Takvimler": { ar: "تقاويم ملاحية", en: "Maritime Calendars" },
-  "Albüm Plaketler": { ar: "دروع وألبومات تكريم", en: "Plaque Albums" },
-  "Album Plaketler": { ar: "دروع وألبومات تكريم", en: "Plaque Albums" },
-  "Kupalar ve Madalyalar": { ar: "كؤوس وميداليات", en: "Cups & Medals" },
-  "Karışık Ürünler": { ar: "منتجات متنوعة", en: "Miscellaneous Products" },
-  "Karisik Ürünler": { ar: "منتجات متنوعة", en: "Miscellaneous Products" },
-  "Karisik Urunler": { ar: "منتجات متنوعة", en: "Miscellaneous Products" },
-  "Tişörtler": { ar: "تيشيرتات وملابس", en: "T-Shirts" },
-  "Tisörtler": { ar: "تيشيرتات وملابس", en: "T-Shirts" },
-  "Tisortler": { ar: "تيشيرتات وملابس", en: "T-Shirts" },
-  "Cam Ürünleri": { ar: "منتجات زجاجية", en: "Glass Products" },
-  "Cam Urunleri": { ar: "منتجات زجاجية", en: "Glass Products" },
-  "Saatli Duvar Tabloları": { ar: "لوحات جدارية بساعة", en: "Clock Wall Arts" },
-  "Saatli Duvar Tablolari": { ar: "لوحات جدارية بساعة", en: "Clock Wall Arts" },
-  "Bombe Cam Duvar Saatleri": { ar: "ساعات حائط زجاج محدب", en: "Convex Glass Wall Clocks" },
   "Metal Duvar Saatleri": { ar: "ساعات حائط معدنية", en: "Metal Wall Clocks" },
   "Metalize Duvar Saatleri": { ar: "ساعات حائط ممعدنة", en: "Metallized Wall Clocks" },
-  "Bitki Yetiştirme Setleri": { ar: "مجموعات زراعة نباتات", en: "Plant Growing Sets" },
-  "Bitki Yetistirme Setleri": { ar: "مجموعات زراعة نباتات", en: "Plant Growing Sets" },
+  "Plastik Duvar Saatleri": { ar: "ساعات حائط بلاستيكية", en: "Plastic Wall Clocks" },
+  "Bombe Cam Duvar Saatleri": { ar: "ساعات حائط زجاج محدب", en: "Convex Glass Wall Clocks" },
+  "Duvar Saatleri": { ar: "ساعات حائط", en: "Wall Clocks" },
+  "Saatler": { ar: "ساعات", en: "Clocks" },
   "Şapka": { ar: "قبعات ترويجية", en: "Caps & Hats" },
   "Sapka": { ar: "قبعات ترويجية", en: "Caps & Hats" },
+  "Tişörtler": { ar: "تيشيرتات وملابس", en: "T-Shirts" },
+  "Tisortler": { ar: "تيشيرتات وملابس", en: "T-Shirts" },
+  "Tekstil Ürünleri": { ar: "منتجات نسيجية وملابس", en: "Textile Products" },
+  "Tekstil Urunleri": { ar: "منتجات نسيجية وملابس", en: "Textile Products" },
+  "Termoslar": { ar: "ترمسات وحافظات حرارية", en: "Thermoses" },
+  "Termoslar ve Bardaklar": { ar: "ترمسات وأكواب", en: "Thermoses & Mugs" },
+  "Termos - Mug": { ar: "ترمسات وأكواب", en: "Thermoses & Mugs" },
+  "Termos Bardaklar (Mug)": { ar: "أكواب حرارية", en: "Thermal Mugs" },
+  "Mataralar": { ar: "قوارير مياه", en: "Water Bottles" },
+  "Cam Ürünleri": { ar: "منتجات زجاجية", en: "Glass Products" },
+  "Cam Urunleri": { ar: "منتجات زجاجية", en: "Glass Products" },
+  "Cam Ürünler": { ar: "منتجات زجاجية", en: "Glass Products" },
+  "Seramik ve Porselen Ürünler": { ar: "أكواب سيراميك وبورسلين", en: "Ceramic & Porcelain Mugs" },
+  "Seramik ve Porselen Urunler": { ar: "أكواب سيراميك وبورسلين", en: "Ceramic & Porcelain Mugs" },
+  "Seramik Kupa Bardaklar": { ar: "أكواب سيراميك", en: "Ceramic Mugs" },
+  "Sekreterlik & Menü Kapları": { ar: "ملفات سكرتارية وحافظات قوائم", en: "Portfolios & Menu Covers" },
+  "Sekreterlik & Menu Kaplari": { ar: "ملفات سكرتارية وحافظات قوائم", en: "Portfolios & Menu Covers" },
+  "Sekreterlikler": { ar: "ملفات سكرتارية", en: "Portfolios" },
+  "Sekreter Bloknotlar": { ar: "ملفات سكرتارية ومفكرات", en: "Secretary Notepads" },
+  "Kartvizitlikler": { ar: "حاملات بطاقات أعمال", en: "Business Card Holders" },
+  "Çakmaklar": { ar: "ولاعات ترويجية", en: "Promotional Lighters" },
+  "Cakmaklar": { ar: "ولاعات ترويجية", en: "Promotional Lighters" },
+  "Çakmak": { ar: "ولاعات ترويجية", en: "Promotional Lighters" },
+  "Promosyon Çakmaklar": { ar: "ولاعات ترويجية", en: "Promotional Lighters" },
+  "Açacaklı Magnetler": { ar: "فتاحات مغناطيسية", en: "Bottle Opener Magnets" },
+  "Acacakli Magnetler": { ar: "فتاحات مغناطيسية", en: "Bottle Opener Magnets" },
+  "Araç ve Gereçler": { ar: "أدوات ومستلزمات متنوعة", en: "Tools & Accessories" },
+  "Arac ve Gerecler": { ar: "أدوات ومستلزمات متنوعة", en: "Tools & Accessories" },
+  "Çantalar ve Cüzdanlar": { ar: "حقائب ومحافظ", en: "Bags & Wallets" },
+  "Cantalar ve Cuzdanlar": { ar: "حقائب ومحافظ", en: "Bags & Wallets" },
+  "Çantalar": { ar: "حقائب ومحافظ", en: "Bags & Wallets" },
+  "Cantalar": { ar: "حقائب ومحافظ", en: "Bags & Wallets" },
+  "Çanta": { ar: "حقائب ومحافظ", en: "Bags & Wallets" },
+  "Cüzdanlar": { ar: "محافظ", en: "Wallets" },
+  "Duvar Tabloları": { ar: "لوحات وساعات جدارية", en: "Wall Clocks & Arts" },
+  "Duvar Tablolari": { ar: "لوحات وساعات جدارية", en: "Wall Clocks & Arts" },
+  "Saatli Duvar Tabloları": { ar: "لوحات وساعات جدارية", en: "Wall Clocks & Arts" },
+  "Saatli Duvar Tablolari": { ar: "لوحات وساعات جدارية", en: "Wall Clocks & Arts" },
+  "Karton Çantalar": { ar: "حقائب كرتونية ورقية", en: "Paper Gift Bags" },
+  "Karton Cantalar": { ar: "حقائب كرتونية ورقية", en: "Paper Gift Bags" },
+  "Karton Çanta": { ar: "حقائب كرتونية ورقية", en: "Paper Gift Bags" },
+  "Bloknotlar ve Sümenler": { ar: "مفكرات ولبادات مكتب", en: "Notepads & Blotters" },
+  "Bloknotlar ve Sumenler": { ar: "مفكرات ولبادات مكتب", en: "Notepads & Blotters" },
+  "Masa Takvimleri": { ar: "تقويمات مكتبية", en: "Desk Calendars" },
+  "Gemici Takvimler": { ar: "تقاويم ملاحية", en: "Maritime Calendars" },
+  "Kağıt Ürünleri": { ar: "منتجات ورقية", en: "Paper Products" },
+  "Kutulu Kristal Plaketler": { ar: "دروع كريستالية بعلب فاخرة", en: "Boxed Crystal Plaques" },
+  "Kristal Plaketler": { ar: "دروع كريستالية", en: "Crystal Plaques" },
+  "Kristal Plaket": { ar: "دروع كريستالية", en: "Crystal Plaques" },
+  "Albüm Plaketler": { ar: "دروع وألبومات تكريم", en: "Plaque Albums" },
+  "Album Plaketler": { ar: "دروع وألبومات تكريم", en: "Plaque Albums" },
+  "Ahşap Plaketler": { ar: "دروع خشبية", en: "Wooden Plaques" },
+  "Ahsap Plaketler": { ar: "دروع خشبية", en: "Wooden Plaques" },
+  "Madalyalar": { ar: "ميداليات وجوائز", en: "Medals & Awards" },
+  "Kupalar ve Madalyalar": { ar: "كؤوس وميداليات", en: "Cups & Medals" },
+  "Plaket ve Madalyalar": { ar: "دروع وميداليات", en: "Plaques & Medals" },
+  "Bitki Yetiştirme Setleri": { ar: "مجموعات زراعة نباتات", en: "Plant Growing Sets" },
+  "Bitki Yetistirme Setleri": { ar: "مجموعات زراعة نباتات", en: "Plant Growing Sets" },
+  "Karışık Ürünler": { ar: "منتجات متنوعة", en: "Miscellaneous Products" },
+  "Karisik Urunler": { ar: "منتجات متنوعة", en: "Miscellaneous Products" },
+  "Diğer Ürünler": { ar: "منتجات متنوعة", en: "Various Products" },
+  "Diger Urunler": { ar: "منتجات متنوعة", en: "Various Products" },
+  "Çeşitli Ürünler": { ar: "منتجات متنوعة", en: "Various Products" },
+  // Zakariaprom Custom Categories
+  "Ofset Baskı": { ar: "مطبوعات ورقية وأوفست", en: "Offset Printing" },
+  "Ofset Baski": { ar: "مطبوعات ورقية وأوفست", en: "Offset Printing" },
+  "Ofsit Baskı": { ar: "مطبوعات ورقية وأوفست", en: "Offset Printing" },
+  "ofsit baski": { ar: "مطبوعات ورقية وأوفست", en: "Offset Printing" },
   "Fuar Ürünleri": { ar: "مستلزمات المعارض والفعاليات", en: "Exhibition Products" },
   "fuar urunleri": { ar: "مستلزمات المعارض والفعاليات", en: "Exhibition Products" },
-  "Masa Setleri": { ar: "أطقم مكتبية", en: "Desk Sets" },
   "Bayrak": { ar: "أعلام ورايات", en: "Flags & Banners" },
   "Byrak": { ar: "أعلام ورايات", en: "Flags & Banners" },
-  "Bayraklar": { ar: "أعلام ورايات", en: "Flags & Banners" }
+  "Bayraklar": { ar: "أعلام ورايات", en: "Flags & Banners" },
+  "Genel": { ar: "منتجات عامة", en: "General Products" }
 };
 
 // Common product term translations
@@ -434,80 +433,69 @@ function getSortedTerms() {
 }
 
 function normalizeCategoryName(catTr) {
-  if (!catTr) return 'Promosyon Ürünleri';
-  let str = String(catTr).trim();
+  if (!catTr) return 'Genel';
+  let str = fixMojikake(String(catTr)).trim();
   str = str.replace(/&gt;/g, '>').trim();
 
-  // Plastic Pens
-  if (str === 'Kalemler > Plastik Kalem' || str === 'Plastik Kalem' || str === 'Plastik Kalemler' || str === 'Plastik Kalemleri' || str === 'Promosyon Kalemler > Plastik Kalem') {
-    return 'Plastik Kalemler';
-  }
+  // Strip pipe prefixes if present
+  if (str.includes('|')) str = str.split('|')[0].trim();
 
-  // Metal Pens
-  if (str === 'Kalemler > Metal Kalem' || str === 'Metal Kalem' || str === 'Metal Kalemler' || str === 'Metal Kalemleri' || str === 'Metal Tükenmez - Roller Kalemler') {
-    return 'Metal Kalemler';
-  }
+  // Custom Zakariaprom categories & typos
+  if (/^byrak$/i.test(str) || /^bayraklar$/i.test(str) || /^bayrak$/i.test(str)) return 'Bayrak';
+  if (/ofsit|ofset/i.test(str)) return 'Ofset Baskı';
+  if (/fuar/i.test(str)) return 'Fuar Ürünleri';
 
-  // Pen Sets
-  if (str === 'Kalem Setleri > Kalem Seti' || str === 'KalemSetleri > Kalem Seti' || str === 'Kalem Seti' || str === 'Hediyelik Kalem Setleri' || str === 'Kalem Setleri' || str === 'Set Kalemleri' || str === 'Set Kalem') {
-    return 'Kalem Setleri';
-  }
+  // Gift Sets & Boxes
+  if (str === 'Kutulu Setler' || str === 'Kutulu Hediyelik Setler' || str === 'Hediyelik Set - Kişisel Ürünler') return 'Hediyelik Setler';
+  if (str === 'Kutu - Aksesuar' || str === 'Kutu Aksesuar' || str === 'Hediyelik Kutu' || str === 'Hediyelik Kutuları') return 'Hediyelik Kutular';
 
-  // Wall Clocks
-  if (str === 'Saatler > Plastik Duvar Saati' || str === 'Plastik Duvar Saati' || str === 'Duvar Saatleri' || str === 'Saatler > Duvar Saati') {
-    return 'Plastik Duvar Saatleri';
-  }
+  // Bags
+  if (str === 'Çantalar' || str === 'Çanta' || str === 'Cüzdanlar' || str === 'Çanta | Çanta' || str === 'Evrak Çantaları' || str === 'Sırt Çantaları' || str === 'Bez Çantalar') return 'Çantalar ve Cüzdanlar';
+  if (str === 'Karton Çanta') return 'Karton Çantalar';
 
-  // USB Drives
-  if (str === 'Teknoloji Ürünleri > USB Bellek' || str === 'Usb Bellekler' || str === 'USB Bellek') {
-    return 'USB Bellekler';
-  }
+  // Medals & Plaques
+  if (str === 'Kupalar ve Madalyalar' || str === 'Madalya') return 'Madalyalar';
+  if (str === 'Kutulu Kristal Plaketler' || str === 'Kutulu Kristal Plaket') return 'Kutulu Kristal Plaketler';
+  if (str === 'Kristal Plaketler' || str === 'Kristal Plaket') return 'Kristal Plaketler';
+  if (str === 'Albüm Plaket' || str === 'Album Plaketler') return 'Albüm Plaketler';
+  if (str === 'Ahşap Plaket' || str === 'Ahsap Plaketler') return 'Ahşap Plaketler';
 
-  // Powerbanks
-  if (str === 'Teknoloji Ürünleri > Powerbank' || str === 'Powerbanklar' || str === 'Power Bank') {
-    return 'Powerbank';
-  }
+  // Wall Art
+  if (str === 'Saatli Duvar Tabloları' || str === 'Saatli Duvar Tablolari') return 'Duvar Tabloları';
 
-  // Thermoses
-  if (str === 'Termos - Matara > Diğer Termos - Matara' || str === 'Termos - Mug' || str === 'Termos Bardaklar (Mug)') {
-    return 'Termoslar';
-  }
+  // Portfolios
+  if (str === 'Sekreter Bloknotlar' || str === 'Sekreterlik' || str === 'Sekreterlikler') return 'Sekreterlik & Menü Kapları';
 
-  // Agendas / Notebooks
-  if (str === 'Ajanda - Defter' || str === 'Not Defterleri' || str === 'Notluk - Defterler') {
-    return 'Defterler';
-  }
-
-  // Plaques (Crystal & Glass, Wood, Album)
-  if (str === 'Kristal Plaket' || str === 'Kristal Plaketler' || str === 'Cam Plaket' || str === 'Cam Plaketler' || str === 'Cam ve Kristal Plaketler' || str === 'Kutulu Kristal Plaketler' || str === 'Kutulu Kristal Plaket' || str === 'Plaketler > Kristal Plaket') {
-    return 'Kristal Plaketler';
-  }
-  if (str === 'Ahşap Plaket' || str === 'Ahşap Plaketler' || str === 'Ahsap Plaket' || str === 'Ahsap Plaketler' || str === 'Plaketler > Ahşap Plaket') {
-    return 'Ahşap Plaketler';
-  }
-  if (str === 'Albüm Plaket' || str === 'Albüm Plaketler' || str === 'Album Plaket' || str === 'Album Plaketler') {
-    return 'Albüm Plaketler';
-  }
-
-  // Gift Sets
-  if (str === 'Hediyelik Setler' || str === 'Hediye Setleri' || str === 'Kutulu Hediyelik Setler' || str === 'Kutulu Setler > Hediyelik Set' || str === 'Hediyelik Set - Kişisel Ürünler') {
-    return 'Kutulu Setler';
-  }
+  // Desk Blotters
+  if (str === 'Masa Sümeni' || str === 'Masa Sumenleri' || str === 'Masa Sümenleri') return 'Masa Sümenleri';
 
   // Desk Sets
-  if (str === 'Masa Setleri' || str === 'Kristal Masa Setleri' || str === 'Masa Setleri ve Gereçleri' || str === 'Suni Deri Masa Setleri' || str === 'VIP Lüks Masa Setleri') {
-    return 'Masa Setleri';
-  }
+  if (str === 'VIP Lüks Masa Setleri' || str === 'Suni Deri Masa Setleri' || str === 'Masa Seti') return 'Masa Setleri';
 
-  // Plant Growing Sets
-  if (str === 'Bitki Yetiştirme Setleri' || str === 'Bitki Yetistirme Setleri') {
-    return 'Bitki Yetiştirme Setleri';
-  }
+  // Tech
+  if (str === 'Teknoloji Ürünleri > Powerbank' || str === 'Powerbanklar' || str === 'Power Bank') return 'Powerbank';
+  if (str === 'Teknoloji Ürünleri > USB Bellek' || str === 'Usb Bellekler' || str === 'USB Bellek') return 'USB Bellekler';
+  if (str === 'Teknoloji Ürünleri' || str === 'Teknoloji' || str === 'Diger Teknoloji Urunleri') return 'Elektronik Ürünler';
+  if (str === 'Telefon Standları' || str === 'Telefon Standı') return 'Araç ve Gereçler';
 
-  // Ofset Baskı (Custom Offset Printing category)
-  if (str === 'ofsit baski' || str === 'Ofsit Baskı' || str === 'Ofset Baski' || str === 'Ofset Baskı' || str.toLowerCase().includes('ofsit baski')) {
-    return 'Ofset Baskı';
-  }
+  // Plastic / Metal Pens
+  if (str === 'Kalemler > Plastik Kalem' || str === 'Plastik Kalem' || str === 'Plastik Kalemler' || str === 'Plastik Kalemleri' || str === 'Promosyon Kalemler > Plastik Kalem') return 'Plastik Kalemler';
+  if (str === 'Kalemler > Metal Kalem' || str === 'Metal Kalem' || str === 'Metal Kalemler' || str === 'Metal Kalemleri' || str === 'Metal Tükenmez - Roller Kalemler') return 'Metal Kalemler';
+  if (str === 'Kalem Setleri > Kalem Seti' || str === 'KalemSetleri > Kalem Seti' || str === 'Kalem Seti' || str === 'Hediyelik Kalem Setleri' || str === 'Set Kalemleri' || str === 'Set Kalem') return 'Kalem Setleri';
+
+  // Wall Clocks
+  if (str === 'Saatler > Plastik Duvar Saati' || str === 'Plastik Duvar Saati' || str === 'Duvar Saatleri' || str === 'Saatler > Duvar Saati') return 'Plastik Duvar Saatleri';
+  if (str === 'Metal Duvar Saati') return 'Metal Duvar Saatleri';
+  if (str === 'Metalize Duvar Saati') return 'Metalize Duvar Saatleri';
+
+  // Thermoses
+  if (str === 'Termos - Matara > Diğer Termos - Matara' || str === 'Termos - Mug' || str === 'Termos Bardaklar (Mug)' || str === 'Mataralar' || str === 'Termos - Matara') return 'Termoslar';
+
+  // Agendas / Notebooks
+  if (str === 'Ajanda - Defter' || str === 'Not Defterleri' || str === 'Notluk - Defterler') return 'Defterler';
+
+  // Eco-Friendly
+  if (str === 'Geri Dönüşümlü Kalemler') return 'Doğa Dostu Kalemler';
 
   return str;
 }

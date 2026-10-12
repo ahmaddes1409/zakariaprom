@@ -17,6 +17,15 @@ const categoryTranslations = {
   "Kalem Seti": { ar: "أطقم أقلام", en: "Pen Sets" },
   "Kutulu Setler": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
   "Kutulu Hediyelik Setler": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
+  "Hediyelik Setler": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
+  "Hediye Setleri": { ar: "أطقم هدايا بعلب", en: "Boxed Gift Sets" },
+  "Kristal Plaketler": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
+  "Kristal Plaket": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
+  "Cam Plaket": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
+  "Cam Plaketler": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
+  "Cam ve Kristal Plaketler": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
+  "Kutulu Kristal Plaketler": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
+  "Kutulu Kristal Plaket": { ar: "دروع زجاجية وكريستال", en: "Crystal & Glass Plaques" },
   "Tarihli Ajandalar": { ar: "أجندات مؤرخة", en: "Dated Agendas" },
   "Ajandalar": { ar: "أجندات", en: "Agendas" },
   "Masaüstü Organizerler": { ar: "منظمات مكتبية", en: "Desk Organizers" },
@@ -467,6 +476,32 @@ function normalizeCategoryName(catTr) {
   // Agendas / Notebooks
   if (str === 'Ajanda - Defter' || str === 'Not Defterleri' || str === 'Notluk - Defterler') {
     return 'Defterler';
+  }
+
+  // Plaques (Crystal & Glass, Wood, Album)
+  if (str === 'Kristal Plaket' || str === 'Kristal Plaketler' || str === 'Cam Plaket' || str === 'Cam Plaketler' || str === 'Cam ve Kristal Plaketler' || str === 'Kutulu Kristal Plaketler' || str === 'Kutulu Kristal Plaket' || str === 'Plaketler > Kristal Plaket') {
+    return 'Kristal Plaketler';
+  }
+  if (str === 'Ahşap Plaket' || str === 'Ahşap Plaketler' || str === 'Ahsap Plaket' || str === 'Ahsap Plaketler' || str === 'Plaketler > Ahşap Plaket') {
+    return 'Ahşap Plaketler';
+  }
+  if (str === 'Albüm Plaket' || str === 'Albüm Plaketler' || str === 'Album Plaket' || str === 'Album Plaketler') {
+    return 'Albüm Plaketler';
+  }
+
+  // Gift Sets
+  if (str === 'Hediyelik Setler' || str === 'Hediye Setleri' || str === 'Kutulu Hediyelik Setler' || str === 'Kutulu Setler > Hediyelik Set' || str === 'Hediyelik Set - Kişisel Ürünler') {
+    return 'Kutulu Setler';
+  }
+
+  // Desk Sets
+  if (str === 'Masa Setleri' || str === 'Kristal Masa Setleri' || str === 'Masa Setleri ve Gereçleri' || str === 'Suni Deri Masa Setleri' || str === 'VIP Lüks Masa Setleri') {
+    return 'Masa Setleri';
+  }
+
+  // Plant Growing Sets
+  if (str === 'Bitki Yetiştirme Setleri' || str === 'Bitki Yetistirme Setleri') {
+    return 'Bitki Yetiştirme Setleri';
   }
 
   // Ofset Baskı (Custom Offset Printing category)

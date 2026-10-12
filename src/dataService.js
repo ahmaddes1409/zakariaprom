@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parseStringPromise } = require('xml2js');
-const { translateProductName, translateCategory, fixMojikake } = require('./translations');
+const { translateProductName, translateCategory, fixMojikake, normalizeCategoryName } = require('./translations');
 
 const XML_URL = 'https://karmedya.com/xml/xml_export_product.xml';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hour cache
@@ -12,26 +12,114 @@ let lastFetchTime = 0;
 function resolveStrictCategory(catStr, nameStr) {
   const origCatTr = fixMojikake(catStr ? catStr.split('>').pop().trim() : 'Genel');
   const nameTr = fixMojikake(nameStr || '').toLowerCase();
+  const origCatLower = origCatTr.toLowerCase();
 
   let catTr = origCatTr;
   let catAr = translateCategory(origCatTr, 'ar');
   let catEn = translateCategory(origCatTr, 'en');
 
-  // 1. PEN SETS SEPARATION (MUST BE CHECKED FIRST BEFORE GENERAL PENS)
+  // 1. PLAQUES & TROPHIES (PLAKETLER & ÖDÜLLER) - MUST BE CHECKED FIRST TO AVOID BOX/SET CONFUSION
+  const isPlaque = origCatLower.includes('plaket') ||
+                   nameTr.includes('plaket') ||
+                   nameTr.includes('kristal ödül') ||
+                   nameTr.includes('kristal odul') ||
+                   nameTr.includes('kristal odül') ||
+                   origCatLower.includes('kupa ve madalya') ||
+                   origCatLower.includes('kupalar ve madalyalar') ||
+                   (origCatLower.includes('kristal') && !origCatLower.includes('masa'));
+
+  if (isPlaque) {
+    if (origCatLower.includes('ahşap') || origCatLower.includes('ahsap') || nameTr.includes('ahşap') || nameTr.includes('ahsap')) {
+      catTr = 'Ahşap Plaketler';
+      catAr = 'دروع خشبية';
+      catEn = 'Wooden Plaques';
+    } else if (origCatLower.includes('albüm') || origCatLower.includes('album') || nameTr.includes('albüm') || nameTr.includes('album') || origCatLower.includes('kadife')) {
+      catTr = 'Albüm Plaketler';
+      catAr = 'دروع تكريم وألبومات';
+      catEn = 'Plaque Albums';
+    } else if (origCatLower.includes('kupa') || origCatLower.includes('madalya') || nameTr.includes('madalya') || nameTr.includes('kupa')) {
+      catTr = 'Kupalar ve Madalyalar';
+      catAr = 'كؤوس وميداليات';
+      catEn = 'Cups & Medals';
+    } else {
+      // Crystal & Glass Plaques (Cam Plaket, Kristal Plaket, Kutulu Kristal Plaket)
+      catTr = 'Kristal Plaketler';
+      catAr = 'دروع زجاجية وكريستال';
+      catEn = 'Crystal & Glass Plaques';
+    }
+    return { catTr, catAr, catEn };
+  }
+
+  // 2. PEN SETS SEPARATION (MUST BE CHECKED BEFORE GENERAL PENS AND GENERAL SETS)
   const isPenSet = origCatTr === 'Kalem Setleri' || 
                    origCatTr === 'Set Kalemleri' ||
                    origCatTr === 'Kalem Seti' ||
                    origCatTr === 'Hediyelik Kalem Setleri' ||
-                   origCatTr.toLowerCase().includes('kalem set') ||
-                   origCatTr.toLowerCase().includes('set kalem') ||
+                   origCatTr === 'Lüks Kalem Setleri (2 li)' ||
+                   origCatTr === 'Lüks Kalem Setleri (Tekli)' ||
+                   origCatLower.includes('kalem set') ||
+                   origCatLower.includes('set kalem') ||
                    ((origCatTr.includes('Kalem') || origCatTr.includes('Hediyelik')) && (nameTr.includes('kalem seti') || nameTr.includes('set kalem') || nameTr.includes('kalem set') || nameTr.includes('ikili set') || nameTr.includes('2 li set') || nameTr.includes('3 lü set')));
 
   if (isPenSet) {
     catTr = 'Kalem Setleri';
     catAr = 'أطقم أقلام';
     catEn = 'Pen Sets';
+    return { catTr, catAr, catEn };
   }
-  // 2. PENS SEPARATION
+
+  // 3. PLANT GROWING SETS
+  if (origCatLower.includes('bitki') || nameTr.includes('bitki yetiştirme') || nameTr.includes('tohum')) {
+    catTr = 'Bitki Yetiştirme Setleri';
+    catAr = 'مجموعات زراعة نباتات';
+    catEn = 'Plant Growing Sets';
+    return { catTr, catAr, catEn };
+  }
+
+  // 4. DESK SETS
+  if (origCatLower.includes('masa set') || origCatLower.includes('sümen') || origCatLower.includes('sumen') || nameTr.includes('masa seti') || nameTr.includes('sümen takımı')) {
+    catTr = 'Masa Setleri';
+    catAr = 'أطقم مكتبية';
+    catEn = 'Desk Sets';
+    return { catTr, catAr, catEn };
+  }
+
+  // 5. BOXES & ACCESSORIES (EMPTY GIFT BOXES, PEN BOXES, ETC.)
+  if (origCatTr === 'Kutu - Aksesuar' || origCatTr === 'Kutu' || origCatTr === 'Hediyelik Kutular' || origCatTr === 'Kalem ve Set Kutuları' || (origCatTr.includes('Kutu') && !origCatTr.includes('Set') && !origCatTr.includes('Plaket'))) {
+    catTr = 'Kutu - Aksesuar';
+    catAr = 'علب وإكسسوارات';
+    catEn = 'Boxes & Accessories';
+    return { catTr, catAr, catEn };
+  }
+
+  // 6. ORGANIZERS
+  if (origCatLower.includes('organizer')) {
+    if (origCatLower.includes('powerbank')) {
+      catTr = 'Powerbank Organizerler';
+      catAr = 'منظمات باوربانك';
+      catEn = 'Powerbank Organizers';
+    } else if (origCatLower.includes('masaüstü') || origCatLower.includes('masaustu')) {
+      catTr = 'Masaüstü Organizerler';
+      catAr = 'منظمات مكتبية';
+      catEn = 'Desk Organizers';
+    } else {
+      catTr = 'Organizerler';
+      catAr = 'منظمات ومفكرات';
+      catEn = 'Organizers';
+    }
+    return { catTr, catAr, catEn };
+  }
+
+  // 7. TRUE PROMOTIONAL GIFT SETS (KUTULU SETLER / HEDİYELİK SETLER)
+  // Strictly only actual gift sets (VIP sets, notebook+pen, mug+notebook sets, etc.)
+  if (origCatTr === 'Kutulu Setler' || origCatTr === 'Hediyelik Setler' || origCatTr === 'Kutulu Hediyelik Setler' || origCatTr === 'Hediyelik Set - Kişisel Ürünler' || origCatTr === 'Hediye Setleri' || origCatLower.includes('hediye set') || origCatLower.includes('hediyelik set') || nameTr.includes('hediyelik set') || nameTr.includes('hediye seti') || nameTr.includes('vip set')) {
+    catTr = 'Kutulu Setler';
+    catAr = 'أطقم هدايا بعلب';
+    catEn = 'Boxed Gift Sets';
+    return { catTr, catAr, catEn };
+  }
+
+  // 8. PENS SEPARATION
   else if (origCatTr === 'Kalemler' || origCatTr === 'Promosyon Kalemler' || origCatTr === 'Promosyon Kalem' || origCatTr.includes('Kalem')) {
     if (origCatTr.includes('Metal') || nameTr.includes('metal') || nameTr.includes('roller') || nameTr.includes('lüks') || nameTr.includes('luks')) {
       catTr = 'Metal Kalemler';
@@ -50,8 +138,10 @@ function resolveStrictCategory(catStr, nameStr) {
       catAr = 'أقلام بلاستيكية';
       catEn = 'Plastic Pens';
     }
+    return { catTr, catAr, catEn };
   }
-  // 2. AGENDAS & NOTEBOOKS SEPARATION
+
+  // 9. AGENDAS & NOTEBOOKS SEPARATION
   else if (origCatTr.includes('Ajanda') || origCatTr.includes('Defter') || origCatTr.includes('Notluk') || origCatTr.includes('Bloknot')) {
     if (nameTr.includes('tarihli') || nameTr.includes('2026') || nameTr.includes('2025') || origCatTr.includes('Tarihli') || origCatTr.includes('2026')) {
       catTr = 'Tarihli Ajandalar';
@@ -66,8 +156,10 @@ function resolveStrictCategory(catStr, nameStr) {
       catAr = 'دفاتر ملاحظات';
       catEn = 'Notebooks';
     }
+    return { catTr, catAr, catEn };
   }
-  // 3. KEYCHAINS & BADGES SEPARATION
+
+  // 10. KEYCHAINS & BADGES SEPARATION
   else if (origCatTr.includes('Anahtarlık') || origCatTr.includes('Rozet')) {
     if (nameTr.includes('rozet') || origCatTr === 'Rozetler') {
       catTr = 'Rozetler';
@@ -78,12 +170,33 @@ function resolveStrictCategory(catStr, nameStr) {
       catAr = 'ميداليات';
       catEn = 'Keychains';
     }
+    return { catTr, catAr, catEn };
   }
-  // 4. KUTULU SETLER / GIFT SETS DISAMBIGUATION
-  else if (origCatTr.includes('Kutulu') || origCatTr.includes('Set') || origCatTr.includes('Hediyelik')) {
-    catTr = 'Kutulu Setler';
-    catAr = 'أطقم هدايا بعلب';
-    catEn = 'Boxed Gift Sets';
+
+  // 11. CLOCKS SEPARATION
+  else if (origCatTr.includes('Saat')) {
+    if (origCatTr.includes('Metal Duvar') || nameTr.includes('metal duvar')) {
+      catTr = 'Metal Duvar Saatleri';
+      catAr = 'ساعات حائط معدنية';
+      catEn = 'Metal Wall Clocks';
+    } else if (origCatTr.includes('Bombe') || nameTr.includes('bombe cam')) {
+      catTr = 'Bombe Cam Duvar Saatleri';
+      catAr = 'ساعات حائط زجاج محدب';
+      catEn = 'Convex Glass Wall Clocks';
+    } else if (origCatTr.includes('Metalize') || nameTr.includes('metalize')) {
+      catTr = 'Metalize Duvar Saatleri';
+      catAr = 'ساعات حائط ممعدنة';
+      catEn = 'Metallized Wall Clocks';
+    } else if (origCatTr.includes('Akıllı') || nameTr.includes('akıllı saat')) {
+      catTr = 'Akıllı Saatler';
+      catAr = 'ساعات ذكية';
+      catEn = 'Smart Watches';
+    } else {
+      catTr = 'Plastik Duvar Saatleri';
+      catAr = 'ساعات حائط بلاستيكية';
+      catEn = 'Plastic Wall Clocks';
+    }
+    return { catTr, catAr, catEn };
   }
 
   return { catTr, catAr, catEn };
@@ -315,6 +428,8 @@ function getProductsByCategory(products, catName, lang = 'ar') {
     .replace(/set$/gi, 'setler')
     .trim();
 
+  const normTargetCategoryTr = normalizeCategoryName(rawTarget).toLowerCase();
+
   return products.filter(p => {
     if (!p) return false;
 
@@ -325,36 +440,74 @@ function getProductsByCategory(products, catName, lang = 'ar') {
     const catTr = resolved.catTr.toLowerCase();
     const catAr = resolved.catAr.toLowerCase();
     const catEn = resolved.catEn.toLowerCase();
+    const normResolvedCatTr = normalizeCategoryName(resolved.catTr).toLowerCase();
 
-    // Direct match check against resolved strict category
-    if (catTr === target || catAr === target || catEn === target || catTr === normTarget) {
+    // 1. Direct match check against resolved strict category
+    if (catTr === target || catAr === target || catEn === target || catTr === normTarget || normResolvedCatTr === normTargetCategoryTr) {
       return true;
     }
 
-    if (catTr.includes(target) || catAr.includes(target) || catEn.includes(target) || catTr.includes(normTarget)) {
-      return true;
+    // 2. Plaques matching (Crystal, Wood, Album) - prevent any cross-bleeding
+    const isTargetPlaque = target.includes('plaket') || target.includes('درع') || target.includes('دروع') || target.includes('plaque');
+    const isCatPlaque = catTr.includes('plaket');
+    if (isTargetPlaque || isCatPlaque) {
+      if (!isTargetPlaque || !isCatPlaque) return false;
+      if (target.includes('ahşap') || target.includes('ahsap') || target.includes('خشب')) {
+        return catTr.includes('ahşap') || catTr.includes('ahsap');
+      }
+      if (target.includes('albüm') || target.includes('album') || target.includes('ألبوم')) {
+        return catTr.includes('albüm') || catTr.includes('album');
+      }
+      return !catTr.includes('ahşap') && !catTr.includes('ahsap') && !catTr.includes('albüm') && !catTr.includes('album');
     }
 
-    // Flexible pen set matching: "set" and "kalem" in any order
-    if ((target.includes('set') && target.includes('kalem')) && (catTr.includes('set') && catTr.includes('kalem'))) {
-      return true;
+    // 3. Gift Sets (Kutulu Setler / Hediyelik Setler) - strictly exclude pen sets, desk sets, plant sets
+    const isTargetGiftSet = target === 'kutulu setler' || target === 'hediyelik setler' || target === 'hediye setleri' || target.includes('أطقم هدايا بعلب') || target.includes('boxed gift sets');
+    if (isTargetGiftSet) {
+      return catTr === 'kutulu setler' || normResolvedCatTr === 'kutulu setler';
     }
 
-    // Flexible metal pen matching: "metal" and "kalem" in any order
-    if ((target.includes('metal') && target.includes('kalem')) && (catTr.includes('metal') && catTr.includes('kalem'))) {
-      return true;
+    // 4. Desk Sets (Masa Setleri) matching
+    const isTargetDeskSet = target.includes('masa set') || target.includes('أطقم مكتب');
+    if (isTargetDeskSet) {
+      return catTr.includes('masa set') || catTr === 'masa setleri';
     }
 
-    // Flexible plastic pen matching: "plastik" and "kalem" in any order
-    if ((target.includes('plastik') && target.includes('kalem')) && (catTr.includes('plastik') && catTr.includes('kalem'))) {
-      return true;
+    // 5. Plant Sets (Bitki Yetiştirme Setleri) matching
+    const isTargetPlantSet = target.includes('bitki') || target.includes('زراعة نباتات');
+    if (isTargetPlantSet) {
+      return catTr.includes('bitki');
+    }
+
+    // 6. Pen Sets (Kalem Setleri) matching
+    const isTargetPenSet = (target.includes('set') && target.includes('kalem')) || target.includes('أطقم أقلام') || target.includes('pen sets');
+    if (isTargetPenSet) {
+      return catTr === 'kalem setleri' || (catTr.includes('kalem') && catTr.includes('set'));
+    }
+
+    // 7. Metal Pens matching
+    const isTargetMetalPen = (target.includes('metal') && target.includes('kalem')) || target.includes('أقلام معدنية');
+    if (isTargetMetalPen) {
+      return catTr === 'metal kalemler' || (catTr.includes('metal') && catTr.includes('kalem'));
+    }
+
+    // 8. Plastic Pens matching
+    const isTargetPlasticPen = (target.includes('plastik') && target.includes('kalem')) || target.includes('أقلام بلاستيكية');
+    if (isTargetPlasticPen) {
+      return catTr === 'plastik kalemler' || (catTr.includes('plastik') && catTr.includes('kalem'));
+    }
+
+    // 9. Agendas & Dated Agendas matching
+    const isTargetDatedAgenda = target.includes('tarihli') || target.includes('مؤرخة') || target.includes('dated agenda');
+    if (isTargetDatedAgenda) {
+      return catTr === 'tarihli ajandalar';
     }
 
     const translatedAr = fixMojikake(translateCategory(resolved.catTr, 'ar') || '').toLowerCase();
     const translatedTr = fixMojikake(translateCategory(rawTarget, 'tr') || '').toLowerCase();
     const normTranslatedTr = translatedTr.replace(/setleri$/gi, 'setler').replace(/leri$/gi, 'ler').replace(/ları$/gi, 'lar').trim();
 
-    if (translatedAr === target || catTr === translatedTr || catTr.includes(translatedTr) || catTr.includes(normTranslatedTr)) {
+    if (translatedAr === target || catTr === translatedTr || normResolvedCatTr === translatedTr) {
       return true;
     }
 

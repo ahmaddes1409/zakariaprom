@@ -100,13 +100,15 @@ async function syncEtkinProducts(db, saveDatabase) {
         const price = parseFloat(priceStr) || 0;
         const quantity = parseInt(item.toplam_stok || item.stok || 0) || 0;
 
-        let catTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
-        if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
-        catTr = normalizeCategoryName(catTr);
+        let rawCatTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
+        if (rawCatTr.includes('|')) rawCatTr = rawCatTr.split('|')[0].trim();
 
-        const topCatTr = normalizeCategoryName(catTr.split('>')[0].trim());
-        const catAr = translateCategory(catTr, 'ar');
-        const catEn = translateCategory(catTr, 'en');
+        const { resolveStrictCategory } = require('../dataService');
+        const resolved = resolveStrictCategory(rawCatTr, nameTr);
+        const catTr = resolved.catTr;
+        const catAr = resolved.catAr;
+        const catEn = resolved.catEn;
+        const topCatTr = catTr.split('>')[0].trim();
 
         if (topCatTr && !categorySet.has(topCatTr)) {
           categorySet.set(topCatTr, {

@@ -533,40 +533,27 @@ function migrateCategories(db) {
         db.prepare("UPDATE custom_categories SET name_tr = ?, name_ar = ?, name_en = ?, image_url = ?, active = 1 WHERE id = ?").run(realTr, realAr, realEn, realImg, m.id);
       }
 
-      // Also ensure any existing Ofset Baskı row has active = 1
-      db.prepare("UPDATE custom_categories SET active = 1 WHERE name_tr = 'Ofset Baskı' OR name_tr = 'Ofset Baski' OR name_ar = 'مطبوعات ورقية'").run();
+      // Ensure hidden_categories DOES NOT hide legitimate Etkin or Zakariaprom categories
+      const { categoryTranslations } = require('./translations');
+      const validCatNames = Object.keys(categoryTranslations);
+      const placeholders = validCatNames.map(() => '?').join(',');
+      db.prepare(`DELETE FROM hidden_categories WHERE category_name IN (${placeholders}) OR category_name LIKE '%drive.google.com%' OR category_name LIKE '%http%'`).run(...validCatNames);
 
-      // Ensure hidden_categories DOES NOT hide Ofset Baskı or misplaced URLs
-      db.prepare("DELETE FROM hidden_categories WHERE category_name LIKE '%drive.google.com%' OR category_name LIKE '%http%' OR LOWER(category_name) LIKE '%ofsit%' OR LOWER(category_name) LIKE '%ofset%' OR category_name = 'Ofset Baskı' OR category_name = 'Ofset Baski'").run();
+      // Ensure hidden_products is cleared of legitimate Etkin products
+      db.prepare("DELETE FROM hidden_products WHERE product_id LIKE 'etkin_%'").run();
 
-      // Ensure hidden_categories DOES NOT hide Metal Kalemler, Kalem Setleri, or general pens
-      db.prepare("DELETE FROM hidden_categories WHERE category_name IN ('Metal Kalem', 'Metal Kalemler', 'Metal Kalemleri', 'Kalem Setleri', 'Set Kalemleri', 'Set Kalem', 'Kalem Seti', 'Kalemler')").run();
+      // Ensure manual local product categories and typos are cleanly normalized
+      db.prepare("UPDATE local_products SET category_tr = 'Bayrak', category_ar = 'أعلام ورايات', category_en = 'Flags & Banners' WHERE category_tr = 'Byrak' OR category_tr = 'Bayraklar'").run();
+      db.prepare("UPDATE local_products SET category_tr = 'Ofset Baskı', category_ar = 'مطبوعات ورقية وأوفست', category_en = 'Offset Printing' WHERE LOWER(category_tr) LIKE '%ofsit%'").run();
+      db.prepare("UPDATE local_products SET category_tr = 'Fuar Ürünleri', category_ar = 'مستلزمات المعارض والفعاليات', category_en = 'Exhibition Products' WHERE LOWER(category_tr) = 'fuar urunleri'").run();
+      db.prepare("UPDATE local_products SET category_tr = 'Hediyelik Setler', category_ar = 'أطقم هدايا فاخرة', category_en = 'Luxury Gift Sets' WHERE category_tr = 'Genel' OR category_tr = 'Kutulu Setler'").run();
 
-      // Ensure custom_categories has active = 1 and clean translations for Metal Kalemler and Kalem Setleri
-      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أقلام معدنية', name_en = 'Metal Pens' WHERE name_tr IN ('Metal Kalemler', 'Metal Kalemleri', 'Metal Kalem')").run();
-      db.prepare("UPDATE custom_categories SET active = 1, name_ar = 'أطقم أقلام', name_en = 'Pen Sets' WHERE name_tr IN ('Kalem Setleri', 'Set Kalemleri', 'Kalem Seti')").run();
-
-      // Ensure translation_overrides has Ofset Baskı
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baskı', 'ar', 'مطبوعات ورقية')").run();
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baskı', 'en', 'Ofset Baskı')").run();
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baski', 'ar', 'مطبوعات ورقية')").run();
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Ofset Baski', 'en', 'Ofset Baskı')").run();
-
-      // Ensure translation_overrides has Metal Kalemler and Kalem Setleri
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'ar', 'أقلام معدنية')").run();
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Metal Kalemler', 'en', 'Metal Pens')").run();
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Kalem Setleri', 'ar', 'أطقم أقلام')").run();
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Kalem Setleri', 'en', 'Pen Sets')").run();
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Set Kalemleri', 'ar', 'أطقم أقلام')").run();
-      db.prepare("INSERT OR REPLACE INTO translation_overrides (type, original_key, lang, translation) VALUES ('category', 'Set Kalemleri', 'en', 'Pen Sets')").run();
+      // Ensure custom_categories has active = 1 and clean translations
+      db.prepare("UPDATE custom_categories SET active = 1 WHERE active = 0").run();
 
       // Ensure category_images has high-resolution preview images ONLY IF NOT EXISTS
       db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Metal Kalemler', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/metal/0555-860/0555-860_pembe.jpg', CURRENT_TIMESTAMP)").run();
       db.prepare("INSERT OR IGNORE INTO category_images (category_name, image_url, updated_at) VALUES ('Kalem Setleri', 'https://www.birikimpromosyon.com/resimler/urunler/jpg/kalem/set/0510-235/0510-235.jpg', CURRENT_TIMESTAMP)").run();
-
-      // Clean bad Arabic translation 'قلم طقمleri' in local_products
-      db.prepare("UPDATE local_products SET category_ar = 'أطقم أقلام' WHERE category_tr = 'Kalem Setleri' OR category_ar LIKE '%طقمleri%'").run();
-      db.prepare("UPDATE local_products SET category_ar = 'أقلام معدنية' WHERE category_tr = 'Metal Kalemler'").run();
 
       // Update site_slogan_ar in settings
       db.prepare("UPDATE settings SET value = 'أعلام عربية و أجنبية هدايا دعائية مطبوعات ورقية' WHERE key = 'site_slogan_ar'").run();
@@ -878,11 +865,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
             const price = parseFloat(priceStr) || 0;
             const quantity = parseInt(item.toplam_stok || item.stok || 0) || 0;
 
-            let catTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
-            if (catTr.includes('|')) catTr = catTr.split('|')[0].trim();
+            let rawCatTr = item.kategori_adi || item.kategori || 'Etkin Promosyon';
+            if (rawCatTr.includes('|')) rawCatTr = rawCatTr.split('|')[0].trim();
 
-            const catAr = translateCategory(catTr, 'ar');
-            const catEn = translateCategory(catTr, 'en');
+            const { resolveStrictCategory } = require('./dataService');
+            const resolved = resolveStrictCategory(rawCatTr, nameTr);
+            const catTr = resolved.catTr;
+            const catAr = resolved.catAr;
+            const catEn = resolved.catEn;
 
             const images = [];
             for (let i = 1; i <= 9; i++) {
@@ -896,7 +886,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
               id: pId,
               name: { tr: nameTr, ar: nameAr, en: nameEn },
               model,
+              category: { tr: catTr, ar: catAr, en: catEn },
               categories: { tr: [catTr], ar: [catAr], en: [catEn] },
+              category_tr: catTr,
+              category_ar: catAr,
+              category_en: catEn,
               topCategory: {
                 tr: catTr.split('>')[0].trim(),
                 ar: catAr.split('>')[0].trim(),

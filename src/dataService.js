@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { parseStringPromise } = require('xml2js');
-const { translateProductName, translateCategory, fixMojikake } = require('./translations');
+let parseStringPromise = null;
+try { parseStringPromise = require('xml2js').parseStringPromise; } catch (e) {}
+const { translateProductName, translateCategory, normalizeCategoryName, fixMojikake } = require('./translations');
 
 const XML_URL = 'https://karmedya.com/xml/xml_export_product.xml';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hour cache
@@ -10,81 +11,67 @@ let cachedProducts = null;
 let lastFetchTime = 0;
 
 function resolveStrictCategory(catStr, nameStr) {
-  const origCatTr = fixMojikake(catStr ? catStr.split('>').pop().trim() : 'Genel');
+  let normalized = normalizeCategoryName(catStr ? catStr.split('>').pop().trim() : 'Genel');
   const nameTr = fixMojikake(nameStr || '').toLowerCase();
 
-  let catTr = origCatTr;
-  let catAr = translateCategory(origCatTr, 'ar');
-  let catEn = translateCategory(origCatTr, 'en');
+  let catTr = normalized;
 
-  // 1. PEN SETS SEPARATION (MUST BE CHECKED FIRST BEFORE GENERAL PENS)
-  const isPenSet = origCatTr === 'Kalem Setleri' || 
-                   origCatTr === 'Set Kalemleri' ||
-                   origCatTr === 'Kalem Seti' ||
-                   origCatTr === 'Hediyelik Kalem Setleri' ||
-                   origCatTr.toLowerCase().includes('kalem set') ||
-                   origCatTr.toLowerCase().includes('set kalem') ||
-                   ((origCatTr.includes('Kalem') || origCatTr.includes('Hediyelik')) && (nameTr.includes('kalem seti') || nameTr.includes('set kalem') || nameTr.includes('kalem set') || nameTr.includes('ikili set') || nameTr.includes('2 li set') || nameTr.includes('3 lü set')));
-
-  if (isPenSet) {
-    catTr = 'Kalem Setleri';
-    catAr = 'أطقم أقلام';
-    catEn = 'Pen Sets';
-  }
-  // 2. PENS SEPARATION
-  else if (origCatTr === 'Kalemler' || origCatTr === 'Promosyon Kalemler' || origCatTr === 'Promosyon Kalem' || origCatTr.includes('Kalem')) {
-    if (origCatTr.includes('Metal') || nameTr.includes('metal') || nameTr.includes('roller') || nameTr.includes('lüks') || nameTr.includes('luks')) {
+  // Disambiguate generic "Kalemler" or "Promosyon Kalemler"
+  if (catTr === 'Kalemler' || catTr === 'Promosyon Kalemler') {
+    if (nameTr.includes('set') || nameTr.includes('kutulu') || nameTr.includes('2 li') || nameTr.includes('3 lü')) {
+      catTr = 'Kalem Setleri';
+    } else if (nameTr.includes('metal') || nameTr.includes('roller') || nameTr.includes('lüks')) {
       catTr = 'Metal Kalemler';
-      catAr = 'أقلام معدنية';
-      catEn = 'Metal Pens';
-    } else if (nameTr.includes('kurşun') || nameTr.includes('kursun') || nameTr.includes('bambu') || nameTr.includes('ahşap') || origCatTr.includes('Kurşun')) {
+    } else if (nameTr.includes('bambu') || nameTr.includes('tohumlu') || nameTr.includes('doğa')) {
+      catTr = 'Doğa Dostu Kalemler';
+    } else if (nameTr.includes('kurşun')) {
       catTr = 'Kurşun Kalemler';
-      catAr = 'أقلام رصاص';
-      catEn = 'Pencils';
-    } else if (nameTr.includes('dokunmatik') || origCatTr.includes('Dokunmatik')) {
-      catTr = 'Dokunmatik Ekran Kalemleri';
-      catAr = 'أقلام شاشة لمس';
-      catEn = 'Touchscreen Pens';
     } else {
       catTr = 'Plastik Kalemler';
-      catAr = 'أقلام بلاستيكية';
-      catEn = 'Plastic Pens';
     }
   }
-  // 2. AGENDAS & NOTEBOOKS SEPARATION
-  else if (origCatTr.includes('Ajanda') || origCatTr.includes('Defter') || origCatTr.includes('Notluk') || origCatTr.includes('Bloknot')) {
-    if (nameTr.includes('tarihli') || nameTr.includes('2026') || nameTr.includes('2025') || origCatTr.includes('Tarihli') || origCatTr.includes('2026')) {
+
+  // Disambiguate generic "Ajandalar"
+  if (catTr === 'Ajandalar') {
+    if (nameTr.includes('tarihli') || /202[5-7]/.test(nameTr)) {
       catTr = 'Tarihli Ajandalar';
-      catAr = 'أجندات مؤرخة';
-      catEn = 'Dated Agendas';
-    } else if (nameTr.includes('ajanda') || origCatTr.startsWith('Ajanda')) {
-      catTr = 'Ajandalar';
-      catAr = 'أجندات';
-      catEn = 'Agendas';
+    } else if (nameTr.includes('aksesuar') || nameTr.includes('lastik') || nameTr.includes('plaka')) {
+      catTr = 'Ajanda Aksesuarları';
     } else {
-      catTr = 'Defterler';
-      catAr = 'دفاتر ملاحظات';
-      catEn = 'Notebooks';
+      catTr = 'Organizerler';
     }
   }
-  // 3. KEYCHAINS & BADGES SEPARATION
-  else if (origCatTr.includes('Anahtarlık') || origCatTr.includes('Rozet')) {
-    if (nameTr.includes('rozet') || origCatTr === 'Rozetler') {
-      catTr = 'Rozetler';
-      catAr = 'شارات';
-      catEn = 'Badges';
+
+  // Disambiguate generic eco products
+  if (catTr === 'Geri Dönüşüm Ürünler' || catTr === 'Doğa Dostu Ürünler') {
+    if (nameTr.includes('kalem')) {
+      catTr = 'Doğa Dostu Kalemler';
+    } else if (nameTr.includes('defter')) {
+      catTr = 'Doğa Dostu Defterler';
     } else {
-      catTr = 'Anahtarlıklar';
-      catAr = 'ميداليات';
-      catEn = 'Keychains';
+      catTr = 'Doğa Dostu Notluklar';
     }
   }
-  // 4. KUTULU SETLER / GIFT SETS DISAMBIGUATION
-  else if (origCatTr.includes('Kutulu') || origCatTr.includes('Set') || origCatTr.includes('Hediyelik')) {
-    catTr = 'Kutulu Setler';
-    catAr = 'أطقم هدايا بعلب';
-    catEn = 'Boxed Gift Sets';
+
+  // Disambiguate Plaques
+  if (catTr === 'Kristal Plaketler' && nameTr.includes('kutulu')) {
+    catTr = 'Kutulu Kristal Plaketler';
   }
+
+  // Disambiguate Gift Sets & Boxes
+  if (catTr === 'Hediyelik Setler' && (nameTr.includes('kutu') || nameTr.includes('kılıf')) && !nameTr.includes('set')) {
+    catTr = 'Hediyelik Kutular';
+  }
+
+  // Fallback for "Genel" or empty
+  if (!catTr || catTr === 'Genel') {
+    if (nameTr.includes('set')) catTr = 'Hediyelik Setler';
+    else if (nameTr.includes('kalem')) catTr = 'Plastik Kalemler';
+    else catTr = 'Defterler';
+  }
+
+  const catAr = translateCategory(catTr, 'ar');
+  const catEn = translateCategory(catTr, 'en');
 
   return { catTr, catAr, catEn };
 }
